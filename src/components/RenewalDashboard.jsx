@@ -26,6 +26,12 @@ const isChurnRisk = a =>
   a.churn_risk === 'Yes' ||
   ['Churn Activated', 'Churn Predicted', 'Churn Executed'].includes(a.churn_status);
 
+const RAG_DOT = {
+  Red:   'bg-red-500',
+  Amber: 'bg-amber-400',
+  Green: 'bg-green-500',
+};
+
 const SUMMARY_ROWS = [
   { label: 'Total Due for Renewal',  fn: a => a.length,                                                       cls: 'font-semibold text-gray-800' },
   { label: 'Renewed',                fn: a => a.filter(x => x.renewal_status === 'Renewed').length,           cls: 'text-green-700' },
@@ -144,14 +150,19 @@ export default function RenewalDashboard() {
                       return (
                         <td key={m.key} className={`px-2 py-2 align-top border-b border-gray-100 ${churn ? 'bg-yellow-100' : 'bg-white'}`}>
                           <Link to={`/accounts/${acc.id}`} className="block hover:opacity-75 transition-opacity">
-                            <div className={`font-semibold leading-snug ${churn ? 'text-yellow-900' : 'text-gray-800'}`}>
-                              {acc.account_name}
+                            <div className="flex items-start gap-1.5">
+                              {acc.rag_status && (
+                                <span className={`mt-0.5 shrink-0 w-2.5 h-2.5 rounded-full ${RAG_DOT[acc.rag_status] ?? 'bg-gray-300'}`} title={acc.rag_status} />
+                              )}
+                              <span className={`font-semibold leading-snug ${churn ? 'text-yellow-900' : 'text-gray-800'}`}>
+                                {acc.account_name}
+                              </span>
                             </div>
                             {acc.churn_status && (
-                              <div className="text-red-600 mt-0.5">{acc.churn_status}</div>
+                              <div className="text-red-600 mt-0.5 pl-4">{acc.churn_status}</div>
                             )}
                             {!acc.churn_status && acc.renewal_status && (
-                              <div className={`mt-0.5 ${acc.renewal_status === 'Renewed' ? 'text-green-600' : 'text-amber-600'}`}>
+                              <div className={`mt-0.5 pl-4 ${acc.renewal_status === 'Renewed' ? 'text-green-600' : 'text-amber-600'}`}>
                                 {acc.renewal_status}
                               </div>
                             )}
@@ -165,10 +176,15 @@ export default function RenewalDashboard() {
             </tbody>
           </table>
         </div>
-        <p className="mt-2 text-xs text-gray-400 flex items-center gap-1.5">
-          <span className="inline-block w-3 h-3 rounded bg-yellow-100 border border-yellow-300" />
-          Yellow = churn_risk flagged or churn status activated/predicted/executed
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-400">
+          <span className="flex items-center gap-1.5">
+            <span className="inline-block w-3 h-3 rounded bg-yellow-100 border border-yellow-300" />
+            Yellow = churn risk flagged
+          </span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-green-500 inline-block" /> Green</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-amber-400 inline-block" /> Amber</span>
+          <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-full bg-red-500 inline-block" /> Red</span>
+        </div>
       </div>
     </div>
   );
