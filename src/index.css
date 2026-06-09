@@ -10,6 +10,14 @@ body { font-family: 'Inter', sans-serif; background: #f8fafc; }
 
 .card { @apply bg-white rounded-xl shadow-sm border border-gray-100 p-5; }
 
+@keyframes flash-card {
+  0%   { box-shadow: inset 0 0 0 0px transparent; }
+  15%  { box-shadow: inset 0 0 0 3px #6366f1; background-color: #e0e7ff !important; }
+  85%  { box-shadow: inset 0 0 0 3px #6366f1; background-color: #e0e7ff !important; }
+  100% { box-shadow: inset 0 0 0 0px transparent; }
+}
+.flash-card { animation: flash-card 2s ease-in-out forwards; }
+
 input, select, textarea {
   @apply w-full rounded-lg border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent transition;
 }

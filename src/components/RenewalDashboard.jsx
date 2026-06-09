@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
@@ -33,21 +33,42 @@ const RAG_DOT = {
 };
 
 const SUMMARY_ROWS = [
-  { label: 'Total Due for Renewal',  fn: a => a.length,                                                       cls: 'font-semibold text-gray-800' },
-  { label: 'Renewed',                fn: a => a.filter(x => x.renewal_status === 'Renewed').length,           cls: 'text-green-700' },
-  { label: 'Pending Renewal',        fn: a => a.filter(x => x.renewal_status === 'Renewal Pending').length,   cls: 'text-amber-700' },
+  { label: 'Total Due for Renewal',  fn: a => a.length,                                                       filterFn: null,                                              cls: 'font-semibold text-gray-800' },
+  { label: 'Renewed',                fn: a => a.filter(x => x.renewal_status === 'Renewed').length,           filterFn: x => x.renewal_status === 'Renewed',               cls: 'text-green-700' },
+  { label: 'Pending Renewal',        fn: a => a.filter(x => x.renewal_status === 'Renewal Pending').length,   filterFn: x => x.renewal_status === 'Renewal Pending',        cls: 'text-amber-700' },
   null,
-  { label: 'Churn Executed',         fn: a => a.filter(x => x.churn_status === 'Churn Executed').length,      cls: 'text-red-800' },
-  { label: 'Churn Activated',        fn: a => a.filter(x => x.churn_status === 'Churn Activated').length,     cls: 'text-red-600' },
-  { label: 'Churn Predicted',        fn: a => a.filter(x => x.churn_status === 'Churn Predicted').length,     cls: 'text-orange-600' },
+  { label: 'Churn Executed',         fn: a => a.filter(x => x.churn_status === 'Churn Executed').length,      filterFn: x => x.churn_status === 'Churn Executed',           cls: 'text-red-800' },
+  { label: 'Churn Activated',        fn: a => a.filter(x => x.churn_status === 'Churn Activated').length,     filterFn: x => x.churn_status === 'Churn Activated',          cls: 'text-red-600' },
+  { label: 'Churn Predicted',        fn: a => a.filter(x => x.churn_status === 'Churn Predicted').length,     filterFn: x => x.churn_status === 'Churn Predicted',          cls: 'text-orange-600' },
   null,
-  { label: 'Contraction Activated',  fn: a => a.filter(x => x.contraction_risk === 'Yes').length,             cls: 'text-purple-600' },
+  { label: 'Contraction Activated',  fn: a => a.filter(x => x.contraction_risk === 'Yes').length,             filterFn: x => x.contraction_risk === 'Yes',                  cls: 'text-purple-600' },
 ];
 
 export default function RenewalDashboard() {
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState(null);
+  const accountRefs = useRef({});
+  const gridRef     = useRef(null);
+
+  function handleSummaryClick(monthKey, filterFn) {
+    const m = byMonth.find(x => x.key === monthKey);
+    if (!m) return;
+    const matching = filterFn ? m.accounts.filter(filterFn) : m.accounts;
+    if (matching.length === 0) return;
+
+    // Scroll grid into view first, then flash each matching cell
+    gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    matching.forEach((acc, i) => {
+      const el = accountRefs.current[acc.id];
+      if (!el) return;
+      el.classList.remove('flash-card');
+      void el.offsetWidth; // force reflow to restart animation
+      el.classList.add('flash-card');
+      setTimeout(() => el.classList.remove('flash-card'), 2100);
+      if (i === 0) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350);
+    });
+  }
 
   useEffect(() => {
     axios.get('/api/accounts')
@@ -106,8 +127,12 @@ export default function RenewalDashboard() {
                   <td className={`py-2 pr-8 ${row.cls}`}>{row.label}</td>
                   {byMonth.map(m => {
                     const val = row.fn(m.accounts);
+                    const clickable = val > 0;
                     return (
-                      <td key={m.key} className={`text-center py-2 px-4 font-semibold tabular-nums ${val > 0 ? row.cls : 'text-gray-200'}`}>
+                      <td key={m.key}
+                        className={`text-center py-2 px-4 font-semibold tabular-nums ${clickable ? `${row.cls} cursor-pointer hover:underline underline-offset-2` : 'text-gray-200'}`}
+                        onClick={() => clickable && handleSummaryClick(m.key, row.filterFn)}
+                      >
                         {val}
                       </td>
                     );
@@ -122,7 +147,7 @@ export default function RenewalDashboard() {
       {/* ── Account grid by month ── */}
       <div>
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Accounts by Renewal Month</h2>
-        <div className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+        <div ref={gridRef} className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
           <table className="border-collapse text-xs w-full">
             <thead>
               <tr>
@@ -148,7 +173,7 @@ export default function RenewalDashboard() {
                       if (!acc) return <td key={m.key} className="px-2 py-1.5 bg-white border-b border-gray-100" />;
                       const churn = isChurnRisk(acc);
                       return (
-                        <td key={m.key} className={`px-2 py-2 align-top border-b border-gray-100 ${churn ? 'bg-yellow-100' : 'bg-white'}`}>
+                        <td key={m.key} ref={el => { accountRefs.current[acc.id] = el; }} className={`px-2 py-2 align-top border-b border-gray-100 ${churn ? 'bg-yellow-100' : 'bg-white'}`}>
                           <Link to={`/accounts/${acc.id}`} className="block hover:opacity-75 transition-opacity">
                             <div className="flex items-start gap-1.5">
                               {acc.rag_status && (
