@@ -6,13 +6,11 @@ const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','
 
 function parseRenewalDate(str) {
   if (!str) return null;
-  // DD/MM/YY or DD/MM/YYYY
   const m1 = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
   if (m1) {
     const y = m1[3].length === 2 ? 2000 + +m1[3] : +m1[3];
     return new Date(y, +m1[2] - 1, +m1[1]);
   }
-  // DD-Mon-YY like "18-Apr-26"
   const m2 = str.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
   if (m2) {
     const y = m2[3].length === 2 ? 2000 + +m2[3] : +m2[3];
@@ -26,49 +24,31 @@ const isChurnRisk = a =>
   a.churn_risk === 'Yes' ||
   ['Churn Activated', 'Churn Predicted', 'Churn Executed'].includes(a.churn_status);
 
-const RAG_DOT = {
-  Red:   'bg-red-500',
-  Amber: 'bg-amber-400',
-  Green: 'bg-green-500',
-};
+const RAG_DOT = { Red: 'bg-red-500', Amber: 'bg-amber-400', Green: 'bg-green-500' };
 
 const SUMMARY_ROWS = [
-  { label: 'Total Due for Renewal',  fn: a => a.length,                                                       filterFn: null,                                              cls: 'font-semibold text-gray-800' },
-  { label: 'Renewed',                fn: a => a.filter(x => x.renewal_status === 'Renewed').length,           filterFn: x => x.renewal_status === 'Renewed',               cls: 'text-green-700' },
-  { label: 'Pending Renewal',        fn: a => a.filter(x => x.renewal_status === 'Renewal Pending').length,   filterFn: x => x.renewal_status === 'Renewal Pending',        cls: 'text-amber-700' },
+  { label: 'Total Due for Renewal',  fn: a => a.length,                                                      filterFn: null,                                        cls: 'font-semibold text-gray-800' },
+  { label: 'Renewed',                fn: a => a.filter(x => x.renewal_status === 'Renewed').length,          filterFn: x => x.renewal_status === 'Renewed',          cls: 'text-green-700' },
+  { label: 'Pending Renewal',        fn: a => a.filter(x => x.renewal_status === 'Renewal Pending').length,  filterFn: x => x.renewal_status === 'Renewal Pending',  cls: 'text-amber-700' },
   null,
-  { label: 'Churn Executed',         fn: a => a.filter(x => x.churn_status === 'Churn Executed').length,      filterFn: x => x.churn_status === 'Churn Executed',           cls: 'text-red-800' },
-  { label: 'Churn Activated',        fn: a => a.filter(x => x.churn_status === 'Churn Activated').length,     filterFn: x => x.churn_status === 'Churn Activated',          cls: 'text-red-600' },
-  { label: 'Churn Predicted',        fn: a => a.filter(x => x.churn_status === 'Churn Predicted').length,     filterFn: x => x.churn_status === 'Churn Predicted',          cls: 'text-orange-600' },
+  { label: 'Churn Executed',         fn: a => a.filter(x => x.churn_status === 'Churn Executed').length,     filterFn: x => x.churn_status === 'Churn Executed',     cls: 'text-red-800' },
+  { label: 'Churn Activated',        fn: a => a.filter(x => x.churn_status === 'Churn Activated').length,    filterFn: x => x.churn_status === 'Churn Activated',    cls: 'text-red-600' },
+  { label: 'Churn Predicted',        fn: a => a.filter(x => x.churn_status === 'Churn Predicted').length,    filterFn: x => x.churn_status === 'Churn Predicted',    cls: 'text-orange-600' },
   null,
-  { label: 'Contraction Activated',  fn: a => a.filter(x => x.contraction_risk === 'Yes').length,             filterFn: x => x.contraction_risk === 'Yes',                  cls: 'text-purple-600' },
+  { label: 'Contraction Activated',  fn: a => a.filter(x => x.contraction_risk === 'Yes').length,            filterFn: x => x.contraction_risk === 'Yes',            cls: 'text-purple-600' },
 ];
 
 export default function RenewalDashboard() {
-  const [accounts, setAccounts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState(null);
+  const [accounts,     setAccounts]     = useState([]);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState(null);
+  const [periodOffset, setPeriodOffset] = useState(0); // each step = 6 months
+  const [filterCsm,    setFilterCsm]    = useState('');
+  const [filterRag,    setFilterRag]    = useState('');
+  const [filterRegion, setFilterRegion] = useState('');
+
   const accountRefs = useRef({});
   const gridRef     = useRef(null);
-
-  function handleSummaryClick(monthKey, filterFn) {
-    const m = byMonth.find(x => x.key === monthKey);
-    if (!m) return;
-    const matching = filterFn ? m.accounts.filter(filterFn) : m.accounts;
-    if (matching.length === 0) return;
-
-    // Scroll grid into view first, then flash each matching cell
-    gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    matching.forEach((acc, i) => {
-      const el = accountRefs.current[acc.id];
-      if (!el) return;
-      el.classList.remove('flash-card');
-      void el.offsetWidth; // force reflow to restart animation
-      el.classList.add('flash-card');
-      setTimeout(() => el.classList.remove('flash-card'), 2100);
-      if (i === 0) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350);
-    });
-  }
 
   useEffect(() => {
     axios.get('/api/accounts')
@@ -76,24 +56,57 @@ export default function RenewalDashboard() {
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
-  // 6-month window: 2 months back → 3 months ahead
+  // Unique values for filter dropdowns
+  const csms    = useMemo(() => [...new Set(accounts.map(a => a.csm).filter(Boolean))].sort(), [accounts]);
+  const regions = useMemo(() => [...new Set(accounts.map(a => a.region).filter(Boolean))].sort(), [accounts]);
+
+  // Filtered account pool
+  const filteredAccounts = useMemo(() => accounts.filter(a => {
+    if (filterCsm    && a.csm        !== filterCsm)    return false;
+    if (filterRag    && a.rag_status !== filterRag)    return false;
+    if (filterRegion && a.region     !== filterRegion) return false;
+    return true;
+  }), [accounts, filterCsm, filterRag, filterRegion]);
+
+  // 6-month window: default starts 2 months back, shifts by periodOffset * 6
   const months = useMemo(() => {
-    const now = new Date();
+    const now  = new Date();
+    const base = new Date(now.getFullYear(), now.getMonth() - 2 + periodOffset * 6, 1);
     return Array.from({ length: 6 }, (_, i) => {
-      const d = new Date(now.getFullYear(), now.getMonth() - 2 + i, 1);
-      return { year: d.getFullYear(), month: d.getMonth(), key: `${d.getFullYear()}-${d.getMonth()}`,
+      const d = new Date(base.getFullYear(), base.getMonth() + i, 1);
+      return { year: d.getFullYear(), month: d.getMonth(),
+               key: `${d.getFullYear()}-${d.getMonth()}`,
                label: `${MON[d.getMonth()]} ${String(d.getFullYear()).slice(2)}` };
     });
-  }, []);
+  }, [periodOffset]);
 
   const byMonth = useMemo(() => months.map(m => ({
     ...m,
-    accounts: accounts
+    accounts: filteredAccounts
       .filter(a => { const d = parseRenewalDate(a.renewal_date); return d && d.getFullYear() === m.year && d.getMonth() === m.month; })
       .sort((a, b) => a.account_name.localeCompare(b.account_name)),
-  })), [accounts, months]);
+  })), [filteredAccounts, months]);
 
   const maxRows = Math.max(...byMonth.map(m => m.accounts.length), 0);
+
+  const periodLabel = `${months[0].label} – ${months[5].label}`;
+
+  function handleSummaryClick(monthKey, filterFn) {
+    const m = byMonth.find(x => x.key === monthKey);
+    if (!m) return;
+    const matching = filterFn ? m.accounts.filter(filterFn) : m.accounts;
+    if (matching.length === 0) return;
+    gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    matching.forEach((acc, i) => {
+      const el = accountRefs.current[acc.id];
+      if (!el) return;
+      el.classList.remove('flash-card');
+      void el.offsetWidth;
+      el.classList.add('flash-card');
+      setTimeout(() => el.classList.remove('flash-card'), 2100);
+      if (i === 0) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350);
+    });
+  }
 
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -103,8 +116,55 @@ export default function RenewalDashboard() {
   if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-bold text-gray-800">Renewal Dashboard</h1>
+    <div className="space-y-6">
+      {/* ── Header row: title + period nav + filters ── */}
+      <div className="flex flex-wrap items-center gap-4 justify-between">
+        <h1 className="text-2xl font-bold text-gray-800">Renewal Dashboard</h1>
+
+        {/* Period navigator */}
+        <div className="flex items-center gap-2">
+          <button onClick={() => setPeriodOffset(p => p - 1)}
+            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition text-gray-600">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          </button>
+          <span className="text-sm font-semibold text-gray-700 min-w-[140px] text-center">{periodLabel}</span>
+          <button onClick={() => setPeriodOffset(p => p + 1)}
+            className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition text-gray-600">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          </button>
+          {periodOffset !== 0 && (
+            <button onClick={() => setPeriodOffset(0)}
+              className="text-xs text-brand-600 hover:underline ml-1">Today</button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Filter row ── */}
+      <div className="flex flex-wrap gap-3">
+        <select value={filterCsm} onChange={e => setFilterCsm(e.target.value)}
+          className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500">
+          <option value="">All CSMs</option>
+          {csms.map(c => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={filterRag} onChange={e => setFilterRag(e.target.value)}
+          className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500">
+          <option value="">All RAG</option>
+          <option value="Green">Green</option>
+          <option value="Amber">Amber</option>
+          <option value="Red">Red</option>
+        </select>
+        <select value={filterRegion} onChange={e => setFilterRegion(e.target.value)}
+          className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500">
+          <option value="">All Regions</option>
+          {regions.map(r => <option key={r} value={r}>{r}</option>)}
+        </select>
+        {(filterCsm || filterRag || filterRegion) && (
+          <button onClick={() => { setFilterCsm(''); setFilterRag(''); setFilterRegion(''); }}
+            className="text-xs text-red-500 hover:text-red-700 hover:underline self-center">
+            Clear filters
+          </button>
+        )}
+      </div>
 
       {/* ── Summary matrix ── */}
       <div className="card overflow-x-auto">
@@ -173,7 +233,9 @@ export default function RenewalDashboard() {
                       if (!acc) return <td key={m.key} className="px-2 py-1.5 bg-white border-b border-gray-100" />;
                       const churn = isChurnRisk(acc);
                       return (
-                        <td key={m.key} ref={el => { accountRefs.current[acc.id] = el; }} className={`px-2 py-2 align-top border-b border-gray-100 ${churn ? 'bg-yellow-100' : 'bg-white'}`}>
+                        <td key={m.key}
+                          ref={el => { accountRefs.current[acc.id] = el; }}
+                          className={`px-2 py-2 align-top border-b border-gray-100 ${churn ? 'bg-yellow-100' : 'bg-white'}`}>
                           <Link to={`/accounts/${acc.id}`} className="block hover:opacity-75 transition-opacity">
                             <div className="flex items-start gap-1.5">
                               {acc.rag_status && (
