@@ -6,6 +6,7 @@ import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import AccountsPage from './components/AccountsPage';
 import AccountDetail from './components/AccountDetail';
+import RenewalDashboard from './components/RenewalDashboard';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -26,6 +27,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
+        <Route path="renewal" element={<RenewalDashboard />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
