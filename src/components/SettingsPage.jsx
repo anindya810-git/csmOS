@@ -10,17 +10,82 @@ const ROLE_BADGE = {
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'csm', csm_name: '', csm_lead: '' };
 
+function getInitials(name) {
+  if (!name) return '?';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0][0].toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+function buildTree(users) {
+  const byName = {};
+  users.forEach(u => { if (u.csm_name) byName[u.csm_name] = u; });
+  const childrenMap = {};
+  const roots = [];
+  users.forEach(u => {
+    const parent = u.csm_lead ? byName[u.csm_lead] : null;
+    if (parent && parent.id !== u.id) {
+      if (!childrenMap[parent.id]) childrenMap[parent.id] = [];
+      childrenMap[parent.id].push(u);
+    } else {
+      roots.push(u);
+    }
+  });
+  return { roots, childrenMap };
+}
+
+function UserRow({ u, childrenMap, currentUserId, onEdit, onDelete, deleting }) {
+  const kids = childrenMap[u.id] || [];
+  const avatarCls = u.role === 'admin' ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-600';
+
+  return (
+    <div>
+      <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition group">
+        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarCls}`}>
+          {getInitials(u.name)}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-gray-900">{u.name}</span>
+            {u.id === currentUserId && <span className="text-xs text-gray-400">(you)</span>}
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
+          </div>
+          <p className="text-xs text-gray-400 truncate">{u.email}{u.csm_name ? ` · ${u.csm_name}` : ''}</p>
+        </div>
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
+          <button onClick={() => onEdit(u)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded-md transition" title="Edit">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+          </button>
+          {u.id !== currentUserId && (
+            <button onClick={() => onDelete(u)} disabled={deleting === u.id} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-50" title="Delete">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </button>
+          )}
+        </div>
+      </div>
+      {kids.length > 0 && (
+        <div className="ml-9 border-l-2 border-dashed border-gray-100 pl-3">
+          {kids.map(k => (
+            <UserRow key={k.id} u={k} childrenMap={childrenMap} currentUserId={currentUserId} onEdit={onEdit} onDelete={onDelete} deleting={deleting} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [users,    setUsers]    = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const [users,     setUsers]     = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [viewMode,  setViewMode]  = useState('list');
   const [showModal, setShowModal] = useState(false);
-  const [editUser, setEditUser] = useState(null);
-  const [form,     setForm]     = useState(EMPTY_FORM);
-  const [saving,   setSaving]   = useState(false);
-  const [error,    setError]    = useState('');
-  const [deleting, setDeleting] = useState(null);
+  const [editUser,  setEditUser]  = useState(null);
+  const [form,      setForm]      = useState(EMPTY_FORM);
+  const [saving,    setSaving]    = useState(false);
+  const [error,     setError]     = useState('');
+  const [deleting,  setDeleting]  = useState(null);
 
   useEffect(() => {
     if (user?.role !== 'admin') { navigate('/'); return; }
@@ -84,6 +149,8 @@ export default function SettingsPage() {
     }
   };
 
+  const { roots, childrenMap } = buildTree(users);
+
   return (
     <div className="space-y-6 max-w-4xl">
       <div>
@@ -97,20 +164,39 @@ export default function SettingsPage() {
             <h2 className="text-sm font-semibold text-gray-900">Users & CSMs</h2>
             <p className="text-xs text-gray-400 mt-0.5">{users.length} user{users.length !== 1 ? 's' : ''}</p>
           </div>
-          <button
-            onClick={openAdd}
-            className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Add User
-          </button>
+          <div className="flex items-center gap-3">
+            {/* View toggle */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+                List
+              </button>
+              <button
+                onClick={() => setViewMode('tree')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'tree' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm0 8a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1zm8-8a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2h-1a2 2 0 01-2-2V5zm0 8a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2h-1a2 2 0 01-2-2v-1z" /></svg>
+                Tree
+              </button>
+            </div>
+            <button
+              onClick={openAdd}
+              className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add User
+            </button>
+          </div>
         </div>
 
         {loading ? (
           <div className="py-12 text-center text-gray-400">Loading…</div>
         ) : users.length === 0 ? (
           <div className="py-12 text-center text-gray-400">No users found.</div>
-        ) : (
+        ) : viewMode === 'list' ? (
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
@@ -137,20 +223,11 @@ export default function SettingsPage() {
                   <td className="px-5 py-3 text-gray-600">{u.csm_name || <span className="text-gray-300">—</span>}</td>
                   <td className="px-5 py-3">
                     <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => openEdit(u)}
-                        className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded-md transition"
-                        title="Edit user"
-                      >
+                      <button onClick={() => openEdit(u)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded-md transition" title="Edit user">
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       </button>
                       {u.id !== user?.id && (
-                        <button
-                          onClick={() => handleDelete(u)}
-                          disabled={deleting === u.id}
-                          className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-50"
-                          title="Delete user"
-                        >
+                        <button onClick={() => handleDelete(u)} disabled={deleting === u.id} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-50" title="Delete user">
                           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                         </button>
                       )}
@@ -160,6 +237,20 @@ export default function SettingsPage() {
               ))}
             </tbody>
           </table>
+        ) : (
+          <div className="py-2">
+            {roots.map(u => (
+              <UserRow
+                key={u.id}
+                u={u}
+                childrenMap={childrenMap}
+                currentUserId={user?.id}
+                onEdit={openEdit}
+                onDelete={handleDelete}
+                deleting={deleting}
+              />
+            ))}
+          </div>
         )}
       </div>
 
