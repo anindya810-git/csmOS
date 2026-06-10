@@ -15,8 +15,7 @@ export default async function handler(req, res) {
     let query = supabase
       .from('escalations')
       .select('*, accounts(id, rag_status)')
-      .order('date_of_escalation', { ascending: false })
-      .limit(10000);
+      .order('date_of_escalation', { ascending: false });
 
     if (user.role === 'csm') {
       query = query.eq('csm', user.csm_name);

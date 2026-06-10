@@ -18,8 +18,7 @@ export default async function handler(req, res) {
       .from('issues')
       .select('*')
       .order('reported_date', { ascending: false, nullsFirst: false })
-      .order('created_at', { ascending: false })
-      .limit(10000);
+      .order('created_at', { ascending: false });
 
     if (user.role === 'csm') query = query.eq('csm', user.csm_name);
     else if (csm) query = query.eq('csm', csm);
