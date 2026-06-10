@@ -101,7 +101,7 @@ export default function RAGDashboard() {
         <input
           type="text" placeholder="Search accounts, reasons, actions…"
           value={search} onChange={e => setSearch(e.target.value)}
-          className="!w-64 text-sm"
+          className="!w-full sm:!w-64 text-sm"
         />
         <select value={filterCsm} onChange={e => setFilterCsm(e.target.value)}
           className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5">

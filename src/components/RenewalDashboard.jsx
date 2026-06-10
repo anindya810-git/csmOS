@@ -47,7 +47,8 @@ export default function RenewalDashboard() {
   const [filterRag,    setFilterRag]    = useState('');
   const [filterRegion, setFilterRegion] = useState('');
 
-  const accountRefs = useRef({});
+  const desktopRefs = useRef({});
+  const mobileRefs  = useRef({});
   const gridRef     = useRef(null);
 
   useEffect(() => {
@@ -98,13 +99,18 @@ export default function RenewalDashboard() {
     if (matching.length === 0) return;
     gridRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     matching.forEach((acc, i) => {
-      const el = accountRefs.current[acc.id];
-      if (!el) return;
-      el.classList.remove('flash-card');
-      void el.offsetWidth;
-      el.classList.add('flash-card');
-      setTimeout(() => el.classList.remove('flash-card'), 2100);
-      if (i === 0) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350);
+      // Flash whichever view is mounted (desktop table cell or mobile card)
+      [desktopRefs.current[acc.id], mobileRefs.current[acc.id]].forEach(el => {
+        if (!el) return;
+        el.classList.remove('flash-card');
+        void el.offsetWidth;
+        el.classList.add('flash-card');
+        setTimeout(() => el.classList.remove('flash-card'), 2100);
+      });
+      if (i === 0) {
+        const visible = [desktopRefs.current[acc.id], mobileRefs.current[acc.id]].find(el => el && el.offsetParent !== null);
+        if (visible) setTimeout(() => visible.scrollIntoView({ behavior: 'smooth', block: 'center' }), 350);
+      }
     });
   }
 
@@ -116,10 +122,10 @@ export default function RenewalDashboard() {
   if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
 
   return (
-    <div className="space-y-6">
-      {/* ── Header row: title + period nav + filters ── */}
-      <div className="flex flex-wrap items-center gap-4 justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">Renewal Dashboard</h1>
+    <div className="space-y-5 sm:space-y-6">
+      {/* ── Header row: title + period nav ── */}
+      <div className="flex flex-wrap items-center gap-3 sm:gap-4 justify-between">
+        <h1 className="text-xl sm:text-2xl font-bold text-gray-800">Renewal Dashboard</h1>
 
         {/* Period navigator */}
         <div className="flex items-center gap-2">
@@ -127,7 +133,7 @@ export default function RenewalDashboard() {
             className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition text-gray-600">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <span className="text-sm font-semibold text-gray-700 min-w-[140px] text-center">{periodLabel}</span>
+          <span className="text-sm font-semibold text-gray-700 min-w-[130px] sm:min-w-[140px] text-center">{periodLabel}</span>
           <button onClick={() => setPeriodOffset(p => p + 1)}
             className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition text-gray-600">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
@@ -140,7 +146,7 @@ export default function RenewalDashboard() {
       </div>
 
       {/* ── Filter row ── */}
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2 sm:gap-3">
         <select value={filterCsm} onChange={e => setFilterCsm(e.target.value)}
           className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500">
           <option value="">All CSMs</option>
@@ -172,9 +178,9 @@ export default function RenewalDashboard() {
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b-2 border-gray-200">
-              <th className="text-left py-2 pr-8 text-gray-400 font-medium min-w-[200px]" />
+              <th className="text-left py-2 pr-4 sm:pr-8 text-gray-400 font-medium min-w-[150px] sm:min-w-[200px]" />
               {byMonth.map(m => (
-                <th key={m.key} className="text-center py-2 px-4 font-semibold text-gray-700 min-w-[72px]">{m.label}</th>
+                <th key={m.key} className="text-center py-2 px-3 sm:px-4 font-semibold text-gray-700 min-w-[56px] sm:min-w-[72px]">{m.label}</th>
               ))}
             </tr>
           </thead>
@@ -184,13 +190,13 @@ export default function RenewalDashboard() {
                 <tr key={i}><td colSpan={7} className="py-1" /></tr>
               ) : (
                 <tr key={i} className="border-b border-gray-100 last:border-0">
-                  <td className={`py-2 pr-8 ${row.cls}`}>{row.label}</td>
+                  <td className={`py-2 pr-4 sm:pr-8 ${row.cls}`}>{row.label}</td>
                   {byMonth.map(m => {
                     const val = row.fn(m.accounts);
                     const clickable = val > 0;
                     return (
                       <td key={m.key}
-                        className={`text-center py-2 px-4 font-semibold tabular-nums ${clickable ? `${row.cls} cursor-pointer hover:underline underline-offset-2` : 'text-gray-200'}`}
+                        className={`text-center py-2 px-3 sm:px-4 font-semibold tabular-nums ${clickable ? `${row.cls} cursor-pointer hover:underline underline-offset-2` : 'text-gray-200'}`}
                         onClick={() => clickable && handleSummaryClick(m.key, row.filterFn)}
                       >
                         {val}
@@ -204,10 +210,12 @@ export default function RenewalDashboard() {
         </table>
       </div>
 
-      {/* ── Account grid by month ── */}
-      <div>
+      {/* ── Accounts by renewal month ── */}
+      <div ref={gridRef} className="scroll-mt-20">
         <h2 className="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-3">Accounts by Renewal Month</h2>
-        <div ref={gridRef} className="overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
+
+        {/* Desktop: side-by-side month grid */}
+        <div className="hidden md:block overflow-x-auto rounded-xl border border-gray-200 shadow-sm">
           <table className="border-collapse text-xs w-full">
             <thead>
               <tr>
@@ -234,7 +242,7 @@ export default function RenewalDashboard() {
                       const churn = isChurnRisk(acc);
                       return (
                         <td key={m.key}
-                          ref={el => { accountRefs.current[acc.id] = el; }}
+                          ref={el => { desktopRefs.current[acc.id] = el; }}
                           className={`px-2 py-2 align-top border-b border-gray-100 ${churn ? 'bg-yellow-100' : 'bg-white'}`}>
                           <Link to={`/accounts/${acc.id}`} className="block hover:opacity-75 transition-opacity">
                             <div className="flex items-start gap-1.5">
@@ -263,7 +271,51 @@ export default function RenewalDashboard() {
             </tbody>
           </table>
         </div>
-        <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-gray-400">
+
+        {/* Mobile: stacked month sections */}
+        <div className="md:hidden space-y-4">
+          {maxRows === 0 ? (
+            <div className="card text-center py-8 text-gray-400 text-sm">No accounts with renewal dates in this period</div>
+          ) : (
+            byMonth.filter(m => m.accounts.length > 0).map(m => (
+              <div key={m.key}>
+                <div className="flex items-center gap-2 mb-2 px-0.5">
+                  <h3 className="text-sm font-bold text-gray-700">{m.label}</h3>
+                  <span className="text-xs text-gray-400">({m.accounts.length})</span>
+                </div>
+                <div className="space-y-2">
+                  {m.accounts.map(acc => {
+                    const churn = isChurnRisk(acc);
+                    return (
+                      <Link key={acc.id} to={`/accounts/${acc.id}`}
+                        ref={el => { mobileRefs.current[acc.id] = el; }}
+                        className={`block rounded-xl border p-3 transition active:opacity-80 ${churn ? 'bg-yellow-100 border-yellow-300' : 'bg-white border-gray-200'}`}>
+                        <div className="flex items-start gap-2">
+                          {acc.rag_status && (
+                            <span className={`mt-1 shrink-0 w-2.5 h-2.5 rounded-full ${RAG_DOT[acc.rag_status] ?? 'bg-gray-300'}`} title={acc.rag_status} />
+                          )}
+                          <div className="min-w-0">
+                            <p className={`text-sm font-semibold ${churn ? 'text-yellow-900' : 'text-gray-800'}`}>{acc.account_name}</p>
+                            <div className="mt-0.5 flex flex-wrap gap-x-2 gap-y-0.5 text-xs">
+                              {acc.churn_status && <span className="text-red-600 font-medium">{acc.churn_status}</span>}
+                              {!acc.churn_status && acc.renewal_status && (
+                                <span className={acc.renewal_status === 'Renewed' ? 'text-green-600 font-medium' : 'text-amber-600 font-medium'}>{acc.renewal_status}</span>
+                              )}
+                              {acc.csm && <span className="text-gray-400">· {acc.csm}</span>}
+                              {acc.renewal_date && <span className="text-gray-400">· {acc.renewal_date}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </Link>
+                    );
+                  })}
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3 sm:gap-4 text-xs text-gray-400">
           <span className="flex items-center gap-1.5">
             <span className="inline-block w-3 h-3 rounded bg-yellow-100 border border-yellow-300" />
             Yellow = churn risk flagged

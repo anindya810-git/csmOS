@@ -277,7 +277,9 @@ export default function EscalationsDashboard() {
       ) : escalations.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">No escalations found.</div>
       ) : (
-        <div className="card overflow-hidden p-0">
+        <>
+        {/* Desktop table */}
+        <div className="card overflow-hidden p-0 hidden lg:block">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
@@ -371,6 +373,72 @@ export default function EscalationsDashboard() {
             </table>
           </div>
         </div>
+
+        {/* Mobile / tablet cards */}
+        <div className="lg:hidden space-y-3">
+          {escalations.map(e => {
+            const rag = e.accounts?.rag_status;
+            const open = expanded === e.id;
+            return (
+              <div key={e.id} className="card p-0 overflow-hidden">
+                <button type="button" onClick={() => setExpanded(open ? null : e.id)}
+                  className="w-full text-left p-4 active:bg-gray-50 transition">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      {e.account_id ? (
+                        <Link to={`/accounts/${e.account_id}`} onClick={ev => ev.stopPropagation()}
+                          className="font-semibold text-brand-700 hover:underline break-words">{e.account_name}</Link>
+                      ) : (
+                        <span className="font-semibold text-gray-900 break-words">{e.account_name}</span>
+                      )}
+                      {e.tenant_id && <p className="text-xs text-gray-400 font-mono">{e.tenant_id}</p>}
+                    </div>
+                    <div className="flex flex-col items-end gap-1 shrink-0">
+                      <StatusBadge status={e.status} />
+                      {rag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${RAG_BADGE[rag] || 'bg-gray-100 text-gray-700'}`}>{rag}</span>}
+                    </div>
+                  </div>
+                  <p className="mt-2 text-sm text-gray-700 line-clamp-2">{e.description}</p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                    {e.date_of_escalation && <span>{new Date(e.date_of_escalation).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>}
+                    {e.csm && <span><span className="text-gray-400">CSM:</span> {e.csm}</span>}
+                    {e.eta && <span><span className="text-gray-400">ETA:</span> {e.eta}</span>}
+                  </div>
+                </button>
+                {open && (
+                  <div className="px-4 pb-4 pt-1 bg-gray-50 border-t border-gray-100 space-y-3">
+                    <div>
+                      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
+                      <p className="text-sm text-gray-800 whitespace-pre-wrap">{e.description}</p>
+                    </div>
+                    {e.action_taken && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Action Taken</p>
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{e.action_taken}</p>
+                      </div>
+                    )}
+                    {e.email_subject && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Email Subject</p>
+                        <p className="text-sm text-gray-700 italic">{e.email_subject}</p>
+                      </div>
+                    )}
+                    <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                      {e.ownership && <span><span className="font-medium">Ownership:</span> {e.ownership}</span>}
+                      {e.ps_leader && <span><span className="font-medium">PS Leader:</span> {e.ps_leader}</span>}
+                      {e.escalated_by && <span><span className="font-medium">Escalated By:</span> {e.escalated_by}</span>}
+                      {e.month && <span><span className="font-medium">Month:</span> {e.month}</span>}
+                    </div>
+                    {e.account_id && (
+                      <Link to={`/accounts/${e.account_id}`} className="inline-block text-sm text-brand-600 hover:underline font-medium">View Account →</Link>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+        </>
       )}
     </div>
   );

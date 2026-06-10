@@ -98,7 +98,8 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      <div className="card p-0 overflow-hidden">
+      {/* Desktop table */}
+      <div className="card p-0 overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -146,6 +147,39 @@ export default function AccountsPage() {
         </div>
       </div>
 
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          <div className="card text-center py-10 text-gray-400">Loading…</div>
+        ) : sorted.length === 0 ? (
+          <div className="card text-center py-10 text-gray-400">No accounts found.</div>
+        ) : sorted.map(a => (
+          <button key={a.id} onClick={() => navigate(`/accounts/${a.id}`)}
+            className="card w-full text-left active:bg-gray-50 transition">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="font-semibold text-gray-900 truncate">{a.account_name}</p>
+                <p className="text-xs text-gray-400 font-mono">{a.tenant_id || '—'}</p>
+              </div>
+              {a.rag_status && <span className={`shrink-0 text-xs font-semibold px-2.5 py-0.5 rounded-full ${RAG_BADGE[a.rag_status] || ''}`}>{a.rag_status}</span>}
+            </div>
+            <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-xs">
+              <div><span className="text-gray-400">MRR</span><p className="font-medium text-gray-800">{fmt(a.mrr)}</p></div>
+              <div><span className="text-gray-400">CSM</span><p className="font-medium text-gray-700 truncate">{a.csm || '—'}</p></div>
+              <div><span className="text-gray-400">Industry</span><p className="font-medium text-gray-700 truncate">{a.industry || '—'}</p></div>
+              <div><span className="text-gray-400">Region</span><p className="font-medium text-gray-700">{a.region || '—'}</p></div>
+              <div><span className="text-gray-400">Renewal</span><p className="font-medium text-gray-700">{a.renewal_date || '—'}</p></div>
+              <div>
+                <span className="text-gray-400">Churn</span>
+                {a.churn_status
+                  ? <p><span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${CHURN_BADGE[a.churn_status] || 'bg-gray-100 text-gray-600'}`}>{a.churn_status}</span></p>
+                  : <p className="font-medium text-gray-300">—</p>}
+              </div>
+            </div>
+          </button>
+        ))}
+      </div>
+
       {showAdd && <AddAccountModal onClose={() => setShowAdd(false)} onSave={() => { setShowAdd(false); fetchAccounts(); }} />}
     </div>
   );
@@ -169,15 +203,15 @@ function AddAccountModal({ onClose, onSave }) {
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg">
-        <div className="flex items-center justify-between p-6 border-b border-gray-100">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
           <h2 className="text-lg font-semibold text-gray-900">Add New Account</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">✕</button>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition text-lg leading-none">✕</button>
         </div>
-        <div className="p-6 space-y-4">
+        <div className="p-5 sm:p-6 space-y-4">
           {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2"><label className="block text-xs font-medium text-gray-600 mb-1">Account Name *</label><input value={form.account_name} onChange={e => setForm(f=>({...f, account_name: e.target.value}))} /></div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2"><label className="block text-xs font-medium text-gray-600 mb-1">Account Name *</label><input value={form.account_name} onChange={e => setForm(f=>({...f, account_name: e.target.value}))} /></div>
             <div><label className="block text-xs font-medium text-gray-600 mb-1">Tenant ID</label><input value={form.tenant_id} onChange={e => setForm(f=>({...f, tenant_id: e.target.value}))} /></div>
             <div><label className="block text-xs font-medium text-gray-600 mb-1">Industry</label><input value={form.industry} onChange={e => setForm(f=>({...f, industry: e.target.value}))} /></div>
             <div><label className="block text-xs font-medium text-gray-600 mb-1">MRR (₹)</label><input type="number" value={form.mrr} onChange={e => setForm(f=>({...f, mrr: e.target.value}))} /></div>

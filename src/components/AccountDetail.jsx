@@ -294,14 +294,14 @@ export default function AccountDetail() {
 
   return (
     <div className="space-y-5">
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 min-w-0">
           <button onClick={() => navigate('/accounts')} className="text-gray-400 hover:text-gray-600 transition">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
           <div>
-            <h1 className="text-xl font-bold text-gray-900">{account.account_name}</h1>
-            <div className="flex items-center gap-2 mt-1">
+            <h1 className="text-lg sm:text-xl font-bold text-gray-900 break-words">{account.account_name}</h1>
+            <div className="flex flex-wrap items-center gap-2 mt-1">
               <span className="text-sm text-gray-500">ID: {account.tenant_id}</span>
               {account.rag_status && <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${RAG_BADGE[account.rag_status]}`}>{account.rag_status}</span>}
               {account.churn_status && <span className="text-xs bg-red-50 text-red-700 border border-red-200 px-2.5 py-0.5 rounded-full font-medium">{account.churn_status}</span>}
