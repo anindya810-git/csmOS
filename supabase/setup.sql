@@ -57,6 +57,18 @@ CREATE TABLE IF NOT EXISTS public.accounts (
   nps                             NUMERIC,
   adoption_rate                   NUMERIC,
   sa_status                       TEXT,
+  poc1_name                       TEXT,
+  poc1_email                      TEXT,
+  poc1_phone                      TEXT,
+  poc1_designation                TEXT,
+  poc2_name                       TEXT,
+  poc2_email                      TEXT,
+  poc2_phone                      TEXT,
+  poc2_designation                TEXT,
+  poc3_name                       TEXT,
+  poc3_email                      TEXT,
+  poc3_phone                      TEXT,
+  poc3_designation                TEXT,
   updated_at                      TIMESTAMPTZ DEFAULT NOW(),
   created_at                      TIMESTAMPTZ DEFAULT NOW()
 );

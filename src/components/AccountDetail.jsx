@@ -35,16 +35,73 @@ function Section({ title, children }) {
   );
 }
 
+function PocCard({ num, prefix, account, editing, form, setForm }) {
+  const nameKey  = `${prefix}_name`;
+  const emailKey = `${prefix}_email`;
+  const phoneKey = `${prefix}_phone`;
+  const desigKey = `${prefix}_designation`;
+
+  const hasData = account[nameKey] || account[emailKey] || account[phoneKey] || account[desigKey];
+
+  if (!editing && !hasData) return null;
+
+  if (!editing) {
+    return (
+      <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-1">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">POC {num}</p>
+        {account[nameKey]  && <p className="text-sm font-semibold text-gray-800">{account[nameKey]}</p>}
+        {account[desigKey] && <p className="text-xs text-gray-500">{account[desigKey]}</p>}
+        {account[emailKey] && (
+          <a href={`mailto:${account[emailKey]}`} className="text-xs text-brand-600 hover:underline block break-all">
+            {account[emailKey]}
+          </a>
+        )}
+        {account[phoneKey] && <p className="text-xs text-gray-600">{account[phoneKey]}</p>}
+      </div>
+    );
+  }
+
+  const inp = (key, placeholder) => (
+    <input
+      type="text"
+      placeholder={placeholder}
+      value={form[key] || ''}
+      onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
+      className="!py-1.5 text-xs"
+    />
+  );
+
+  return (
+    <div className="rounded-lg border border-gray-200 p-3 space-y-2">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">POC {num}</p>
+      {inp(nameKey,  'Full name')}
+      {inp(desigKey, 'Designation')}
+      {inp(emailKey, 'Email')}
+      {inp(phoneKey, 'Phone')}
+    </div>
+  );
+}
+
 export default function AccountDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [account, setAccount] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(null);
   const [editing, setEditing] = useState(false);
-  const [form, setForm] = useState({});
-  const [saving, setSaving] = useState(false);
+  const [form,    setForm]    = useState({});
+  const [saving,  setSaving]  = useState(false);
 
   useEffect(() => {
-    axios.get(`/api/accounts/${id}`).then(r => { setAccount(r.data); setForm(r.data); });
+    setLoading(true);
+    setError(null);
+    axios.get(`/api/accounts/${id}`)
+      .then(r => { setAccount(r.data); setForm(r.data); })
+      .catch(e => {
+        const msg = e.response?.data?.error || e.message || 'Unknown error';
+        setError(`Failed to load account: ${msg} (status ${e.response?.status ?? 'network error'})`);
+      })
+      .finally(() => setLoading(false));
   }, [id]);
 
   const handleSave = async () => {
@@ -54,10 +111,27 @@ export default function AccountDetail() {
       setAccount(r.data);
       setForm(r.data);
       setEditing(false);
-    } finally { setSaving(false); }
+    } catch (e) {
+      alert('Save failed: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setSaving(false);
+    }
   };
 
-  if (!account) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>;
+  if (loading) return (
+    <div className="flex items-center justify-center h-64">
+      <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (error) return (
+    <div className="max-w-lg mx-auto mt-16 p-6 bg-red-50 rounded-xl border border-red-200 text-center space-y-3">
+      <p className="text-red-700 font-medium">{error}</p>
+      <button onClick={() => navigate('/accounts')} className="text-sm text-brand-600 hover:underline">← Back to accounts</button>
+    </div>
+  );
+
+  if (!account) return null;
 
   const F = ({ label, field, type = 'text', options }) => {
     if (!editing) return <Field label={label} value={account[field] != null ? String(account[field]) : ''} />;
@@ -89,6 +163,8 @@ export default function AccountDetail() {
       </div>
     );
   };
+
+  const hasPocs = account.poc1_name || account.poc1_email || account.poc2_name || account.poc2_email || account.poc3_name || account.poc3_email;
 
   return (
     <div className="space-y-5">
@@ -185,6 +261,28 @@ export default function AccountDetail() {
               <YNF label="PS Solutioning" field="ps_solutioning" />
             </div>
           </Section>
+
+          {/* Points of Contact */}
+          {(editing || hasPocs) && (
+            <Section title="Points of Contact">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[1, 2, 3].map(n => (
+                  <PocCard
+                    key={n}
+                    num={n}
+                    prefix={`poc${n}`}
+                    account={account}
+                    editing={editing}
+                    form={form}
+                    setForm={setForm}
+                  />
+                ))}
+              </div>
+              {!editing && !hasPocs && (
+                <p className="text-sm text-gray-400 italic">No contacts added yet. Click Edit to add.</p>
+              )}
+            </Section>
+          )}
         </div>
 
         <div className="space-y-5">
