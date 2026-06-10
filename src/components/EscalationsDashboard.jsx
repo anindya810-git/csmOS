@@ -175,7 +175,11 @@ export default function EscalationsDashboard() {
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date of Escalation</p>
               <input type="date" value={form.date_of_escalation}
-                onChange={e => setForm(f => ({ ...f, date_of_escalation: e.target.value }))}
+                onChange={e => {
+                  const val = e.target.value;
+                  const month = val ? MONTHS[new Date(val + 'T00:00:00').getMonth()] : '';
+                  setForm(f => ({ ...f, date_of_escalation: val, month }));
+                }}
                 className="!py-1.5 text-sm" />
             </div>
             <div>

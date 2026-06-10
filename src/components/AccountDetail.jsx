@@ -505,7 +505,12 @@ export default function AccountDetail() {
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date of Escalation</p>
                 <input type="date" value={escalForm.date_of_escalation}
-                  onChange={e => setEscalForm(f => ({ ...f, date_of_escalation: e.target.value }))} className="!py-1.5 text-sm" />
+                  onChange={e => {
+                    const val = e.target.value;
+                    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+                    const month = val ? MONTHS[new Date(val + 'T00:00:00').getMonth()] : '';
+                    setEscalForm(f => ({ ...f, date_of_escalation: val, month }));
+                  }} className="!py-1.5 text-sm" />
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Month</p>
