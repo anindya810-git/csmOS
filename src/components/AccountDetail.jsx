@@ -4,11 +4,29 @@ import axios from 'axios';
 
 const RAG_BADGE = { Green: 'bg-green-100 text-green-800', Amber: 'bg-amber-100 text-amber-800', Red: 'bg-red-100 text-red-800' };
 
-function fmt(n) {
-  if (n == null || n === '') return '—';
-  if (n >= 10000000) return `₹${(n/10000000).toFixed(2)}Cr`;
-  if (n >= 100000) return `₹${(n/100000).toFixed(2)}L`;
-  return `₹${n.toLocaleString()}`;
+const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+function toDateInput(str) {
+  if (!str) return '';
+  const m1 = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2,4})$/);
+  if (m1) {
+    const y = m1[3].length === 2 ? 2000 + +m1[3] : +m1[3];
+    return `${y}-${String(+m1[2]).padStart(2,'0')}-${String(+m1[1]).padStart(2,'0')}`;
+  }
+  const m2 = str.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{2,4})$/);
+  if (m2) {
+    const y = m2[3].length === 2 ? 2000 + +m2[3] : +m2[3];
+    const mo = MON_NAMES.findIndex(n => n.toLowerCase() === m2[2].toLowerCase());
+    if (mo >= 0) return `${y}-${String(mo+1).padStart(2,'0')}-${String(+m2[1]).padStart(2,'0')}`;
+  }
+  return '';
+}
+
+function fromDateInput(str) {
+  if (!str) return '';
+  const m = str.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m) return `${m[3]}/${m[2]}/${m[1]}`;
+  return str;
 }
 
 function Field({ label, value }) {
@@ -154,9 +172,34 @@ export default function AccountDetail() {
           </select>
         ) : type === 'textarea' ? (
           <textarea rows={3} value={form[field] || ''} onChange={e => setForm(f => ({...f, [field]: e.target.value}))} />
+        ) : type === 'date' ? (
+          <input type="date" value={toDateInput(form[field] || '')}
+            onChange={e => setForm(f => ({...f, [field]: fromDateInput(e.target.value)}))} />
         ) : (
           <input type={type} value={form[field] != null ? form[field] : ''} onChange={e => setForm(f => ({...f, [field]: e.target.value}))} />
         )}
+      </div>
+    );
+  };
+
+  const MultiIdF = ({ label, field }) => {
+    const raw = account[field] || '';
+    const ids = raw ? raw.split(',').map(s => s.trim()).filter(Boolean) : [];
+    if (!editing) return (
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">{label}</p>
+        <div className="mt-1 flex flex-wrap gap-1">
+          {ids.length ? ids.map(id => (
+            <span key={id} className="inline-block text-xs bg-gray-100 text-gray-700 border border-gray-200 rounded px-1.5 py-0.5 font-mono">{id}</span>
+          )) : <span className="text-sm text-gray-300">—</span>}
+        </div>
+      </div>
+    );
+    return (
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{label}</p>
+        <input type="text" value={form[field] || ''} placeholder="Separate multiple IDs with commas"
+          onChange={e => setForm(f => ({...f, [field]: e.target.value}))} />
       </div>
     );
   };
@@ -213,7 +256,7 @@ export default function AccountDetail() {
           <Section title="Account Information">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <F label="Account Name" field="account_name" />
-              <F label="Tenant ID" field="tenant_id" />
+              <MultiIdF label="Tenant ID" field="tenant_id" />
               <F label="Industry" field="industry" />
               <F label="Region" field="region" options={['North','South','East','West']} />
               <F label="MRR Tier" field="mrr_tier" options={['Tier 1 (>500k)','Tier 2 (300k - 500k)','Tier 3 (200k - 300k)']} />
@@ -228,9 +271,9 @@ export default function AccountDetail() {
               <F label="CP" field="cp" />
               <F label="TAM Assigned" field="tam_assigned" />
               <F label="Billing Frequency" field="billing_frequency" options={['Monthly','Quarterly','Half Yearly','Yearly']} />
-              <F label="Renewal Date" field="renewal_date" />
+              <F label="Renewal Date" field="renewal_date" type="date" />
               <F label="Renewal Status" field="renewal_status" options={['Renewal Pending','Renewed']} />
-              <F label="Closure ETA" field="closure_eta" />
+              <F label="Closure ETA" field="closure_eta" type="date" />
               <F label="SA Status" field="sa_status" options={['Open','Churn']} />
             </div>
           </Section>
@@ -239,8 +282,6 @@ export default function AccountDetail() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <F label="Churn Status" field="churn_status" options={['','Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted']} />
               <F label="Churn Reason" field="churn_reason" />
-              <YNF label="Contraction Risk" field="contraction_risk" />
-              <YNF label="Churn Risk" field="churn_risk" />
               <F label="GRR (%)" field="grr" type="number" />
               <F label="NPS" field="nps" type="number" />
             </div>
@@ -264,10 +305,10 @@ export default function AccountDetail() {
 
           <Section title="Implementation">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <F label="Implementation Status" field="implementation_status" />
-              <F label="Implementation Type" field="implementation_type" />
-              <YNF label="PS Engagement" field="ps_engagement" />
-              <YNF label="PS Solutioning" field="ps_solutioning" />
+              <F label="Implementation Status" field="implementation_status" options={['Active','Hypercare','Planned']} />
+              <F label="Implementation Type" field="implementation_type" options={['New','CR Paid','CR FOC','Reimplementation']} />
+              <F label="PS Engagement" field="ps_engagement" />
+              <F label="PS Solutioning" field="ps_solutioning" />
             </div>
           </Section>
 
