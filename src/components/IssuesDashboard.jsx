@@ -93,7 +93,7 @@ export default function IssuesDashboard() {
   const [editForm,     setEditForm]     = useState({});
   const [editSaving,   setEditSaving]   = useState(false);
 
-  const [filters,      setFilters]      = useState({ status: '', priority: '', issue_type: '', owner_team: '', csm: '', month: '' });
+  const [filters,      setFilters]      = useState({ status: '', priority: '', issue_type: '', owner_team: '', csm: '', month: '', account_name: '' });
   const [search,       setSearch]       = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [conditions,   setConditions]   = useState([]);
@@ -241,6 +241,7 @@ export default function IssuesDashboard() {
   ];
 
   const bulkFieldDefs = [
+    { key: 'account_id',     label: 'Account',        type: 'account', group: 'Account' },
     { key: 'status',         label: 'Status',         type: 'select', group: 'Status & Priority', opts: ['Open','In Progress','Deferred','Resolved','Closed'] },
     { key: 'priority',       label: 'Priority',       type: 'select', group: 'Status & Priority', opts: ['P0','P1','P2','P3'] },
     { key: 'owner_team',     label: 'Owner Team',     type: 'text',   group: 'Assignment' },
@@ -254,7 +255,7 @@ export default function IssuesDashboard() {
 
   const clearAll = () => {
     setSearch('');
-    setFilters({ status: '', priority: '', issue_type: '', owner_team: '', csm: '', month: '' });
+    setFilters({ status: '', priority: '', issue_type: '', owner_team: '', csm: '', month: '', account_name: '' });
     setConditions([]);
   };
   const hasFilters = !!(search || Object.values(filters).some(Boolean) || conditions.length > 0);
@@ -267,6 +268,7 @@ export default function IssuesDashboard() {
         .filter(Boolean).join(' ').toLowerCase();
       if (!blob.includes(q)) return false;
     }
+    if (filters.account_name && issue.account_name !== filters.account_name) return false;
     if (filters.status     && issue.status     !== filters.status)     return false;
     if (filters.priority   && issue.priority   !== filters.priority)   return false;
     if (filters.issue_type && issue.issue_type !== filters.issue_type) return false;
@@ -467,6 +469,10 @@ export default function IssuesDashboard() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <select value={filters.account_name} onChange={e => setFilter('account_name', e.target.value)} className="!w-auto text-sm !py-1.5">
+            <option value="">All Accounts</option>
+            {[...new Set(issues.map(i => i.account_name).filter(Boolean))].sort().map(a => <option key={a}>{a}</option>)}
+          </select>
           <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="!w-auto text-sm !py-1.5">
             <option value="">All Statuses</option>
             {['Open','In Progress','Deferred','Resolved','Closed'].map(s => <option key={s}>{s}</option>)}
@@ -594,6 +600,12 @@ export default function IssuesDashboard() {
             {(() => {
               const def = bulkFieldDefs.find(f => f.key === bulkField);
               if (!def) return null;
+              if (def.type === 'account') return (
+                <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
+                  <option value="">— Select account —</option>
+                  {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
+                </select>
+              );
               if (def.type === 'select') return (
                 <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
                   <option value="">— Select value —</option>
@@ -833,7 +845,7 @@ export default function IssuesDashboard() {
             </div>
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
               Set <strong>{bulkFieldDefs.find(f => f.key === bulkField)?.label}</strong> to{' '}
-              <strong>"{bulkValue}"</strong> for{' '}
+              <strong>"{bulkField === 'account_id' ? (accounts.find(a => String(a.id) === String(bulkValue))?.account_name || bulkValue) : bulkValue}"</strong> for{' '}
               <strong>{displayed.length} issue{displayed.length !== 1 ? 's' : ''}</strong>
             </div>
             <div className="flex justify-end gap-3">

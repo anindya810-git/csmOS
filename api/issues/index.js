@@ -112,15 +112,24 @@ export default async function handler(req, res) {
     const { ids, field, value } = req.body;
     const ALLOWED = [
       'status', 'priority', 'owner_team', 'csm', 'csm_lead',
-      'issue_type', 'issue_sub_type', 'next_steps', 'closure_date',
+      'issue_type', 'issue_sub_type', 'next_steps', 'closure_date', 'account_id',
     ];
     if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
     if (!field || !ALLOWED.includes(field)) return res.status(400).json({ error: 'invalid field' });
     const coerced = value === '' || value === null || value === undefined ? null : value;
-    const { error } = await supabase
-      .from('issues')
-      .update({ [field]: coerced, updated_at: new Date().toISOString() })
-      .in('id', ids);
+
+    let updateObj = { updated_at: new Date().toISOString() };
+    if (field === 'account_id') {
+      updateObj.account_id = coerced ? parseInt(coerced) : null;
+      if (coerced) {
+        const { data: acct } = await supabase.from('accounts').select('account_name').eq('id', parseInt(coerced)).single();
+        if (acct) updateObj.account_name = acct.account_name;
+      }
+    } else {
+      updateObj[field] = coerced;
+    }
+
+    const { error } = await supabase.from('issues').update(updateObj).in('id', ids);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ updated: ids.length });
   }
