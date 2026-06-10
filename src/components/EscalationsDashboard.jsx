@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import Pagination from './Pagination';
 
 const STATUS_STYLES = {
   'Resolved':        'bg-green-100 text-green-800',
@@ -76,6 +77,8 @@ export default function EscalationsDashboard() {
   const [advancedOpen,setAdvancedOpen]= useState(false);
   const [conditions,  setConditions]  = useState([]);
   const [conditionLogic, setConditionLogic] = useState('AND');
+  const [page,        setPage]        = useState(1);
+  const [perPage,     setPerPage]     = useState(100);
   const [bulkOpen,    setBulkOpen]    = useState(false);
   const [bulkField,   setBulkField]   = useState('status');
   const [bulkValue,   setBulkValue]   = useState('');
@@ -111,8 +114,6 @@ export default function EscalationsDashboard() {
   }, [reload]);
 
   useEffect(() => { load(); }, [load]);
-
-  const setFilter = (key, val) => setFilters(f => ({ ...f, [key]: val }));
 
   const handleAccountSelect = (accountId) => {
     const acct = accounts.find(a => String(a.id) === String(accountId));
@@ -262,13 +263,18 @@ export default function EscalationsDashboard() {
     { key: 'month',                label: 'Month',                type: 'select', group: 'Classification', opts: MONTHS },
   ];
 
+  const setFilter = (key, val) => { setFilters(f => ({ ...f, [key]: val })); setPage(1); };
+  useEffect(() => { setPage(1); }, [search]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   const clearAll = () => {
     setSearch('');
     setFilters({ status: '', csm: '', ownership: '', issue_type: '', month: '' });
     setConditions([]);
+    setPage(1);
   };
   const hasFilters = !!(search || Object.values(filters).some(Boolean) || conditions.length > 0);
   const activeConditions = conditions.filter(c => c.field && c.operator);
+  // paginated is derived after displayed is computed below
 
   const displayed = escalations.filter(e => {
     if (search) {
@@ -285,6 +291,8 @@ export default function EscalationsDashboard() {
     const results = activeConditions.map(c => matchesEscalationCondition(e, c, fieldDefs));
     return conditionLogic === 'OR' ? results.some(Boolean) : results.every(Boolean);
   });
+
+  const paginated = displayed.slice((page - 1) * perPage, page * perPage);
 
   const stats = {
     total:         displayed.length,
@@ -696,7 +704,7 @@ export default function EscalationsDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {displayed.map(e => {
+                {paginated.map(e => {
                   const rag = e.accounts?.rag_status;
                   const isEditing = editing === e.id;
                   return (
@@ -933,11 +941,12 @@ export default function EscalationsDashboard() {
               </tbody>
             </table>
           </div>
+          <Pagination page={page} perPage={perPage} total={displayed.length} onPage={setPage} onPerPage={setPerPage} />
         </div>
 
         {/* Mobile / tablet cards */}
         <div className="lg:hidden space-y-3">
-          {displayed.map(e => {
+          {paginated.map(e => {
             const rag = e.accounts?.rag_status;
             const open = expanded === e.id;
             const isEditing = editing === e.id;
@@ -1165,6 +1174,7 @@ export default function EscalationsDashboard() {
               </div>
             );
           })}
+          <Pagination page={page} perPage={perPage} total={displayed.length} onPage={setPage} onPerPage={setPerPage} />
         </div>
         </>
       )}

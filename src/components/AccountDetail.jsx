@@ -82,6 +82,9 @@ export default function AccountDetail() {
   const [escalations, setEscalations] = useState([]);
   const [escalExpanded, setEscalExpanded] = useState(null);
   const [showAllEscal, setShowAllEscal] = useState(false);
+  const [issues,        setIssues]        = useState([]);
+  const [issueExpanded, setIssueExpanded] = useState(null);
+  const [showAllIssues, setShowAllIssues] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -96,6 +99,9 @@ export default function AccountDetail() {
       .finally(() => setLoading(false));
     axios.get(`/api/escalations?account_id=${id}`)
       .then(r => setEscalations(r.data || []))
+      .catch(() => {});
+    axios.get(`/api/issues?account_id=${id}`)
+      .then(r => setIssues(r.data || []))
       .catch(() => {});
   }, [id]);
 
@@ -121,6 +127,13 @@ export default function AccountDetail() {
   const activeEscal  = escalations.filter(e => e.status !== 'Resolved').length;
   const viewEscal    = showAllEscal ? escalations : escalations.slice(0, 3);
   const viewPocs     = [1,2,3].filter(n => a[`poc${n}_name`] || a[`poc${n}_email`]);
+
+  const openIssues   = issues.filter(i => i.status === 'Open').length;
+  const activeIssues = issues.filter(i => i.status !== 'Resolved').length;
+  const viewIssues   = showAllIssues ? issues : issues.slice(0, 3);
+  const topThemes    = Object.entries(
+    issues.reduce((acc, i) => { if (i.issue_type) { acc[i.issue_type] = (acc[i.issue_type] || 0) + 1; } return acc; }, {})
+  ).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
   return (
     <div className="space-y-5">
@@ -151,11 +164,12 @@ export default function AccountDetail() {
       </div>
 
       {/* Key metrics row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         <MetricCard label="MRR" value={fmt(a.mrr)} sub={a.mrr_tier} />
         <MetricCard label="Renewal" value={fmtDate(a.renewal_date)} sub={a.renewal_status} colorClass={a.renewal_status === 'Renewed' ? 'text-green-700' : 'text-gray-900'} />
         <MetricCard label="RAG" value={a.rag_status || '—'} colorClass={a.rag_status === 'Green' ? 'text-green-700' : a.rag_status === 'Red' ? 'text-red-700' : a.rag_status === 'Amber' ? 'text-amber-700' : 'text-gray-400'} />
         <MetricCard label="Escalations" value={activeEscal > 0 ? `${activeEscal} active` : escalations.length > 0 ? `${escalations.length} total` : '—'} sub={openEscal > 0 ? `${openEscal} open` : 'all resolved'} colorClass={openEscal > 0 ? 'text-red-600' : activeEscal > 0 ? 'text-amber-600' : 'text-gray-400'} />
+        <MetricCard label="Issues" value={activeIssues > 0 ? `${activeIssues} active` : issues.length > 0 ? `${issues.length} total` : '—'} sub={openIssues > 0 ? `${openIssues} open` : issues.length > 0 ? 'all resolved' : undefined} colorClass={openIssues > 0 ? 'text-red-600' : activeIssues > 0 ? 'text-amber-600' : 'text-gray-400'} />
         <MetricCard label="Adoption" value={a.adoption_score != null ? `${a.adoption_score}` : '—'} sub="score" />
         <MetricCard label="NPS" value={a.nps != null ? `${a.nps}` : '—'} />
       </div>
@@ -230,6 +244,109 @@ export default function AccountDetail() {
               </>
             ) : (
               <p className="text-sm text-gray-400 italic">No escalations recorded.</p>
+            )}
+          </div>
+
+          {/* Issues */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-700">
+                Issues
+                {issues.length > 0 && <span className="ml-2 text-xs font-normal text-gray-400">{issues.length} total</span>}
+              </h3>
+              <div className="flex items-center gap-2">
+                {issues.length === 0 && <span className="text-xs text-gray-400">None recorded</span>}
+                <Link to="/issues" className="text-xs text-brand-600 hover:underline font-medium">All issues →</Link>
+              </div>
+            </div>
+
+            {issues.length > 0 ? (
+              <>
+                {/* Status summary chips */}
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {(['Open','In Progress','Resolved']).map(s => {
+                    const cnt = issues.filter(i => i.status === s).length;
+                    if (!cnt) return null;
+                    return <span key={s} className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[s] || 'bg-gray-100 text-gray-700'}`}>{cnt} {s}</span>;
+                  })}
+                </div>
+
+                {/* Top themes */}
+                {topThemes.length > 0 && (
+                  <div className="mb-4 p-3 bg-gray-50 rounded-lg">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Top Themes</p>
+                    <div className="space-y-1.5">
+                      {topThemes.map(([type, count]) => (
+                        <div key={type} className="flex items-center gap-2">
+                          <div className="flex-1 bg-gray-200 rounded-full h-1.5 overflow-hidden">
+                            <div className="bg-brand-500 h-full rounded-full" style={{ width: `${Math.round((count / issues.length) * 100)}%` }} />
+                          </div>
+                          <span className="text-xs text-gray-600 whitespace-nowrap min-w-0 truncate max-w-[140px]">{type}</span>
+                          <span className="text-xs font-semibold text-gray-700 shrink-0">{count}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  {viewIssues.map(issue => (
+                    <div key={issue.id} className="rounded-lg border border-gray-100 overflow-hidden">
+                      <button
+                        type="button"
+                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 transition text-left"
+                        onClick={() => setIssueExpanded(issueExpanded === issue.id ? null : issue.id)}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className={`shrink-0 inline-flex text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[issue.status] || 'bg-gray-100 text-gray-700'}`}>{issue.status}</span>
+                          {issue.priority && <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded border ${issue.priority === 'High' ? 'bg-red-50 text-red-600 border-red-200' : issue.priority === 'Medium' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-gray-50 text-gray-500 border-gray-200'}`}>{issue.priority}</span>}
+                          <span className="text-sm text-gray-700 truncate">{issue.description?.substring(0, 70)}{issue.description?.length > 70 ? '…' : ''}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <span className="text-xs text-gray-400 whitespace-nowrap">{fmtDate(issue.reported_date)}</span>
+                          <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${issueExpanded === issue.id ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                      </button>
+                      {issueExpanded === issue.id && (
+                        <div className="px-3 pb-3 pt-1 bg-gray-50 border-t border-gray-100 space-y-2 text-sm">
+                          <p className="text-gray-700 whitespace-pre-wrap">{issue.description}</p>
+                          {issue.next_steps && <div><p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Next Steps</p><p className="text-gray-700 whitespace-pre-wrap">{issue.next_steps}</p></div>}
+                          <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1">
+                            {issue.issue_type && <span><span className="font-medium">Type:</span> {issue.issue_type}</span>}
+                            {issue.issue_sub_type && <span><span className="font-medium">Sub-type:</span> {issue.issue_sub_type}</span>}
+                            {issue.owner_team && <span><span className="font-medium">Owner:</span> {issue.owner_team}</span>}
+                            {issue.csm && <span><span className="font-medium">CSM:</span> {issue.csm}</span>}
+                            {issue.closure_date && <span><span className="font-medium">Closure:</span> {issue.closure_date}</span>}
+                          </div>
+                          {(issue.support_ticket || issue.dev_ticket) && (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {issue.support_ticket && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2 py-0.5 rounded font-mono">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
+                                  Support #{issue.support_ticket}
+                                </span>
+                              )}
+                              {issue.dev_ticket && (
+                                <span className="inline-flex items-center gap-1 text-xs bg-purple-50 text-purple-700 border border-purple-200 px-2 py-0.5 rounded font-mono">
+                                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" /></svg>
+                                  Dev #{issue.dev_ticket}
+                                </span>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {issues.length > 3 && (
+                  <button onClick={() => setShowAllIssues(s => !s)} className="mt-3 text-xs text-brand-600 hover:underline font-medium">
+                    {showAllIssues ? 'Show less' : `Show all ${issues.length} issues`}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-400 italic">No issues recorded.</p>
             )}
           </div>
 

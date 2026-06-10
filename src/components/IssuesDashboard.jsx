@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import Pagination from './Pagination';
 
 const PRIORITY_BADGE = {
   P0: 'bg-red-100 text-red-800 border border-red-200',
@@ -98,6 +99,8 @@ export default function IssuesDashboard() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [conditions,   setConditions]   = useState([]);
   const [conditionLogic, setConditionLogic] = useState('AND');
+  const [page,         setPage]         = useState(1);
+  const [perPage,      setPerPage]      = useState(100);
   const [bulkOpen,     setBulkOpen]     = useState(false);
   const [bulkField,    setBulkField]    = useState('status');
   const [bulkValue,    setBulkValue]    = useState('');
@@ -122,7 +125,8 @@ export default function IssuesDashboard() {
 
   useEffect(() => { load(); }, [load]);
 
-  const setFilter = (key, val) => setFilters(f => ({ ...f, [key]: val }));
+  const setFilter = (key, val) => { setFilters(f => ({ ...f, [key]: val })); setPage(1); };
+  useEffect(() => { setPage(1); }, [search]);
 
   const handleAccountSelect = (accountId, setter) => {
     const acct = accounts.find(a => String(a.id) === String(accountId));
@@ -258,6 +262,7 @@ export default function IssuesDashboard() {
     setSearch('');
     setFilters({ status: '', priority: '', issue_type: '', owner_team: '', csm: '', month: '', account_name: '' });
     setConditions([]);
+    setPage(1);
   };
   const hasFilters = !!(search || Object.values(filters).some(Boolean) || conditions.length > 0);
   const activeConditions = conditions.filter(c => c.field && c.operator);
@@ -283,6 +288,8 @@ export default function IssuesDashboard() {
     const results = activeConditions.map(c => matchesCondition(issue, c, fieldDefs));
     return conditionLogic === 'OR' ? results.some(Boolean) : results.every(Boolean);
   });
+
+  const paginated = displayed.slice((page - 1) * perPage, page * perPage);
 
   const stats = {
     total:      displayed.length,
@@ -652,7 +659,7 @@ export default function IssuesDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {displayed.map(issue => {
+                  {paginated.map(issue => {
                     const isEditing = editing === issue.id;
                     return (
                       <React.Fragment key={issue.id}>
@@ -760,9 +767,11 @@ export default function IssuesDashboard() {
             </div>
           </div>
 
+          <Pagination page={page} perPage={perPage} total={displayed.length} onPage={setPage} onPerPage={setPerPage} />
+
           {/* Mobile cards */}
           <div className="lg:hidden space-y-3">
-            {displayed.map(issue => {
+            {paginated.map(issue => {
               const open = expanded === issue.id;
               const isEditing = editing === issue.id;
               return (

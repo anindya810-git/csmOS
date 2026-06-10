@@ -2,6 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import Pagination from './Pagination';
 
 function fmt(n) {
   if (!n) return '—';
@@ -137,6 +138,8 @@ export default function AccountsPage() {
   const [bulkValue,        setBulkValue]        = useState('');
   const [bulkConfirm,      setBulkConfirm]      = useState(false);
   const [bulkSaving,       setBulkSaving]       = useState(false);
+  const [page,             setPage]             = useState(1);
+  const [perPage,          setPerPage]          = useState(100);
 
   // Field definitions with dynamic options from filters
   const fieldDefs = useMemo(() => [
@@ -269,13 +272,18 @@ export default function AccountsPage() {
   const removeCondition = (id) =>
     setConditions(c => c.filter(cond => cond.id !== id));
 
+  useEffect(() => { setPage(1); }, [search]);  // eslint-disable-line react-hooks/exhaustive-deps
+
   const clearAll = () => {
     setSearch('');
     setQuery({ csm: '', industry: '', region: '', rag_status: '', mrr_tier: '' });
     setConditions([]);
+    setPage(1);
   };
 
   const hasFilters = search || Object.values(query).some(Boolean) || conditions.length > 0;
+
+  const paginated = displayed.slice((page - 1) * perPage, page * perPage);
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -599,7 +607,7 @@ export default function AccountsPage() {
                 <tr><td colSpan={9} className="py-12 text-center text-gray-400">Loading…</td></tr>
               ) : displayed.length === 0 ? (
                 <tr><td colSpan={9} className="py-12 text-center text-gray-400">No accounts found.</td></tr>
-              ) : displayed.map(a => (
+              ) : paginated.map(a => (
                 <tr key={a.id} onClick={() => navigate(`/accounts/${a.id}`)} className="hover:bg-gray-50 cursor-pointer transition">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900 max-w-xs truncate">{a.account_name}</div>
@@ -625,6 +633,7 @@ export default function AccountsPage() {
               ))}
             </tbody>
           </table>
+          <Pagination page={page} perPage={perPage} total={displayed.length} onPage={setPage} onPerPage={setPerPage} />
         </div>
       </div>
 
@@ -634,7 +643,7 @@ export default function AccountsPage() {
           <div className="card text-center py-10 text-gray-400">Loading…</div>
         ) : displayed.length === 0 ? (
           <div className="card text-center py-10 text-gray-400">No accounts found.</div>
-        ) : displayed.map(a => (
+        ) : paginated.map(a => (
           <button key={a.id} onClick={() => navigate(`/accounts/${a.id}`)}
             className="card w-full text-left active:bg-gray-50 transition">
             <div className="flex items-start justify-between gap-3">
@@ -659,6 +668,7 @@ export default function AccountsPage() {
             </div>
           </button>
         ))}
+        <Pagination page={page} perPage={perPage} total={displayed.length} onPage={setPage} onPerPage={setPerPage} />
       </div>
 
       {bulkConfirm && (
