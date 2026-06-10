@@ -14,7 +14,8 @@ export default async function handler(req, res) {
 
     let query = supabase.from('accounts').select('*').order('account_name');
 
-    if (csm) query = query.eq('csm', csm);
+    if (user.role === 'csm') query = query.eq('csm', user.csm_name);
+    else if (csm) query = query.eq('csm', csm);
     if (industry) query = query.eq('industry', industry);
     if (region) query = query.eq('region', region);
     if (rag_status) query = query.eq('rag_status', rag_status);

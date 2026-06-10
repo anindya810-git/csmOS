@@ -7,11 +7,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  try { verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  let user;
+  try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
-  const { data: accounts, error } = await supabase
-    .from('accounts')
-    .select('id, rag_status, industry, csm, mrr, churn_status, churn_risk, renewal_status');
+  let statsQuery = supabase.from('accounts').select('id, rag_status, industry, csm, mrr, churn_status, churn_risk, renewal_status');
+  if (user.role === 'csm') statsQuery = statsQuery.eq('csm', user.csm_name);
+  const { data: accounts, error } = await statsQuery;
 
   if (error) return res.status(500).json({ error: error.message });
 

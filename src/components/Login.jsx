@@ -58,12 +58,8 @@ export default function Login() {
             </button>
           </form>
 
-          <div className="mt-6 pt-5 border-t border-gray-100">
-            <p className="text-xs text-gray-400 font-medium uppercase tracking-wide mb-2">Demo credentials</p>
-            <div className="space-y-1 text-xs text-gray-500">
-              <div className="flex justify-between"><span className="font-medium">Admin</span><span>anindya@leadsquared.com / Admin@123</span></div>
-              <div className="flex justify-between"><span className="font-medium">CSM</span><span>abhishek.bhargav@leadsquared.com / Csm@123</span></div>
-            </div>
+          <div className="mt-6 pt-5 border-t border-gray-100 text-center">
+            <p className="text-xs text-gray-400">Contact your admin if you've forgotten your password.</p>
           </div>
         </div>
       </div>

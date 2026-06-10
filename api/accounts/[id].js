@@ -30,6 +30,7 @@ export default async function handler(req, res) {
       .from('accounts').select('*').eq('id', id).single();
 
     if (error || !account) return res.status(404).json({ error: 'Not found' });
+    if (user.role === 'csm' && account.csm !== user.csm_name) return res.status(403).json({ error: 'Access denied' });
 
     const { data: logs } = await supabase
       .from('activity_log')
@@ -49,6 +50,7 @@ export default async function handler(req, res) {
       .from('accounts').select('*').eq('id', id).single();
 
     if (fetchErr || !current) return res.status(404).json({ error: 'Not found' });
+    if (user.role === 'csm' && current.csm !== user.csm_name) return res.status(403).json({ error: 'Access denied' });
 
     const updates = {};
     const changes = {};

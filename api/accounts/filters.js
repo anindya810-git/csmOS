@@ -7,9 +7,12 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
 
-  try { verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  let user;
+  try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
-  const { data, error } = await supabase.from('accounts').select('csm, industry, region, mrr_tier');
+  let filtersQuery = supabase.from('accounts').select('csm, industry, region, mrr_tier');
+  if (user.role === 'csm') filtersQuery = filtersQuery.eq('csm', user.csm_name);
+  const { data, error } = await filtersQuery;
   if (error) return res.status(500).json({ error: error.message });
 
   const csms = [...new Set(data.map(a => a.csm).filter(Boolean))].sort();
