@@ -6,7 +6,8 @@
   "rewrites": [
     { "source": "/login",          "destination": "/index.html" },
     { "source": "/accounts",       "destination": "/index.html" },
-    { "source": "/accounts/:id",   "destination": "/index.html" },
+    { "source": "/accounts/:id",      "destination": "/index.html" },
+    { "source": "/accounts/:id/edit", "destination": "/index.html" },
     { "source": "/renewal",        "destination": "/index.html" },
     { "source": "/rag",            "destination": "/index.html" },
     { "source": "/escalations",         "destination": "/index.html" },

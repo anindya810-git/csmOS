@@ -11,6 +11,7 @@ import RAGDashboard from './components/RAGDashboard';
 import EscalationsDashboard from './components/EscalationsDashboard';
 import WeeklyEscalationsDashboard from './components/WeeklyEscalationsDashboard';
 import SettingsPage from './components/SettingsPage';
+import AccountEdit from './components/AccountEdit';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -37,6 +38,7 @@ function AppRoutes() {
         <Route index element={<Dashboard />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
+        <Route path="accounts/:id/edit" element={<AccountEdit />} />
         <Route path="renewal" element={<RenewalDashboard />} />
         <Route path="rag" element={<RAGDashboard />} />
         <Route path="escalations" element={<EscalationsDashboard />} />
