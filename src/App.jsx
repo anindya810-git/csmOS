@@ -10,6 +10,7 @@ import RenewalDashboard from './components/RenewalDashboard';
 import RAGDashboard from './components/RAGDashboard';
 import EscalationsDashboard from './components/EscalationsDashboard';
 import WeeklyEscalationsDashboard from './components/WeeklyEscalationsDashboard';
+import SettingsPage from './components/SettingsPage';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -19,6 +20,12 @@ function ProtectedRoute({ children }) {
     </div>
   );
   return user ? children : <Navigate to="/login" replace />;
+}
+
+function AdminRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return user?.role === 'admin' ? children : <Navigate to="/" replace />;
 }
 
 function AppRoutes() {
@@ -34,6 +41,7 @@ function AppRoutes() {
         <Route path="rag" element={<RAGDashboard />} />
         <Route path="escalations" element={<EscalationsDashboard />} />
         <Route path="escalations/weekly" element={<WeeklyEscalationsDashboard />} />
+        <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

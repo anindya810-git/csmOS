@@ -65,9 +65,24 @@ function matchesCondition(account, cond, escalationMap, fieldDefs) {
     const has = !!(escalationMap[account.id]?.length);
     return operator === 'is yes' ? has : !has;
   }
-  if (field === 'has_open_escalation') {
-    const has = !!(escalationMap[account.id]?.some(e => e.status === 'Open'));
-    return operator === 'is yes' ? has : !has;
+  if (field === 'escalation_status') {
+    const escs = escalationMap[account.id] || [];
+    if (operator === 'is empty')     return escs.length === 0;
+    if (operator === 'is not empty') return escs.length > 0;
+    if (operator === 'is')           return escs.some(e => e.status === value);
+    if (operator === 'is not')       return !escs.some(e => e.status === value);
+    return true;
+  }
+  if (field === 'escalation_date') {
+    const escs = escalationMap[account.id] || [];
+    if (operator === 'is empty')     return escs.length === 0;
+    if (operator === 'is not empty') return escs.length > 0;
+    if (!value) return true;
+    const vD = new Date(value);
+    if (operator === 'is')     return escs.some(e => e.date_of_escalation && new Date(e.date_of_escalation).toDateString() === vD.toDateString());
+    if (operator === 'before') return escs.some(e => e.date_of_escalation && new Date(e.date_of_escalation) < vD);
+    if (operator === 'after')  return escs.some(e => e.date_of_escalation && new Date(e.date_of_escalation) > vD);
+    return true;
   }
 
   const raw = account[field];
@@ -135,8 +150,9 @@ export default function AccountsPage() {
     { key: 'stickiness_score',      label: 'Stickiness Score',         type: 'number' },
     { key: 'poc_name',              label: 'POC Name',                 type: 'text' },
     { key: 'poc_email',             label: 'POC Email',                type: 'text' },
+    { key: 'escalation_status',     label: 'Escalation Status',        type: 'select', opts: ['Open','In Progress','Partly Resolved','Resolved'] },
+    { key: 'escalation_date',       label: 'Escalation Date',          type: 'date' },
     { key: 'has_escalation',        label: 'Has Any Escalation',       type: 'bool' },
-    { key: 'has_open_escalation',   label: 'Has Open Escalation',      type: 'bool' },
   ], [filters]);
 
   useEffect(() => { axios.get('/api/accounts/filters').then(r => setFilters(r.data)); }, []);

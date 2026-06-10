@@ -133,6 +133,17 @@ export default function EscalationsDashboard() {
     }
   };
 
+  const handleDelete = async (id) => {
+    if (!window.confirm('Delete this escalation? This cannot be undone.')) return;
+    try {
+      await axios.delete(`/api/escalations/${id}`);
+      if (editing === id) setEditing(null);
+      setReload(r => r + 1);
+    } catch (e) {
+      alert('Failed to delete: ' + (e.response?.data?.error || e.message));
+    }
+  };
+
   const handleEditSave = async () => {
     if (!editForm.description) { alert('Description is required'); return; }
     setEditSaving(true);
@@ -437,17 +448,28 @@ export default function EscalationsDashboard() {
                         <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{e.eta || '—'}</td>
                         <td className="px-4 py-3 text-gray-600 text-xs">{e.escalated_by || '—'}</td>
                         <td className="px-3 py-3">
-                          <button
-                            onClick={ev => { ev.stopPropagation(); isEditing ? setEditing(null) : startEdit(e); }}
-                            className={`p-1.5 rounded-md transition ${isEditing ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-100'}`}
-                            title={isEditing ? 'Cancel edit' : 'Edit escalation'}
-                          >
-                            {isEditing ? (
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                            ) : (
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={ev => { ev.stopPropagation(); isEditing ? setEditing(null) : startEdit(e); }}
+                              className={`p-1.5 rounded-md transition ${isEditing ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-100'}`}
+                              title={isEditing ? 'Cancel edit' : 'Edit escalation'}
+                            >
+                              {isEditing ? (
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                              ) : (
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                              )}
+                            </button>
+                            {user?.role === 'admin' && !isEditing && (
+                              <button
+                                onClick={ev => { ev.stopPropagation(); handleDelete(e.id); }}
+                                className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                                title="Delete escalation"
+                              >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
                             )}
-                          </button>
+                          </div>
                         </td>
                       </tr>
                       {expanded === e.id && !isEditing && (
@@ -626,17 +648,28 @@ export default function EscalationsDashboard() {
                       {e.eta && <span><span className="text-gray-400">ETA:</span> {e.eta}</span>}
                     </div>
                   </button>
-                  <button
-                    onClick={() => { isEditing ? setEditing(null) : startEdit(e); }}
-                    className={`px-3 border-l border-gray-100 transition shrink-0 ${isEditing ? 'bg-amber-100 text-amber-600' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-50'}`}
-                    title={isEditing ? 'Cancel edit' : 'Edit escalation'}
-                  >
-                    {isEditing ? (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                  <div className="flex flex-col border-l border-gray-100 shrink-0">
+                    <button
+                      onClick={() => { isEditing ? setEditing(null) : startEdit(e); }}
+                      className={`flex-1 px-3 transition ${isEditing ? 'bg-amber-100 text-amber-600' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-50'}`}
+                      title={isEditing ? 'Cancel edit' : 'Edit escalation'}
+                    >
+                      {isEditing ? (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      )}
+                    </button>
+                    {user?.role === 'admin' && !isEditing && (
+                      <button
+                        onClick={() => handleDelete(e.id)}
+                        className="flex-1 px-3 border-t border-gray-100 text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                        title="Delete escalation"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
                     )}
-                  </button>
+                  </div>
                 </div>
                 {open && !isEditing && (
                   <div className="px-4 pb-4 pt-1 bg-gray-50 border-t border-gray-100 space-y-3">

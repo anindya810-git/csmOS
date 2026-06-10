@@ -11,6 +11,7 @@
     { "source": "/rag",            "destination": "/index.html" },
     { "source": "/escalations",         "destination": "/index.html" },
     { "source": "/escalations/weekly", "destination": "/index.html" },
+    { "source": "/settings",           "destination": "/index.html" },
     { "source": "/",               "destination": "/index.html" }
   ]
 }
