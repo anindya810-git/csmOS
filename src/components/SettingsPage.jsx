@@ -11,10 +11,22 @@ const ROLE_BADGE = {
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'csm', csm_name: '', csm_lead: '' };
 
 const DD_FIELDS = [
-  { key: 'trigger_reason',      label: 'Trigger Reason' },
-  { key: 'source_of_escalation',label: 'Source of Escalation' },
-  { key: 'issue_type',          label: 'Issue Type' },
-  { key: 'issue_sub_type',      label: 'Issue Sub-Type' },
+  { key: 'escalation_status',    label: 'Escalation Status',    section: 'Escalations' },
+  { key: 'ownership',            label: 'Ownership',            section: 'Escalations' },
+  { key: 'escalated_by',         label: 'Escalated By',         section: 'Escalations' },
+  { key: 'ps_leader',            label: 'PS Leader',            section: 'Escalations' },
+  { key: 'trigger_reason',       label: 'Trigger Reason',       section: 'Escalations' },
+  { key: 'source_of_escalation', label: 'Source of Escalation', section: 'Escalations' },
+  { key: 'issue_type',           label: 'Issue Type',           section: 'Escalations' },
+  { key: 'issue_sub_type',       label: 'Issue Sub-Type',       section: 'Escalations' },
+  { key: 'mrr_tier',             label: 'MRR Tier',             section: 'Accounts' },
+  { key: 'rag_status',           label: 'RAG Status',           section: 'Accounts' },
+  { key: 'billing_frequency',    label: 'Billing Frequency',    section: 'Accounts' },
+  { key: 'renewal_status',       label: 'Renewal Status',       section: 'Accounts' },
+  { key: 'churn_status',         label: 'Churn Status',         section: 'Accounts' },
+  { key: 'contraction_risk',     label: 'Contraction Risk',     section: 'Accounts' },
+  { key: 'churn_risk',           label: 'Churn Risk',           section: 'Accounts' },
+  { key: 'implementation_status',label: 'Implementation Status',section: 'Accounts' },
 ];
 
 function getInitials(name) {
@@ -319,16 +331,21 @@ export default function SettingsPage() {
         </div>
         <div className="flex min-h-[320px]">
           {/* Left: field selector */}
-          <div className="w-48 shrink-0 border-r border-gray-100 bg-gray-50">
-            {DD_FIELDS.map(f => (
-              <button
-                key={f.key}
-                onClick={() => { setDdField(f.key); setDdEditId(null); setDdAddValue(''); setDdAddParent(''); }}
-                className={`w-full text-left px-4 py-3 text-sm transition border-b border-gray-100 last:border-0 ${ddField === f.key ? 'bg-white font-semibold text-brand-700 border-r-2 border-brand-600' : 'text-gray-600 hover:bg-white'}`}
-              >
-                {f.label}
-                <span className="ml-1 text-xs font-normal text-gray-400">({(ddData[f.key] || []).length})</span>
-              </button>
+          <div className="w-52 shrink-0 border-r border-gray-100 bg-gray-50 overflow-y-auto">
+            {Object.entries(DD_FIELDS.reduce((acc, f) => { (acc[f.section] = acc[f.section] || []).push(f); return acc; }, {})).map(([section, fields]) => (
+              <div key={section}>
+                <p className="px-4 pt-3 pb-1 text-xs font-bold text-gray-400 uppercase tracking-widest">{section}</p>
+                {fields.map(f => (
+                  <button
+                    key={f.key}
+                    onClick={() => { setDdField(f.key); setDdEditId(null); setDdAddValue(''); setDdAddParent(''); }}
+                    className={`w-full text-left px-4 py-2.5 text-sm transition border-b border-gray-100 last:border-0 ${ddField === f.key ? 'bg-white font-semibold text-brand-700 border-r-2 border-brand-600' : 'text-gray-600 hover:bg-white'}`}
+                  >
+                    {f.label}
+                    <span className="ml-1 text-xs font-normal text-gray-400">({(ddData[f.key] || []).length})</span>
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
-const YN_OPTS = ['Yes', 'No', ''];
+const YN_OPTS = ['Yes', 'No'];
 
 function Section({ title, children }) {
   return (
@@ -40,6 +40,7 @@ export default function AccountEdit() {
   const [csmLeads, setCsmLeads] = useState([]);
   const [csmLeadMap, setCsmLeadMap] = useState({});
   const [tiers, setTiers] = useState([]);
+  const [ddConfig, setDdConfig] = useState({});
 
   useEffect(() => {
     axios.get('/api/accounts/filters')
@@ -49,6 +50,9 @@ export default function AccountEdit() {
         setCsmLeadMap(r.data.csmLeadMap || {});
         setTiers(r.data.tiers || []);
       })
+      .catch(() => {});
+    axios.get('/api/dropdown-config')
+      .then(r => setDdConfig(r.data || {}))
       .catch(() => {});
   }, []);
 
@@ -87,6 +91,9 @@ export default function AccountEdit() {
       return next;
     });
   };
+
+  const opts = (key, fallback = []) =>
+    (ddConfig[key]?.length ? ddConfig[key].map(o => o.value) : fallback);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -200,7 +207,7 @@ export default function AccountEdit() {
         <Field label="TAM Assigned">
           <select className={selectCls} value={form.tam_assigned || ''} onChange={e => set('tam_assigned', e.target.value)}>
             <option value="">— Select —</option>
-            {['Yes','No'].map(v => <option key={v} value={v}>{v}</option>)}
+            {YN_OPTS.map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </Field>
         <Field label="SA Status">
@@ -209,7 +216,7 @@ export default function AccountEdit() {
         <Field label="Billing Frequency">
           <select className={selectCls} value={form.billing_frequency || ''} onChange={e => set('billing_frequency', e.target.value)}>
             <option value="">— Select —</option>
-            {['Monthly','Quarterly','Half-Yearly','Annually'].map(v => <option key={v} value={v}>{v}</option>)}
+            {opts('billing_frequency', ['Monthly','Quarterly','Half-Yearly','Annually']).map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </Field>
         <Field label="Renewal Date">
@@ -218,7 +225,7 @@ export default function AccountEdit() {
         <Field label="Renewal Status">
           <select className={selectCls} value={form.renewal_status || ''} onChange={e => set('renewal_status', e.target.value)}>
             <option value="">— Select —</option>
-            {['Renewed','At Risk','Lost','Pending'].map(v => <option key={v} value={v}>{v}</option>)}
+            {opts('renewal_status', ['Renewed','At Risk','Lost','Pending']).map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </Field>
         <Field label="Closure ETA">
@@ -231,19 +238,19 @@ export default function AccountEdit() {
         <Field label="Churn Status">
           <select className={selectCls} value={form.churn_status || ''} onChange={e => set('churn_status', e.target.value)}>
             <option value="">— None —</option>
-            {['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted'].map(v => <option key={v} value={v}>{v}</option>)}
+            {opts('churn_status', ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted']).map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </Field>
         <Field label="Contraction Risk">
           <select className={selectCls} value={form.contraction_risk || ''} onChange={e => set('contraction_risk', e.target.value)}>
             <option value="">— Select —</option>
-            {['High','Medium','Low','None'].map(v => <option key={v} value={v}>{v}</option>)}
+            {opts('contraction_risk', ['High','Medium','Low','None']).map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </Field>
         <Field label="Churn Risk">
           <select className={selectCls} value={form.churn_risk || ''} onChange={e => set('churn_risk', e.target.value)}>
             <option value="">— Select —</option>
-            {['High','Medium','Low','None'].map(v => <option key={v} value={v}>{v}</option>)}
+            {opts('churn_risk', ['High','Medium','Low','None']).map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </Field>
         <Field label="GRR (%)">
@@ -265,7 +272,7 @@ export default function AccountEdit() {
         <Field label="RAG Status">
           <select className={selectCls} value={form.rag_status || ''} onChange={e => set('rag_status', e.target.value)}>
             <option value="">— Select —</option>
-            {['Green','Amber','Red'].map(v => <option key={v} value={v}>{v}</option>)}
+            {opts('rag_status', ['Green','Amber','Red']).map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </Field>
         <Field label="Adoption Score">
@@ -290,7 +297,7 @@ export default function AccountEdit() {
         <Field label="Implementation Status">
           <select className={selectCls} value={form.implementation_status || ''} onChange={e => set('implementation_status', e.target.value)}>
             <option value="">— Select —</option>
-            {['Not Started','In Progress','Completed','On Hold'].map(v => <option key={v} value={v}>{v}</option>)}
+            {opts('implementation_status', ['Not Started','In Progress','Completed','On Hold']).map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </Field>
         <Field label="Implementation Type">
@@ -299,7 +306,7 @@ export default function AccountEdit() {
         <Field label="PS Engagement">
           <select className={selectCls} value={form.ps_engagement || ''} onChange={e => set('ps_engagement', e.target.value)}>
             <option value="">— Select —</option>
-            {YN_OPTS.filter(Boolean).map(v => <option key={v} value={v}>{v}</option>)}
+            {YN_OPTS.map(v => <option key={v} value={v}>{v}</option>)}
           </select>
         </Field>
         <Field label="PS Solutioning">

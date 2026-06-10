@@ -18,9 +18,6 @@ const RAG_BADGE = {
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
-const OWNERSHIP_OPTIONS = ['CSM','PS','CSM + PS','PS + CSM','Support + CSM','Sales + CSM','CSM + CP','CSM + CP + PS','CSM + PS + Engg','PS + CSM + Support','CSM + Engg + Support','CSM + Engg + PS','Support + Engg + PS + CSM','PS DEV + Product + CSM','Support + Product + CSM','CSM + Billings','Product'];
-const ESCALATED_BY_OPTIONS = ['CSM','Vivek','Pritam','Vivek / Pritam','Nilesh','Prashant'];
-const PS_LEADER_OPTIONS = ['Hirak','Ambrish'];
 
 const EMPTY_FORM = {
   account_id: null, account_name: '', tenant_id: '',
@@ -275,14 +272,14 @@ export default function EscalationsDashboard() {
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
               <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="!py-1.5 text-sm">
-                <option>Open</option><option>In Progress</option><option>Partly Resolved</option><option>Resolved</option>
+                {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
               <select value={form.ownership} onChange={e => setForm(f => ({ ...f, ownership: e.target.value }))} className="!py-1.5 text-sm">
                 <option value="">—</option>
-                {OWNERSHIP_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                {(dropdownConfig.ownership || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
               </select>
             </div>
             <div>
@@ -304,14 +301,14 @@ export default function EscalationsDashboard() {
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
               <select value={form.ps_leader} onChange={e => setForm(f => ({ ...f, ps_leader: e.target.value }))} className="!py-1.5 text-sm">
                 <option value="">—</option>
-                {PS_LEADER_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                {(dropdownConfig.ps_leader || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
               </select>
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
               <select value={form.escalated_by} onChange={e => setForm(f => ({ ...f, escalated_by: e.target.value }))} className="!py-1.5 text-sm">
                 <option value="">—</option>
-                {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                {(dropdownConfig.escalated_by || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
               </select>
             </div>
             <div>
@@ -379,7 +376,7 @@ export default function EscalationsDashboard() {
         <div className="flex flex-wrap items-center gap-3">
           <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="!w-auto text-sm">
             <option value="">All Statuses</option>
-            <option>Open</option><option>In Progress</option><option>Partly Resolved</option><option>Resolved</option>
+            {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
           </select>
           {user?.role === 'admin' && (
             <select value={filters.csm} onChange={e => setFilter('csm', e.target.value)} className="!w-auto text-sm">
@@ -583,7 +580,7 @@ export default function EscalationsDashboard() {
                                 <div>
                                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
                                   <select value={editForm.status || 'Open'} onChange={ev => setEditForm(f => ({ ...f, status: ev.target.value }))} className="!py-1.5 text-sm">
-                                    <option>Open</option><option>In Progress</option><option>Partly Resolved</option><option>Resolved</option>
+                                    {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
                                   </select>
                                 </div>
                                 <div className="sm:col-span-2 lg:col-span-3">
@@ -602,7 +599,7 @@ export default function EscalationsDashboard() {
                                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
                                   <select value={editForm.ownership || ''} onChange={ev => setEditForm(f => ({ ...f, ownership: ev.target.value }))} className="!py-1.5 text-sm">
                                     <option value="">—</option>
-                                    {OWNERSHIP_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                                    {(dropdownConfig.ownership || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                                   </select>
                                 </div>
                                 <div>
@@ -619,14 +616,14 @@ export default function EscalationsDashboard() {
                                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
                                   <select value={editForm.ps_leader || ''} onChange={ev => setEditForm(f => ({ ...f, ps_leader: ev.target.value }))} className="!py-1.5 text-sm">
                                     <option value="">—</option>
-                                    {PS_LEADER_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                                    {(dropdownConfig.ps_leader || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                                   </select>
                                 </div>
                                 <div>
                                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
                                   <select value={editForm.escalated_by || ''} onChange={ev => setEditForm(f => ({ ...f, escalated_by: ev.target.value }))} className="!py-1.5 text-sm">
                                     <option value="">—</option>
-                                    {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                                    {(dropdownConfig.escalated_by || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                                   </select>
                                 </div>
                                 <div>
@@ -827,14 +824,14 @@ export default function EscalationsDashboard() {
                         <div>
                           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
                           <select value={editForm.status || 'Open'} onChange={ev => setEditForm(f => ({ ...f, status: ev.target.value }))} className="text-sm">
-                            <option>Open</option><option>In Progress</option><option>Partly Resolved</option><option>Resolved</option>
+                            {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
                           </select>
                         </div>
                         <div>
                           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
                           <select value={editForm.ownership || ''} onChange={ev => setEditForm(f => ({ ...f, ownership: ev.target.value }))} className="text-sm">
                             <option value="">—</option>
-                            {OWNERSHIP_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                            {(dropdownConfig.ownership || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                           </select>
                         </div>
                       </div>
@@ -855,14 +852,14 @@ export default function EscalationsDashboard() {
                           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
                           <select value={editForm.ps_leader || ''} onChange={ev => setEditForm(f => ({ ...f, ps_leader: ev.target.value }))} className="text-sm">
                             <option value="">—</option>
-                            {PS_LEADER_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                            {(dropdownConfig.ps_leader || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                           </select>
                         </div>
                         <div>
                           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
                           <select value={editForm.escalated_by || ''} onChange={ev => setEditForm(f => ({ ...f, escalated_by: ev.target.value }))} className="text-sm">
                             <option value="">—</option>
-                            {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                            {(dropdownConfig.escalated_by || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                           </select>
                         </div>
                         <div>
