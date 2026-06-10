@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
+const STATUS_STYLES = {
+  'Resolved':       'bg-green-100 text-green-800',
+  'In Progress':    'bg-amber-100 text-amber-800',
+  'Partly Resolved':'bg-blue-100 text-blue-800',
+  'Open':           'bg-red-100 text-red-800',
+};
+
 const RAG_BADGE = { Green: 'bg-green-100 text-green-800', Amber: 'bg-amber-100 text-amber-800', Red: 'bg-red-100 text-red-800' };
 
 const MON_NAMES = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -99,21 +106,38 @@ function PocEditCard({ n, form, setForm, onRemove }) {
   );
 }
 
+const EMPTY_ESCAL = {
+  date_of_escalation: '', month: '', description: '', action_taken: '',
+  ownership: '', status: 'Open', csm: '', eta: '', email_subject: '',
+  ps_leader: '', escalated_by: '',
+};
+
 export default function AccountDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [account,   setAccount]   = useState(null);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState(null);
-  const [editing,   setEditing]   = useState(false);
-  const [form,      setForm]      = useState({});
-  const [saving,    setSaving]    = useState(false);
-  const [pocSlots,  setPocSlots]  = useState([]);
-  const [csms,      setCsms]      = useState([]);
+  const [account,      setAccount]      = useState(null);
+  const [loading,      setLoading]      = useState(true);
+  const [error,        setError]        = useState(null);
+  const [editing,      setEditing]      = useState(false);
+  const [form,         setForm]         = useState({});
+  const [saving,       setSaving]       = useState(false);
+  const [pocSlots,     setPocSlots]     = useState([]);
+  const [csms,         setCsms]         = useState([]);
+  const [escalations,  setEscalations]  = useState([]);
+  const [showEscalForm,setShowEscalForm]= useState(false);
+  const [escalForm,    setEscalForm]    = useState(EMPTY_ESCAL);
+  const [escalSaving,  setEscalSaving]  = useState(false);
+  const [escalExpanded,setEscalExpanded]= useState(null);
 
   useEffect(() => {
     axios.get('/api/accounts/filters').then(r => setCsms(r.data.csms || [])).catch(() => {});
   }, []);
+
+  const loadEscalations = () => {
+    axios.get(`/api/escalations?account_id=${id}`)
+      .then(r => setEscalations(r.data || []))
+      .catch(() => {});
+  };
 
   const startEditing = (acc) => {
     const used = [1,2,3].filter(n =>
@@ -152,6 +176,7 @@ export default function AccountDetail() {
         setError(`API error ${status}: ${msg}. Visit /api/debug to check connectivity.`);
       })
       .finally(() => setLoading(false));
+    loadEscalations();
   }, [id]);
 
   const handleSave = async () => {
@@ -166,6 +191,25 @@ export default function AccountDetail() {
       alert('Save failed: ' + (e.response?.data?.error || e.message));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveEscalation = async () => {
+    setEscalSaving(true);
+    try {
+      await axios.post('/api/escalations', {
+        ...escalForm,
+        account_id: Number(id),
+        account_name: account?.account_name,
+        tenant_id: account?.tenant_id,
+      });
+      setShowEscalForm(false);
+      setEscalForm(EMPTY_ESCAL);
+      loadEscalations();
+    } catch (e) {
+      alert('Failed to save escalation: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setEscalSaving(false);
     }
   };
 
@@ -396,6 +440,155 @@ export default function AccountDetail() {
           )}
         </div>
       </div>
+
+      {/* Escalations Section */}
+      <Section title={`Escalations${escalations.length ? ` (${escalations.length})` : ''}`} defaultOpen={escalations.length > 0}>
+        {escalations.length === 0 && !showEscalForm && (
+          <p className="text-sm text-gray-400 italic mb-3">No escalations recorded for this account.</p>
+        )}
+
+        {escalations.length > 0 && (
+          <div className="space-y-2 mb-4">
+            {escalations.map(e => (
+              <div key={e.id} className="rounded-lg border border-gray-100 overflow-hidden">
+                <button
+                  type="button"
+                  className="w-full flex items-center justify-between px-4 py-3 hover:bg-gray-50 transition text-left"
+                  onClick={() => setEscalExpanded(escalExpanded === e.id ? null : e.id)}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLES[e.status] || 'bg-gray-100 text-gray-700'}`}>{e.status}</span>
+                    <span className="text-sm font-medium text-gray-800 truncate">{e.description?.substring(0, 80)}{e.description?.length > 80 ? '…' : ''}</span>
+                  </div>
+                  <div className="flex items-center gap-3 shrink-0 ml-3">
+                    <span className="text-xs text-gray-400">{e.date_of_escalation ? new Date(e.date_of_escalation).toLocaleDateString('en-IN', {day:'2-digit',month:'short',year:'numeric'}) : ''}</span>
+                    <svg className={`w-4 h-4 text-gray-400 transition-transform ${escalExpanded === e.id ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                  </div>
+                </button>
+                {escalExpanded === e.id && (
+                  <div className="px-4 pb-4 pt-1 bg-gray-50 border-t border-gray-100 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
+                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{e.description}</p>
+                      </div>
+                      {e.action_taken && (
+                        <div>
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Action Taken</p>
+                          <p className="text-sm text-gray-800 whitespace-pre-wrap">{e.action_taken}</p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-4 text-xs text-gray-500">
+                      {e.ownership && <span><span className="font-medium">Ownership:</span> {e.ownership}</span>}
+                      {e.csm && <span><span className="font-medium">CSM:</span> {e.csm}</span>}
+                      {e.eta && <span><span className="font-medium">ETA:</span> {e.eta}</span>}
+                      {e.ps_leader && <span><span className="font-medium">PS Leader:</span> {e.ps_leader}</span>}
+                      {e.escalated_by && <span><span className="font-medium">Escalated By:</span> {e.escalated_by}</span>}
+                      {e.email_subject && <span className="sm:col-span-2"><span className="font-medium">Email:</span> {e.email_subject}</span>}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {showEscalForm ? (
+          <div className="border border-gray-200 rounded-xl p-4 space-y-4 bg-gray-50">
+            <p className="text-sm font-semibold text-gray-700">New Escalation</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date of Escalation</p>
+                <input type="date" value={escalForm.date_of_escalation}
+                  onChange={e => setEscalForm(f => ({ ...f, date_of_escalation: e.target.value }))} className="!py-1.5 text-sm" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Month</p>
+                <select value={escalForm.month} onChange={e => setEscalForm(f => ({ ...f, month: e.target.value }))} className="!py-1.5 text-sm">
+                  <option value="">—</option>
+                  {['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => <option key={m}>{m}</option>)}
+                </select>
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
+                <select value={escalForm.status} onChange={e => setEscalForm(f => ({ ...f, status: e.target.value }))} className="!py-1.5 text-sm">
+                  <option>Open</option><option>In Progress</option><option>Partly Resolved</option><option>Resolved</option>
+                </select>
+              </div>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Description *</p>
+                <textarea rows={3} value={escalForm.description}
+                  onChange={e => setEscalForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Describe the escalation issue..." className="text-sm" />
+              </div>
+              <div className="sm:col-span-2 lg:col-span-3">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Action Taken</p>
+                <textarea rows={3} value={escalForm.action_taken}
+                  onChange={e => setEscalForm(f => ({ ...f, action_taken: e.target.value }))}
+                  placeholder="What steps were taken to resolve this..." className="text-sm" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
+                <input type="text" value={escalForm.ownership}
+                  onChange={e => setEscalForm(f => ({ ...f, ownership: e.target.value }))}
+                  placeholder="e.g. CSM + PS" className="!py-1.5 text-sm" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">ETA</p>
+                <input type="text" value={escalForm.eta}
+                  onChange={e => setEscalForm(f => ({ ...f, eta: e.target.value }))}
+                  placeholder="e.g. 15/6/26" className="!py-1.5 text-sm" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
+                <input type="text" value={escalForm.escalated_by}
+                  onChange={e => setEscalForm(f => ({ ...f, escalated_by: e.target.value }))}
+                  placeholder="e.g. Vivek / Prashant" className="!py-1.5 text-sm" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
+                <input type="text" value={escalForm.ps_leader}
+                  onChange={e => setEscalForm(f => ({ ...f, ps_leader: e.target.value }))}
+                  placeholder="PS Leader name" className="!py-1.5 text-sm" />
+              </div>
+              <div>
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
+                {csms.length ? (
+                  <select value={escalForm.csm} onChange={e => setEscalForm(f => ({ ...f, csm: e.target.value }))} className="!py-1.5 text-sm">
+                    <option value="">—</option>
+                    {csms.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                ) : (
+                  <input type="text" value={escalForm.csm}
+                    onChange={e => setEscalForm(f => ({ ...f, csm: e.target.value }))}
+                    placeholder="CSM name" className="!py-1.5 text-sm" />
+                )}
+              </div>
+              <div className="sm:col-span-2">
+                <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email Subject</p>
+                <input type="text" value={escalForm.email_subject}
+                  onChange={e => setEscalForm(f => ({ ...f, email_subject: e.target.value }))}
+                  placeholder="Email subject line (if any)" className="!py-1.5 text-sm" />
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button onClick={handleSaveEscalation} disabled={escalSaving || !escalForm.description}
+                className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+                {escalSaving ? 'Saving…' : 'Save Escalation'}
+              </button>
+              <button onClick={() => { setShowEscalForm(false); setEscalForm(EMPTY_ESCAL); }}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
+            </div>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setShowEscalForm(true)}
+            className="text-sm text-brand-600 hover:text-brand-800 font-medium flex items-center gap-1">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Add Escalation
+          </button>
+        )}
+      </Section>
     </div>
   );
 }

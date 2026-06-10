@@ -9,6 +9,7 @@
     { "source": "/accounts/:id",   "destination": "/index.html" },
     { "source": "/renewal",        "destination": "/index.html" },
     { "source": "/rag",            "destination": "/index.html" },
+    { "source": "/escalations",    "destination": "/index.html" },
     { "source": "/",               "destination": "/index.html" }
   ]
 }
