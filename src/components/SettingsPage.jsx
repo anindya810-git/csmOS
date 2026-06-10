@@ -34,40 +34,102 @@ function buildTree(users) {
   return { roots, childrenMap };
 }
 
-function UserRow({ u, childrenMap, currentUserId, onEdit, onDelete, deleting }) {
+/* Horizontal + vertical connector above each child card */
+function ChildConnector({ isFirst, isLast, isOnly }) {
+  if (isOnly) {
+    return <div className="w-px h-8 bg-gray-200 mx-auto" />;
+  }
+  return (
+    <div className="relative h-8 w-full">
+      {/* Horizontal segment: full width for middle, right-half for first, left-half for last */}
+      <div
+        className="absolute top-0 h-px bg-gray-200"
+        style={{ left: isFirst ? '50%' : '0', right: isLast ? '50%' : '0' }}
+      />
+      {/* Vertical drop to card */}
+      <div className="absolute w-px bg-gray-200" style={{ top: 0, bottom: 0, left: 'calc(50% - 0.5px)' }} />
+    </div>
+  );
+}
+
+function OrgNode({ u, childrenMap, currentUserId, onEdit, onDelete, deleting }) {
   const kids = childrenMap[u.id] || [];
-  const avatarCls = u.role === 'admin' ? 'bg-brand-100 text-brand-700' : 'bg-gray-100 text-gray-600';
+  const avatarCls = u.role === 'admin'
+    ? 'bg-brand-600 text-white'
+    : 'bg-gray-100 text-gray-700';
 
   return (
-    <div>
-      <div className="flex items-center gap-3 px-4 py-2.5 hover:bg-gray-50 transition group">
-        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 ${avatarCls}`}>
-          {getInitials(u.name)}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-gray-900">{u.name}</span>
-            {u.id === currentUserId && <span className="text-xs text-gray-400">(you)</span>}
-            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
+    <div className="flex flex-col items-center">
+      {/* Card */}
+      <div className="w-44 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-brand-300 transition group">
+        <div className="p-3">
+          <div className="flex items-center gap-2.5 mb-2">
+            <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold shrink-0 ${avatarCls}`}>
+              {getInitials(u.name)}
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-gray-900 truncate leading-snug">
+                {u.name}
+                {u.id === currentUserId && <span className="block text-xs font-normal text-gray-400">(you)</span>}
+              </p>
+            </div>
           </div>
-          <p className="text-xs text-gray-400 truncate">{u.email}{u.csm_name ? ` · ${u.csm_name}` : ''}</p>
-        </div>
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
-          <button onClick={() => onEdit(u)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded-md transition" title="Edit">
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-          </button>
-          {u.id !== currentUserId && (
-            <button onClick={() => onDelete(u)} disabled={deleting === u.id} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-50" title="Delete">
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-            </button>
+          <div className="flex items-center justify-between">
+            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-600'}`}>
+              {u.role}
+            </span>
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
+              <button
+                onClick={() => onEdit(u)}
+                className="p-1 text-gray-400 hover:text-brand-600 rounded transition"
+                title="Edit"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              </button>
+              {u.id !== currentUserId && (
+                <button
+                  onClick={() => onDelete(u)}
+                  disabled={deleting === u.id}
+                  className="p-1 text-gray-400 hover:text-red-500 rounded transition disabled:opacity-50"
+                  title="Delete"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                </button>
+              )}
+            </div>
+          </div>
+          {u.csm_name && (
+            <p className="text-xs text-gray-400 mt-1.5 truncate">{u.csm_name}</p>
           )}
         </div>
       </div>
+
+      {/* Children */}
       {kids.length > 0 && (
-        <div className="ml-9 border-l-2 border-dashed border-gray-100 pl-3">
-          {kids.map(k => (
-            <UserRow key={k.id} u={k} childrenMap={childrenMap} currentUserId={currentUserId} onEdit={onEdit} onDelete={onDelete} deleting={deleting} />
-          ))}
+        <div className="flex flex-col items-center w-full">
+          {/* Vertical drop from card */}
+          <div className="w-px h-8 bg-gray-200" />
+
+          {/* Children row */}
+          <div className="flex items-start">
+            {kids.map((k, i) => (
+              <div key={k.id} className="flex flex-col items-center" style={{ minWidth: '11rem', paddingLeft: 8, paddingRight: 8 }}>
+                <ChildConnector
+                  isFirst={i === 0}
+                  isLast={i === kids.length - 1}
+                  isOnly={kids.length === 1}
+                />
+                <OrgNode
+                  u={k}
+                  childrenMap={childrenMap}
+                  currentUserId={currentUserId}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                  deleting={deleting}
+                />
+              </div>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -152,7 +214,7 @@ export default function SettingsPage() {
   const { roots, childrenMap } = buildTree(users);
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-5xl">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
         <p className="text-sm text-gray-500 mt-0.5">Manage users and CSMs</p>
@@ -238,18 +300,20 @@ export default function SettingsPage() {
             </tbody>
           </table>
         ) : (
-          <div className="py-2">
-            {roots.map(u => (
-              <UserRow
-                key={u.id}
-                u={u}
-                childrenMap={childrenMap}
-                currentUserId={user?.id}
-                onEdit={openEdit}
-                onDelete={handleDelete}
-                deleting={deleting}
-              />
-            ))}
+          <div className="overflow-x-auto">
+            <div className="flex gap-16 justify-center py-8 px-6 min-w-max">
+              {roots.map(u => (
+                <OrgNode
+                  key={u.id}
+                  u={u}
+                  childrenMap={childrenMap}
+                  currentUserId={user?.id}
+                  onEdit={openEdit}
+                  onDelete={handleDelete}
+                  deleting={deleting}
+                />
+              ))}
+            </div>
           </div>
         )}
       </div>
