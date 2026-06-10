@@ -41,7 +41,7 @@ export default function EscalationsDashboard() {
   const { user } = useAuth();
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [filters,     setFilters]     = useState({ status: '', csm: '', month: '' });
+  const [filters,     setFilters]     = useState({ status: '', csm: '', month: '', escalated_by: '', date_from: '', date_to: '' });
   const [expanded,    setExpanded]    = useState(null);
   const [reload,      setReload]      = useState(0);
   const [showForm,    setShowForm]    = useState(false);
@@ -99,16 +99,31 @@ export default function EscalationsDashboard() {
   };
 
   const stats = {
-    total:         escalations.length,
-    open:          escalations.filter(e => e.status === 'Open').length,
-    inProgress:    escalations.filter(e => e.status === 'In Progress').length,
-    partlyResolved:escalations.filter(e => e.status === 'Partly Resolved').length,
-    resolved:      escalations.filter(e => e.status === 'Resolved').length,
+    total:         displayed.length,
+    open:          displayed.filter(e => e.status === 'Open').length,
+    inProgress:    displayed.filter(e => e.status === 'In Progress').length,
+    partlyResolved:displayed.filter(e => e.status === 'Partly Resolved').length,
+    resolved:      displayed.filter(e => e.status === 'Resolved').length,
   };
 
-  const allCsms   = [...new Set(escalations.map(e => e.csm).filter(Boolean))].sort();
-  const allMonths = [...new Set(escalations.map(e => e.month).filter(Boolean))];
+  const allCsms        = [...new Set(escalations.map(e => e.csm).filter(Boolean))].sort();
+  const allMonths      = [...new Set(escalations.map(e => e.month).filter(Boolean))];
   allMonths.sort((a,b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
+  const allEscalatedBy = [...new Set(escalations.map(e => e.escalated_by).filter(Boolean))].sort();
+
+  // Client-side filters applied on top of the server-filtered list
+  const displayed = escalations.filter(e => {
+    if (filters.escalated_by && e.escalated_by !== filters.escalated_by) return false;
+    if (filters.date_from) {
+      const d = e.date_of_escalation ? new Date(e.date_of_escalation) : null;
+      if (!d || d < new Date(filters.date_from)) return false;
+    }
+    if (filters.date_to) {
+      const d = e.date_of_escalation ? new Date(e.date_of_escalation) : null;
+      if (!d || d > new Date(filters.date_to + 'T23:59:59')) return false;
+    }
+    return true;
+  });
 
   const inp = (field, placeholder, type='text') => (
     <input type={type} value={form[field] || ''} placeholder={placeholder}
@@ -247,26 +262,44 @@ export default function EscalationsDashboard() {
       </div>
 
       {/* Filters */}
-      <div className="card flex flex-wrap items-center gap-3">
-        <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="!w-auto text-sm">
-          <option value="">All Statuses</option>
-          <option>Open</option><option>In Progress</option><option>Partly Resolved</option><option>Resolved</option>
-        </select>
-        {user?.role === 'admin' && (
-          <select value={filters.csm} onChange={e => setFilter('csm', e.target.value)} className="!w-auto text-sm">
-            <option value="">All CSMs</option>
-            {allCsms.map(c => <option key={c}>{c}</option>)}
+      <div className="card space-y-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="!w-auto text-sm">
+            <option value="">All Statuses</option>
+            <option>Open</option><option>In Progress</option><option>Partly Resolved</option><option>Resolved</option>
           </select>
-        )}
-        <select value={filters.month} onChange={e => setFilter('month', e.target.value)} className="!w-auto text-sm">
-          <option value="">All Months</option>
-          {allMonths.map(m => <option key={m}>{m}</option>)}
-        </select>
-        {(filters.status || filters.csm || filters.month) && (
-          <button onClick={() => setFilters({ status: '', csm: '', month: '' })}
-            className="text-sm text-gray-500 hover:text-gray-700 underline">Clear filters</button>
-        )}
-        <span className="ml-auto text-sm text-gray-400">{escalations.length} escalation{escalations.length !== 1 ? 's' : ''}</span>
+          {user?.role === 'admin' && (
+            <select value={filters.csm} onChange={e => setFilter('csm', e.target.value)} className="!w-auto text-sm">
+              <option value="">All CSMs</option>
+              {allCsms.map(c => <option key={c}>{c}</option>)}
+            </select>
+          )}
+          <select value={filters.month} onChange={e => setFilter('month', e.target.value)} className="!w-auto text-sm">
+            <option value="">All Months</option>
+            {allMonths.map(m => <option key={m}>{m}</option>)}
+          </select>
+          <select value={filters.escalated_by} onChange={e => setFilter('escalated_by', e.target.value)} className="!w-auto text-sm">
+            <option value="">All Escalated By</option>
+            {allEscalatedBy.map(v => <option key={v}>{v}</option>)}
+          </select>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 font-medium whitespace-nowrap">From</label>
+            <input type="date" value={filters.date_from} onChange={e => setFilter('date_from', e.target.value)}
+              className="!w-auto !py-1.5 text-sm" />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-gray-500 font-medium whitespace-nowrap">To</label>
+            <input type="date" value={filters.date_to} onChange={e => setFilter('date_to', e.target.value)}
+              className="!w-auto !py-1.5 text-sm" />
+          </div>
+          {(filters.status || filters.csm || filters.month || filters.escalated_by || filters.date_from || filters.date_to) && (
+            <button onClick={() => setFilters({ status: '', csm: '', month: '', escalated_by: '', date_from: '', date_to: '' })}
+              className="text-sm text-gray-500 hover:text-gray-700 underline">Clear all</button>
+          )}
+          <span className="ml-auto text-sm text-gray-400">{displayed.length} escalation{displayed.length !== 1 ? 's' : ''}</span>
+        </div>
       </div>
 
       {/* Table */}
@@ -274,7 +307,7 @@ export default function EscalationsDashboard() {
         <div className="flex items-center justify-center h-40">
           <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : escalations.length === 0 ? (
+      ) : displayed.length === 0 ? (
         <div className="card text-center py-12 text-gray-400">No escalations found.</div>
       ) : (
         <>
@@ -296,7 +329,7 @@ export default function EscalationsDashboard() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {escalations.map(e => {
+                {displayed.map(e => {
                   const rag = e.accounts?.rag_status;
                   return (
                     <React.Fragment key={e.id}>
@@ -376,7 +409,7 @@ export default function EscalationsDashboard() {
 
         {/* Mobile / tablet cards */}
         <div className="lg:hidden space-y-3">
-          {escalations.map(e => {
+          {displayed.map(e => {
             const rag = e.accounts?.rag_status;
             const open = expanded === e.id;
             return (
