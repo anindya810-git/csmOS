@@ -14,6 +14,7 @@ export default function SettingsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [users,    setUsers]    = useState([]);
+  const [csmLeads, setCsmLeads] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editUser, setEditUser] = useState(null);
@@ -25,6 +26,9 @@ export default function SettingsPage() {
   useEffect(() => {
     if (user?.role !== 'admin') { navigate('/'); return; }
     load();
+    axios.get('/api/accounts/filters')
+      .then(r => setCsmLeads(r.data.csmLeads || []))
+      .catch(() => {});
   }, [user]);
 
   const load = () => {
@@ -209,7 +213,7 @@ export default function SettingsPage() {
                   className="w-full"
                 >
                   <option value="">— Select CSM Lead —</option>
-                  {[...new Set(users.filter(u => u.csm_name).map(u => u.csm_name))].sort().map(n => (
+                  {csmLeads.map(n => (
                     <option key={n} value={n}>{n}</option>
                   ))}
                 </select>
