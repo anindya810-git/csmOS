@@ -72,5 +72,24 @@ export default async function handler(req, res) {
     return res.status(201).json(data);
   }
 
+  if (req.method === 'PATCH') {
+    if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    const { ids, field, value } = req.body;
+    const ALLOWED = [
+      'status', 'ownership', 'ps_leader', 'escalated_by',
+      'trigger_reason', 'source_of_escalation', 'issue_type', 'issue_sub_type',
+      'action_taken', 'eta', 'month',
+    ];
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+    if (!field || !ALLOWED.includes(field)) return res.status(400).json({ error: 'invalid field' });
+    const coerced = value === '' || value === null || value === undefined ? null : value;
+    const { error } = await supabase
+      .from('escalations')
+      .update({ [field]: coerced, updated_at: new Date().toISOString() })
+      .in('id', ids);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ updated: ids.length });
+  }
+
   res.status(405).json({ error: 'Method not allowed' });
 }

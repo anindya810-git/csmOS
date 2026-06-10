@@ -18,6 +18,37 @@ const RAG_BADGE = {
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+const OPS_TEXT   = ['contains','does not contain','is','is not','is empty','is not empty'];
+const OPS_SELECT = ['is','is not','is empty','is not empty'];
+const OPS_DATE   = ['is','before','after','is empty','is not empty'];
+function getOps(type) {
+  if (type === 'select') return OPS_SELECT;
+  if (type === 'date')   return OPS_DATE;
+  return OPS_TEXT;
+}
+function needsValue(op) { return !['is empty','is not empty'].includes(op); }
+function matchesEscalationCondition(esc, cond, fieldDefs) {
+  const { field, operator, value } = cond;
+  const def = fieldDefs.find(f => f.key === field);
+  if (!def) return true;
+  const raw = esc[field];
+  if (operator === 'is empty')     return raw === null || raw === undefined || raw === '';
+  if (operator === 'is not empty') return raw !== null && raw !== undefined && raw !== '';
+  if (def.type === 'date') {
+    if (!raw || !value) return false;
+    const rD = new Date(raw), vD = new Date(value);
+    if (operator === 'is')     return rD.toDateString() === vD.toDateString();
+    if (operator === 'before') return rD < vD;
+    if (operator === 'after')  return rD > vD;
+  }
+  const r = String(raw ?? '').toLowerCase();
+  const v = String(value ?? '').toLowerCase();
+  if (operator === 'contains')         return r.includes(v);
+  if (operator === 'does not contain') return !r.includes(v);
+  if (operator === 'is')               return r === v;
+  if (operator === 'is not')           return r !== v;
+  return true;
+}
 
 const EMPTY_FORM = {
   account_id: null, account_name: '', tenant_id: '',
@@ -40,7 +71,16 @@ export default function EscalationsDashboard() {
   const navigate = useNavigate();
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [filters,     setFilters]     = useState({ status: '', csm: '', month: '', escalated_by: '', date_from: '', date_to: '' });
+  const [filters,     setFilters]     = useState({ status: '', csm: '', ownership: '', issue_type: '', month: '' });
+  const [search,      setSearch]      = useState('');
+  const [advancedOpen,setAdvancedOpen]= useState(false);
+  const [conditions,  setConditions]  = useState([]);
+  const [conditionLogic, setConditionLogic] = useState('AND');
+  const [bulkOpen,    setBulkOpen]    = useState(false);
+  const [bulkField,   setBulkField]   = useState('status');
+  const [bulkValue,   setBulkValue]   = useState('');
+  const [bulkConfirm, setBulkConfirm] = useState(false);
+  const [bulkSaving,  setBulkSaving]  = useState(false);
   const [expanded,    setExpanded]    = useState(null);
   const [reload,      setReload]      = useState(0);
   const [showForm,    setShowForm]    = useState(false);
@@ -64,15 +104,11 @@ export default function EscalationsDashboard() {
 
   const load = useCallback(() => {
     setLoading(true);
-    const params = {};
-    if (filters.status) params.status = filters.status;
-    if (filters.csm)    params.csm    = filters.csm;
-    if (filters.month)  params.month  = filters.month;
-    axios.get('/api/escalations', { params })
+    axios.get('/api/escalations')
       .then(r => setEscalations(r.data || []))
       .catch(() => setEscalations([]))
       .finally(() => setLoading(false));
-  }, [filters, reload]);
+  }, [reload]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -167,23 +203,87 @@ export default function EscalationsDashboard() {
     }
   };
 
-  const allCsms        = [...new Set(escalations.map(e => e.csm).filter(Boolean))].sort();
-  const allMonths      = [...new Set(escalations.map(e => e.month).filter(Boolean))];
-  allMonths.sort((a,b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
-  const allEscalatedBy = [...new Set(escalations.map(e => e.escalated_by).filter(Boolean))].sort();
+  const addCondition = () =>
+    setConditions(c => [...c, { id: Date.now(), field: 'account_name', operator: 'contains', value: '' }]);
+  const updateCondition = (id, updates) =>
+    setConditions(c => c.map(cond => cond.id === id ? { ...cond, ...updates } : cond));
+  const removeCondition = (id) =>
+    setConditions(c => c.filter(cond => cond.id !== id));
 
-  // Client-side filters applied on top of the server-filtered list
+  const handleBulkApply = async () => {
+    setBulkSaving(true);
+    try {
+      await axios.patch('/api/escalations', { ids: displayed.map(e => e.id), field: bulkField, value: bulkValue });
+      setBulkConfirm(false);
+      setBulkOpen(false);
+      setBulkValue('');
+      setReload(r => r + 1);
+    } catch (e) {
+      alert(e.response?.data?.error || 'Bulk update failed');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
+  const allCsms       = [...new Set(escalations.map(e => e.csm).filter(Boolean))].sort();
+  const allMonths     = [...new Set(escalations.map(e => e.month).filter(Boolean))].sort((a, b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
+  const allOwnerships = [...new Set(escalations.map(e => e.ownership).filter(Boolean))].sort();
+  const allIssueTypes = [...new Set(escalations.map(e => e.issue_type).filter(Boolean))].sort();
+
+  const fieldDefs = [
+    { key: 'account_name',         label: 'Account Name',         type: 'text' },
+    { key: 'description',          label: 'Description',          type: 'text' },
+    { key: 'action_taken',         label: 'Action Taken',         type: 'text' },
+    { key: 'status',               label: 'Status',               type: 'select', opts: (dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']) },
+    { key: 'csm',                  label: 'CSM',                  type: 'select', opts: allCsms },
+    { key: 'ownership',            label: 'Ownership',            type: 'select', opts: (dropdownConfig.ownership || []).map(o => o.value) },
+    { key: 'ps_leader',            label: 'PS Leader',            type: 'select', opts: (dropdownConfig.ps_leader || []).map(o => o.value) },
+    { key: 'escalated_by',         label: 'Escalated By',         type: 'select', opts: (dropdownConfig.escalated_by || []).map(o => o.value) },
+    { key: 'trigger_reason',       label: 'Trigger Reason',       type: 'select', opts: (dropdownConfig.trigger_reason || []).map(o => o.value) },
+    { key: 'source_of_escalation', label: 'Source of Escalation', type: 'select', opts: (dropdownConfig.source_of_escalation || []).map(o => o.value) },
+    { key: 'issue_type',           label: 'Issue Type',           type: 'select', opts: (dropdownConfig.issue_type || []).map(o => o.value) },
+    { key: 'issue_sub_type',       label: 'Issue Sub-Type',       type: 'text' },
+    { key: 'date_of_escalation',   label: 'Date of Escalation',   type: 'date' },
+    { key: 'eta',                  label: 'ETA',                  type: 'date' },
+    { key: 'month',                label: 'Month',                type: 'select', opts: MONTHS },
+  ];
+
+  const bulkFieldDefs = [
+    { key: 'status',               label: 'Status',               type: 'select', group: 'Status & Resolution', opts: (dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']) },
+    { key: 'action_taken',         label: 'Action Taken',         type: 'text',   group: 'Status & Resolution' },
+    { key: 'eta',                  label: 'ETA',                  type: 'date',   group: 'Status & Resolution' },
+    { key: 'ownership',            label: 'Ownership',            type: 'select', group: 'Assignment', opts: (dropdownConfig.ownership || []).map(o => o.value) },
+    { key: 'ps_leader',            label: 'PS Leader',            type: 'select', group: 'Assignment', opts: (dropdownConfig.ps_leader || []).map(o => o.value) },
+    { key: 'escalated_by',         label: 'Escalated By',         type: 'select', group: 'Assignment', opts: (dropdownConfig.escalated_by || []).map(o => o.value) },
+    { key: 'trigger_reason',       label: 'Trigger Reason',       type: 'select', group: 'Classification', opts: (dropdownConfig.trigger_reason || []).map(o => o.value) },
+    { key: 'source_of_escalation', label: 'Source of Escalation', type: 'select', group: 'Classification', opts: (dropdownConfig.source_of_escalation || []).map(o => o.value) },
+    { key: 'issue_type',           label: 'Issue Type',           type: 'select', group: 'Classification', opts: (dropdownConfig.issue_type || []).map(o => o.value) },
+    { key: 'issue_sub_type',       label: 'Issue Sub-Type',       type: 'text',   group: 'Classification' },
+    { key: 'month',                label: 'Month',                type: 'select', group: 'Classification', opts: MONTHS },
+  ];
+
+  const clearAll = () => {
+    setSearch('');
+    setFilters({ status: '', csm: '', ownership: '', issue_type: '', month: '' });
+    setConditions([]);
+  };
+  const hasFilters = !!(search || Object.values(filters).some(Boolean) || conditions.length > 0);
+  const activeConditions = conditions.filter(c => c.field && c.operator);
+
   const displayed = escalations.filter(e => {
-    if (filters.escalated_by && e.escalated_by !== filters.escalated_by) return false;
-    if (filters.date_from) {
-      const d = e.date_of_escalation ? new Date(e.date_of_escalation) : null;
-      if (!d || d < new Date(filters.date_from)) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      const blob = [e.account_name, e.description, e.csm, e.ownership, e.escalated_by, e.issue_type].filter(Boolean).join(' ').toLowerCase();
+      if (!blob.includes(q)) return false;
     }
-    if (filters.date_to) {
-      const d = e.date_of_escalation ? new Date(e.date_of_escalation) : null;
-      if (!d || d > new Date(filters.date_to + 'T23:59:59')) return false;
-    }
-    return true;
+    if (filters.status     && e.status     !== filters.status)     return false;
+    if (filters.csm        && e.csm        !== filters.csm)        return false;
+    if (filters.ownership  && e.ownership  !== filters.ownership)  return false;
+    if (filters.issue_type && e.issue_type !== filters.issue_type) return false;
+    if (filters.month      && e.month      !== filters.month)      return false;
+    if (activeConditions.length === 0) return true;
+    const results = activeConditions.map(c => matchesEscalationCondition(e, c, fieldDefs));
+    return conditionLogic === 'OR' ? results.some(Boolean) : results.every(Boolean);
   });
 
   const stats = {
@@ -206,7 +306,11 @@ export default function EscalationsDashboard() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Escalations</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Track and manage account escalations</p>
+          <p className="text-sm text-gray-500 mt-0.5">
+            {displayed.length !== escalations.length
+              ? `${displayed.length} of ${escalations.length} escalations`
+              : `${escalations.length} escalation${escalations.length !== 1 ? 's' : ''}`}
+          </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           <button
@@ -216,6 +320,18 @@ export default function EscalationsDashboard() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
             Weekly View
           </button>
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => { setBulkOpen(o => !o); setBulkValue(''); }}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition
+                ${bulkOpen ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Bulk Update
+            </button>
+          )}
           <button
             onClick={() => { setShowForm(s => !s); setForm(EMPTY_FORM); }}
             className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
@@ -372,45 +488,185 @@ export default function EscalationsDashboard() {
       </div>
 
       {/* Filters */}
-      <div className="card space-y-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="!w-auto text-sm">
+      <div className="card p-4 space-y-3">
+        <div className="relative">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Search account, description, CSM, ownership…"
+            className="pl-11 pr-10 !py-2.5 text-base w-full" />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="!w-auto text-sm !py-1.5">
             <option value="">All Statuses</option>
             {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
           </select>
           {user?.role === 'admin' && (
-            <select value={filters.csm} onChange={e => setFilter('csm', e.target.value)} className="!w-auto text-sm">
+            <select value={filters.csm} onChange={e => setFilter('csm', e.target.value)} className="!w-auto text-sm !py-1.5">
               <option value="">All CSMs</option>
               {allCsms.map(c => <option key={c}>{c}</option>)}
             </select>
           )}
-          <select value={filters.month} onChange={e => setFilter('month', e.target.value)} className="!w-auto text-sm">
+          <select value={filters.ownership} onChange={e => setFilter('ownership', e.target.value)} className="!w-auto text-sm !py-1.5">
+            <option value="">All Ownerships</option>
+            {allOwnerships.map(o => <option key={o}>{o}</option>)}
+          </select>
+          <select value={filters.issue_type} onChange={e => setFilter('issue_type', e.target.value)} className="!w-auto text-sm !py-1.5">
+            <option value="">All Issue Types</option>
+            {allIssueTypes.map(t => <option key={t}>{t}</option>)}
+          </select>
+          <select value={filters.month} onChange={e => setFilter('month', e.target.value)} className="!w-auto text-sm !py-1.5">
             <option value="">All Months</option>
             {allMonths.map(m => <option key={m}>{m}</option>)}
           </select>
-          <select value={filters.escalated_by} onChange={e => setFilter('escalated_by', e.target.value)} className="!w-auto text-sm">
-            <option value="">All Escalated By</option>
-            {allEscalatedBy.map(v => <option key={v}>{v}</option>)}
-          </select>
-        </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 font-medium whitespace-nowrap">From</label>
-            <input type="date" value={filters.date_from} onChange={e => setFilter('date_from', e.target.value)}
-              className="!w-auto !py-1.5 text-sm" />
-          </div>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500 font-medium whitespace-nowrap">To</label>
-            <input type="date" value={filters.date_to} onChange={e => setFilter('date_to', e.target.value)}
-              className="!w-auto !py-1.5 text-sm" />
-          </div>
-          {(filters.status || filters.csm || filters.month || filters.escalated_by || filters.date_from || filters.date_to) && (
-            <button onClick={() => setFilters({ status: '', csm: '', month: '', escalated_by: '', date_from: '', date_to: '' })}
-              className="text-sm text-gray-500 hover:text-gray-700 underline">Clear all</button>
+          <button
+            onClick={() => setAdvancedOpen(o => !o)}
+            className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
+              ${advancedOpen || conditions.length > 0
+                ? 'bg-brand-50 border-brand-300 text-brand-700'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+            </svg>
+            Advanced{conditions.length > 0 ? ` (${conditions.length})` : ''}
+          </button>
+          {hasFilters && (
+            <button onClick={clearAll} className="text-sm text-gray-400 hover:text-gray-600 underline">Clear all</button>
           )}
-          <span className="ml-auto text-sm text-gray-400">{displayed.length} escalation{displayed.length !== 1 ? 's' : ''}</span>
         </div>
+
+        {advancedOpen && (
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Match</span>
+              <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm font-medium">
+                <button onClick={() => setConditionLogic('AND')}
+                  className={`px-3 py-1 transition ${conditionLogic === 'AND' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>AND</button>
+                <button onClick={() => setConditionLogic('OR')}
+                  className={`px-3 py-1 border-l border-gray-200 transition ${conditionLogic === 'OR' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}>OR</button>
+              </div>
+              <span className="text-xs text-gray-400">{conditionLogic === 'AND' ? 'all conditions must match' : 'any condition must match'}</span>
+            </div>
+            {conditions.length === 0 && <p className="text-sm text-gray-400 italic pb-1">No conditions yet — add one below.</p>}
+            {conditions.map((cond, idx) => {
+              const def = fieldDefs.find(f => f.key === cond.field);
+              const ops = getOps(def?.type || 'text');
+              return (
+                <React.Fragment key={cond.id}>
+                  {idx > 0 && (
+                    <div className="flex items-center gap-2 py-0.5">
+                      <div className="flex-1 border-t border-dashed border-gray-200" />
+                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${conditionLogic === 'AND' ? 'text-brand-700 bg-brand-50' : 'text-amber-700 bg-amber-50'}`}>{conditionLogic}</span>
+                      <div className="flex-1 border-t border-dashed border-gray-200" />
+                    </div>
+                  )}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <select value={cond.field}
+                      onChange={ev => {
+                        const nd = fieldDefs.find(f => f.key === ev.target.value);
+                        const no = getOps(nd?.type || 'text');
+                        updateCondition(cond.id, { field: ev.target.value, operator: no[0], value: '' });
+                      }}
+                      className="!w-auto text-sm !py-1.5">
+                      {fieldDefs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                    </select>
+                    <select value={cond.operator}
+                      onChange={ev => updateCondition(cond.id, { operator: ev.target.value, value: '' })}
+                      className="!w-auto text-sm !py-1.5">
+                      {ops.map(op => <option key={op}>{op}</option>)}
+                    </select>
+                    {needsValue(cond.operator) && (
+                      def?.type === 'select' ? (
+                        <select value={cond.value}
+                          onChange={ev => updateCondition(cond.id, { value: ev.target.value })}
+                          className="!w-auto text-sm !py-1.5">
+                          <option value="">Select…</option>
+                          {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
+                        </select>
+                      ) : def?.type === 'date' ? (
+                        <input type="date" value={cond.value}
+                          onChange={ev => updateCondition(cond.id, { value: ev.target.value })}
+                          className="!w-auto text-sm !py-1.5" />
+                      ) : (
+                        <input type="text" value={cond.value}
+                          onChange={ev => updateCondition(cond.id, { value: ev.target.value })}
+                          className="!w-48 text-sm !py-1.5" placeholder="Enter value…" />
+                      )
+                    )}
+                    <button onClick={() => removeCondition(cond.id)}
+                      className="p-1 text-gray-400 hover:text-red-500 transition" title="Remove">
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
+                  </div>
+                </React.Fragment>
+              );
+            })}
+            <button onClick={addCondition}
+              className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700 mt-1">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add condition
+            </button>
+          </div>
+        )}
       </div>
+
+      {/* Bulk update toolbar */}
+      {bulkOpen && (
+        <div className="card border-amber-200 bg-amber-50/60 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="text-sm font-semibold text-amber-800">Bulk Update</span>
+            </div>
+            <span className="text-sm text-amber-700">Set</span>
+            <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue(''); }}
+              className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
+              {Object.entries(bulkFieldDefs.reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc; }, {})).map(([group, fields]) => (
+                <optgroup key={group} label={group}>
+                  {fields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                </optgroup>
+              ))}
+            </select>
+            <span className="text-sm text-amber-700">to</span>
+            {(() => {
+              const def = bulkFieldDefs.find(f => f.key === bulkField);
+              if (!def) return null;
+              if (def.type === 'select') return (
+                <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
+                  <option value="">— Select value —</option>
+                  {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              );
+              if (def.type === 'date') return (
+                <input type="date" value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white" />
+              );
+              return (
+                <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Enter value…" className="!w-48 text-sm !py-1.5 border-amber-200 bg-white" />
+              );
+            })()}
+            <span className="text-sm text-amber-700">
+              for <strong className="text-amber-900">{displayed.length}</strong> escalation{displayed.length !== 1 ? 's' : ''}
+            </span>
+            <button onClick={() => setBulkConfirm(true)} disabled={!bulkValue || displayed.length === 0}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-sm font-medium rounded-lg transition ml-1">
+              Apply →
+            </button>
+            <button onClick={() => { setBulkOpen(false); setBulkValue(''); }}
+              className="text-sm text-amber-600 hover:text-amber-800 transition ml-auto">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       {loading ? (
@@ -911,6 +1167,32 @@ export default function EscalationsDashboard() {
           })}
         </div>
         </>
+      )}
+
+      {bulkConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Confirm Bulk Update</h3>
+              <p className="text-sm text-gray-500 mt-0.5">This will overwrite existing values and cannot be undone.</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+              Set <strong>{bulkFieldDefs.find(f => f.key === bulkField)?.label}</strong> to{' '}
+              <strong>"{bulkValue}"</strong> for{' '}
+              <strong>{displayed.length} escalation{displayed.length !== 1 ? 's' : ''}</strong>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setBulkConfirm(false)} disabled={bulkSaving}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">
+                Cancel
+              </button>
+              <button onClick={handleBulkApply} disabled={bulkSaving}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+                {bulkSaving ? 'Updating…' : `Update ${displayed.length} escalation${displayed.length !== 1 ? 's' : ''}`}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
