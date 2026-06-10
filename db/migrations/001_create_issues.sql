@@ -2,8 +2,8 @@
 -- Project: https://app.supabase.com/project/tcduvikesxhbjkwqdkfk/sql
 
 CREATE TABLE IF NOT EXISTS issues (
-  id              uuid         DEFAULT gen_random_uuid() PRIMARY KEY,
-  account_id      uuid         REFERENCES accounts(id) ON DELETE SET NULL,
+  id              bigserial    PRIMARY KEY,
+  account_id      bigint       REFERENCES accounts(id) ON DELETE SET NULL,
   account_name    text,
   tenant_id       text,
   csm_lead        text,
