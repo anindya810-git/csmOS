@@ -45,13 +45,26 @@ export default async function handler(req, res) {
   if (req.method === 'PATCH') {
     if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
     const { ids, field, value } = req.body;
-    const ALLOWED = ['csm','csm_lead','rag_status','region','mrr_tier','renewal_status',
-      'churn_status','implementation_status','contraction_risk','churn_risk','tam_assigned'];
+    const ALLOWED = [
+      'csm','csm_lead','cp','tam_assigned','sa_status',
+      'industry','region','mrr_tier','mrr',
+      'billing_frequency','renewal_date','renewal_status','closure_eta',
+      'churn_status','churn_reason','contraction_risk','churn_risk','grr','nps','renewal_comments',
+      'rag_status','adoption_score','stickiness_score','adoption_rate','rag_reason','actions_taken',
+      'implementation_status','implementation_type','ps_engagement','ps_solutioning',
+      'account_understanding_session','new_csm_intro_done','csm_escalation_matrix_shared',
+      'ring_fence_meeting_initiated','meeting_planned_date','meeting_done',
+      'issue_mapping_sheet_updated','review_cadence_alignment',
+    ];
+    const NUMERIC = ['mrr','grr','nps','adoption_score','stickiness_score','adoption_rate'];
     if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
     if (!field || !ALLOWED.includes(field)) return res.status(400).json({ error: 'invalid field' });
+    const coerced = value === '' || value === null || value === undefined
+      ? null
+      : NUMERIC.includes(field) ? parseFloat(value) : value;
     const { error } = await supabase
       .from('accounts')
-      .update({ [field]: value || null, updated_at: new Date().toISOString() })
+      .update({ [field]: coerced, updated_at: new Date().toISOString() })
       .in('id', ids);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ updated: ids.length });

@@ -165,17 +165,48 @@ export default function AccountsPage() {
 
   const bulkFieldDefs = useMemo(() => {
     const dd = (key, fb) => ddConfig[key]?.length ? ddConfig[key].map(o => o.value) : fb;
+    const yn = ['Yes', 'No'];
     return [
-      { key: 'csm',                  label: 'CSM',                   opts: filters.csms   || [] },
-      { key: 'csm_lead',             label: 'CSM Lead',              opts: filters.csmLeads || [] },
-      { key: 'rag_status',           label: 'RAG Status',            opts: dd('rag_status', ['Green','Amber','Red']) },
-      { key: 'region',               label: 'Region',                opts: filters.regions || [] },
-      { key: 'mrr_tier',             label: 'MRR Tier',              opts: filters.tiers  || [] },
-      { key: 'renewal_status',       label: 'Renewal Status',        opts: dd('renewal_status', ['Renewed','At Risk','Lost','Pending']) },
-      { key: 'churn_status',         label: 'Churn Status',          opts: dd('churn_status', ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted']) },
-      { key: 'implementation_status',label: 'Implementation Status', opts: dd('implementation_status', ['Not Started','In Progress','Completed','On Hold']) },
-      { key: 'contraction_risk',     label: 'Contraction Risk',      opts: dd('contraction_risk', ['High','Medium','Low','None']) },
-      { key: 'churn_risk',           label: 'Churn Risk',            opts: dd('churn_risk', ['High','Medium','Low','None']) },
+      // Account Info
+      { key: 'industry',     label: 'Industry',     type: 'text',   group: 'Account Info' },
+      { key: 'region',       label: 'Region',       type: 'select', group: 'Account Info', opts: filters.regions || [] },
+      { key: 'mrr_tier',     label: 'MRR Tier',     type: 'select', group: 'Account Info', opts: filters.tiers || [] },
+      { key: 'mrr',          label: 'MRR (₹)',      type: 'number', group: 'Account Info' },
+      // Team & Commercial
+      { key: 'csm',              label: 'CSM',              type: 'select', group: 'Team & Commercial', opts: filters.csms || [] },
+      { key: 'csm_lead',         label: 'CSM Lead',         type: 'select', group: 'Team & Commercial', opts: filters.csmLeads || [] },
+      { key: 'cp',               label: 'CP',               type: 'text',   group: 'Team & Commercial' },
+      { key: 'tam_assigned',     label: 'TAM Assigned',     type: 'select', group: 'Team & Commercial', opts: yn },
+      { key: 'sa_status',        label: 'SA Status',        type: 'text',   group: 'Team & Commercial' },
+      { key: 'billing_frequency',label: 'Billing Frequency',type: 'select', group: 'Team & Commercial', opts: dd('billing_frequency', ['Monthly','Quarterly','Half-Yearly','Annually']) },
+      { key: 'renewal_date',     label: 'Renewal Date',     type: 'date',   group: 'Team & Commercial' },
+      { key: 'renewal_status',   label: 'Renewal Status',   type: 'select', group: 'Team & Commercial', opts: dd('renewal_status', ['Renewed','At Risk','Lost','Pending']) },
+      { key: 'closure_eta',      label: 'Closure ETA',      type: 'date',   group: 'Team & Commercial' },
+      // Churn & Risk
+      { key: 'churn_status',     label: 'Churn Status',     type: 'select', group: 'Churn & Risk', opts: dd('churn_status', ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted']) },
+      { key: 'churn_reason',     label: 'Churn Reason',     type: 'text',   group: 'Churn & Risk' },
+      { key: 'contraction_risk', label: 'Contraction Risk', type: 'select', group: 'Churn & Risk', opts: dd('contraction_risk', ['High','Medium','Low','None']) },
+      { key: 'churn_risk',       label: 'Churn Risk',       type: 'select', group: 'Churn & Risk', opts: dd('churn_risk', ['High','Medium','Low','None']) },
+      { key: 'grr',              label: 'GRR (%)',           type: 'number', group: 'Churn & Risk' },
+      { key: 'nps',              label: 'NPS',               type: 'number', group: 'Churn & Risk' },
+      // RAG & Health
+      { key: 'rag_status',       label: 'RAG Status',       type: 'select', group: 'RAG & Health', opts: dd('rag_status', ['Green','Amber','Red']) },
+      { key: 'adoption_score',   label: 'Adoption Score',   type: 'number', group: 'RAG & Health' },
+      { key: 'stickiness_score', label: 'Stickiness Score', type: 'number', group: 'RAG & Health' },
+      { key: 'adoption_rate',    label: 'Adoption Rate (%)', type: 'number',group: 'RAG & Health' },
+      // Implementation
+      { key: 'implementation_status', label: 'Implementation Status', type: 'select', group: 'Implementation', opts: dd('implementation_status', ['Not Started','In Progress','Completed','On Hold']) },
+      { key: 'implementation_type',   label: 'Implementation Type',   type: 'text',   group: 'Implementation' },
+      { key: 'ps_engagement',         label: 'PS Engagement',          type: 'select', group: 'Implementation', opts: yn },
+      // Ring Fence
+      { key: 'account_understanding_session', label: 'Account Understanding Session', type: 'select', group: 'Ring Fence', opts: yn },
+      { key: 'new_csm_intro_done',            label: 'New CSM Intro Done',            type: 'select', group: 'Ring Fence', opts: yn },
+      { key: 'csm_escalation_matrix_shared',  label: 'CSM Escalation Matrix Shared',  type: 'select', group: 'Ring Fence', opts: yn },
+      { key: 'ring_fence_meeting_initiated',  label: 'Ring Fence Meeting Initiated',  type: 'select', group: 'Ring Fence', opts: yn },
+      { key: 'meeting_planned_date',          label: 'Meeting Planned Date',          type: 'date',   group: 'Ring Fence' },
+      { key: 'meeting_done',                  label: 'Meeting Done',                  type: 'select', group: 'Ring Fence', opts: yn },
+      { key: 'issue_mapping_sheet_updated',   label: 'Issue Mapping Sheet Updated',   type: 'select', group: 'Ring Fence', opts: yn },
+      { key: 'review_cadence_alignment',      label: 'Review Cadence Alignment',      type: 'select', group: 'Ring Fence', opts: yn },
     ];
   }, [filters, ddConfig]);
 
@@ -500,19 +531,32 @@ export default function AccountsPage() {
               onChange={e => { setBulkField(e.target.value); setBulkValue(''); }}
               className="!w-auto text-sm !py-1.5 border-amber-200 bg-white"
             >
-              {bulkFieldDefs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-            </select>
-            <span className="text-sm text-amber-700">to</span>
-            <select
-              value={bulkValue}
-              onChange={e => setBulkValue(e.target.value)}
-              className="!w-auto text-sm !py-1.5 border-amber-200 bg-white"
-            >
-              <option value="">— Select value —</option>
-              {(bulkFieldDefs.find(f => f.key === bulkField)?.opts || []).map(o => (
-                <option key={o} value={o}>{o}</option>
+              {Object.entries(bulkFieldDefs.reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc; }, {})).map(([group, fields]) => (
+                <optgroup key={group} label={group}>
+                  {fields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                </optgroup>
               ))}
             </select>
+            <span className="text-sm text-amber-700">to</span>
+            {(() => {
+              const def = bulkFieldDefs.find(f => f.key === bulkField);
+              if (!def) return null;
+              if (def.type === 'select') return (
+                <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
+                  <option value="">— Select value —</option>
+                  {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              );
+              if (def.type === 'number') return (
+                <input type="number" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Enter value…" className="!w-40 text-sm !py-1.5 border-amber-200 bg-white" />
+              );
+              if (def.type === 'date') return (
+                <input type="date" value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white" />
+              );
+              return (
+                <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Enter value…" className="!w-48 text-sm !py-1.5 border-amber-200 bg-white" />
+              );
+            })()}
             <span className="text-sm text-amber-700">
               for <strong className="text-amber-900">{displayed.length}</strong> account{displayed.length !== 1 ? 's' : ''}
             </span>
