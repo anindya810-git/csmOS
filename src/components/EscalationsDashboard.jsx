@@ -50,6 +50,9 @@ export default function EscalationsDashboard() {
   const [saving,      setSaving]      = useState(false);
   const [accounts,    setAccounts]    = useState([]);
   const [csms,        setCsms]        = useState([]);
+  const [editing,     setEditing]     = useState(null);   // escalation id being edited
+  const [editForm,    setEditForm]    = useState({});
+  const [editSaving,  setEditSaving]  = useState(false);
 
   useEffect(() => {
     axios.get('/api/accounts').then(r => {
@@ -96,6 +99,55 @@ export default function EscalationsDashboard() {
       alert('Failed to save: ' + (e.response?.data?.error || e.message));
     } finally {
       setSaving(false);
+    }
+  };
+
+  const startEdit = (e) => {
+    setEditing(e.id);
+    setExpanded(null);
+    setEditForm({
+      account_id: e.account_id || '',
+      account_name: e.account_name || '',
+      tenant_id: e.tenant_id || '',
+      date_of_escalation: e.date_of_escalation ? e.date_of_escalation.slice(0, 10) : '',
+      month: e.month || '',
+      description: e.description || '',
+      action_taken: e.action_taken || '',
+      ownership: e.ownership || '',
+      status: e.status || 'Open',
+      csm: e.csm || '',
+      eta: e.eta || '',
+      ps_leader: e.ps_leader || '',
+      escalated_by: e.escalated_by || '',
+      email_subject: e.email_subject || '',
+    });
+  };
+
+  const handleEditAccountSelect = (accountId) => {
+    const acct = accounts.find(a => String(a.id) === String(accountId));
+    if (acct) {
+      setEditForm(f => ({ ...f, account_id: acct.id, account_name: acct.account_name, tenant_id: acct.tenant_id || '', csm: acct.csm || f.csm }));
+    } else {
+      setEditForm(f => ({ ...f, account_id: '', account_name: '', tenant_id: '' }));
+    }
+  };
+
+  const handleEditSave = async () => {
+    if (!editForm.description) { alert('Description is required'); return; }
+    setEditSaving(true);
+    try {
+      await axios.put(`/api/escalations/${editing}`, {
+        ...editForm,
+        account_id: editForm.account_id || null,
+        account_name: editForm.account_name || null,
+        tenant_id: editForm.tenant_id || null,
+      });
+      setEditing(null);
+      setReload(r => r + 1);
+    } catch (e) {
+      alert('Failed to save: ' + (e.response?.data?.error || e.message));
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -340,16 +392,18 @@ export default function EscalationsDashboard() {
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ownership</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">ETA</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Escalated By</th>
+                  <th className="px-3 py-3 w-10"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {displayed.map(e => {
                   const rag = e.accounts?.rag_status;
+                  const isEditing = editing === e.id;
                   return (
                     <React.Fragment key={e.id}>
                       <tr
-                        className="hover:bg-gray-50 cursor-pointer transition"
-                        onClick={() => setExpanded(expanded === e.id ? null : e.id)}
+                        className={`transition ${isEditing ? 'bg-amber-50/40' : 'hover:bg-gray-50 cursor-pointer'}`}
+                        onClick={() => { if (!isEditing) setExpanded(expanded === e.id ? null : e.id); }}
                       >
                         <td className="px-4 py-3">
                           {e.account_id ? (
@@ -381,10 +435,23 @@ export default function EscalationsDashboard() {
                         <td className="px-4 py-3 text-gray-600 text-xs">{e.ownership || '—'}</td>
                         <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{e.eta || '—'}</td>
                         <td className="px-4 py-3 text-gray-600 text-xs">{e.escalated_by || '—'}</td>
+                        <td className="px-3 py-3">
+                          <button
+                            onClick={ev => { ev.stopPropagation(); isEditing ? setEditing(null) : startEdit(e); }}
+                            className={`p-1.5 rounded-md transition ${isEditing ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-100'}`}
+                            title={isEditing ? 'Cancel edit' : 'Edit escalation'}
+                          >
+                            {isEditing ? (
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                            ) : (
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            )}
+                          </button>
+                        </td>
                       </tr>
-                      {expanded === e.id && (
+                      {expanded === e.id && !isEditing && (
                         <tr className="bg-blue-50">
-                          <td colSpan={9} className="px-4 py-4">
+                          <td colSpan={10} className="px-4 py-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
@@ -413,6 +480,117 @@ export default function EscalationsDashboard() {
                           </td>
                         </tr>
                       )}
+                      {isEditing && (
+                        <tr className="bg-amber-50">
+                          <td colSpan={10} className="px-4 py-4">
+                            <div className="space-y-4">
+                              <p className="text-sm font-semibold text-gray-800">Edit Escalation</p>
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
+                                  <select value={editForm.account_id || ''} onChange={ev => handleEditAccountSelect(ev.target.value)} className="!py-1.5 text-sm">
+                                    <option value="">Select account…</option>
+                                    {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account Name <span className="text-gray-300 font-normal normal-case">(read-only)</span></p>
+                                  <input type="text" value={editForm.account_name || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Tenant ID <span className="text-gray-300 font-normal normal-case">(read-only)</span></p>
+                                  <input type="text" value={editForm.tenant_id || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed font-mono" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date of Escalation</p>
+                                  <input type="date" value={editForm.date_of_escalation || ''}
+                                    onChange={ev => {
+                                      const val = ev.target.value;
+                                      const month = val ? MONTHS[new Date(val + 'T00:00:00').getMonth()] : '';
+                                      setEditForm(f => ({ ...f, date_of_escalation: val, month }));
+                                    }}
+                                    className="!py-1.5 text-sm" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Month</p>
+                                  <select value={editForm.month || ''} onChange={ev => setEditForm(f => ({ ...f, month: ev.target.value }))} className="!py-1.5 text-sm">
+                                    <option value="">—</option>
+                                    {MONTHS.map(m => <option key={m}>{m}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
+                                  <select value={editForm.status || 'Open'} onChange={ev => setEditForm(f => ({ ...f, status: ev.target.value }))} className="!py-1.5 text-sm">
+                                    <option>Open</option><option>In Progress</option><option>Partly Resolved</option><option>Resolved</option>
+                                  </select>
+                                </div>
+                                <div className="sm:col-span-2 lg:col-span-3">
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Description *</p>
+                                  <textarea rows={3} value={editForm.description || ''}
+                                    onChange={ev => setEditForm(f => ({ ...f, description: ev.target.value }))}
+                                    className="text-sm" />
+                                </div>
+                                <div className="sm:col-span-2 lg:col-span-3">
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Action Taken</p>
+                                  <textarea rows={2} value={editForm.action_taken || ''}
+                                    onChange={ev => setEditForm(f => ({ ...f, action_taken: ev.target.value }))}
+                                    className="text-sm" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
+                                  <select value={editForm.ownership || ''} onChange={ev => setEditForm(f => ({ ...f, ownership: ev.target.value }))} className="!py-1.5 text-sm">
+                                    <option value="">—</option>
+                                    {OWNERSHIP_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">ETA</p>
+                                  <input type="date" value={editForm.eta || ''}
+                                    onChange={ev => setEditForm(f => ({ ...f, eta: ev.target.value }))}
+                                    className="!py-1.5 text-sm" />
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
+                                  {csms.length ? (
+                                    <select value={editForm.csm || ''} onChange={ev => setEditForm(f => ({ ...f, csm: ev.target.value }))} className="!py-1.5 text-sm">
+                                      <option value="">—</option>
+                                      {csms.map(c => <option key={c}>{c}</option>)}
+                                    </select>
+                                  ) : (
+                                    <input type="text" value={editForm.csm || ''} onChange={ev => setEditForm(f => ({ ...f, csm: ev.target.value }))} className="!py-1.5 text-sm" />
+                                  )}
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
+                                  <select value={editForm.ps_leader || ''} onChange={ev => setEditForm(f => ({ ...f, ps_leader: ev.target.value }))} className="!py-1.5 text-sm">
+                                    <option value="">—</option>
+                                    {PS_LEADER_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
+                                  <select value={editForm.escalated_by || ''} onChange={ev => setEditForm(f => ({ ...f, escalated_by: ev.target.value }))} className="!py-1.5 text-sm">
+                                    <option value="">—</option>
+                                    {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                                  </select>
+                                </div>
+                                <div className="sm:col-span-2">
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email Subject</p>
+                                  <input type="text" value={editForm.email_subject || ''} onChange={ev => setEditForm(f => ({ ...f, email_subject: ev.target.value }))} className="!py-1.5 text-sm" placeholder="Email subject line (if any)" />
+                                </div>
+                              </div>
+                              <div className="flex gap-2 pt-1">
+                                <button onClick={handleEditSave} disabled={editSaving || !editForm.description}
+                                  className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+                                  {editSaving ? 'Saving…' : 'Save Changes'}
+                                </button>
+                                <button onClick={() => setEditing(null)}
+                                  className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
                     </React.Fragment>
                   );
                 })}
@@ -426,33 +604,47 @@ export default function EscalationsDashboard() {
           {displayed.map(e => {
             const rag = e.accounts?.rag_status;
             const open = expanded === e.id;
+            const isEditing = editing === e.id;
             return (
               <div key={e.id} className="card p-0 overflow-hidden">
-                <button type="button" onClick={() => setExpanded(open ? null : e.id)}
-                  className="w-full text-left p-4 active:bg-gray-50 transition">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      {e.account_id ? (
-                        <Link to={`/accounts/${e.account_id}`} onClick={ev => ev.stopPropagation()}
-                          className="font-semibold text-brand-700 hover:underline break-words">{e.account_name}</Link>
-                      ) : (
-                        <span className="font-semibold text-gray-900 break-words">{e.account_name}</span>
-                      )}
-                      {e.tenant_id && <p className="text-xs text-gray-400 font-mono">{e.tenant_id}</p>}
+                <div className="flex items-stretch">
+                  <button type="button" onClick={() => { if (!isEditing) setExpanded(open ? null : e.id); }}
+                    className="flex-1 text-left p-4 active:bg-gray-50 transition min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        {e.account_id ? (
+                          <Link to={`/accounts/${e.account_id}`} onClick={ev => ev.stopPropagation()}
+                            className="font-semibold text-brand-700 hover:underline break-words">{e.account_name}</Link>
+                        ) : (
+                          <span className="font-semibold text-gray-900 break-words">{e.account_name}</span>
+                        )}
+                        {e.tenant_id && <p className="text-xs text-gray-400 font-mono">{e.tenant_id}</p>}
+                      </div>
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        <StatusBadge status={e.status} />
+                        {rag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${RAG_BADGE[rag] || 'bg-gray-100 text-gray-700'}`}>{rag}</span>}
+                      </div>
                     </div>
-                    <div className="flex flex-col items-end gap-1 shrink-0">
-                      <StatusBadge status={e.status} />
-                      {rag && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${RAG_BADGE[rag] || 'bg-gray-100 text-gray-700'}`}>{rag}</span>}
+                    <p className="mt-2 text-sm text-gray-700 line-clamp-2">{e.description}</p>
+                    <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                      {e.date_of_escalation && <span>{new Date(e.date_of_escalation).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>}
+                      {e.csm && <span><span className="text-gray-400">CSM:</span> {e.csm}</span>}
+                      {e.eta && <span><span className="text-gray-400">ETA:</span> {e.eta}</span>}
                     </div>
-                  </div>
-                  <p className="mt-2 text-sm text-gray-700 line-clamp-2">{e.description}</p>
-                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                    {e.date_of_escalation && <span>{new Date(e.date_of_escalation).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>}
-                    {e.csm && <span><span className="text-gray-400">CSM:</span> {e.csm}</span>}
-                    {e.eta && <span><span className="text-gray-400">ETA:</span> {e.eta}</span>}
-                  </div>
-                </button>
-                {open && (
+                  </button>
+                  <button
+                    onClick={() => { isEditing ? setEditing(null) : startEdit(e); }}
+                    className={`px-3 border-l border-gray-100 transition shrink-0 ${isEditing ? 'bg-amber-100 text-amber-600' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-50'}`}
+                    title={isEditing ? 'Cancel edit' : 'Edit escalation'}
+                  >
+                    {isEditing ? (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    )}
+                  </button>
+                </div>
+                {open && !isEditing && (
                   <div className="px-4 pb-4 pt-1 bg-gray-50 border-t border-gray-100 space-y-3">
                     <div>
                       <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
@@ -479,6 +671,123 @@ export default function EscalationsDashboard() {
                     {e.account_id && (
                       <Link to={`/accounts/${e.account_id}`} className="inline-block text-sm text-brand-600 hover:underline font-medium">View Account →</Link>
                     )}
+                  </div>
+                )}
+                {isEditing && (
+                  <div className="px-4 pb-4 pt-3 bg-amber-50 border-t border-amber-100 space-y-4">
+                    <p className="text-sm font-semibold text-gray-800">Edit Escalation</p>
+                    <div className="space-y-3">
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
+                        <select value={editForm.account_id || ''} onChange={ev => handleEditAccountSelect(ev.target.value)} className="text-sm">
+                          <option value="">Select account…</option>
+                          {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
+                        </select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account Name</p>
+                          <input type="text" value={editForm.account_name || ''} readOnly className="text-sm bg-gray-100 cursor-not-allowed" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Tenant ID</p>
+                          <input type="text" value={editForm.tenant_id || ''} readOnly className="text-xs bg-gray-100 cursor-not-allowed font-mono" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date</p>
+                          <input type="date" value={editForm.date_of_escalation || ''}
+                            onChange={ev => {
+                              const val = ev.target.value;
+                              const month = val ? MONTHS[new Date(val + 'T00:00:00').getMonth()] : '';
+                              setEditForm(f => ({ ...f, date_of_escalation: val, month }));
+                            }}
+                            className="text-sm" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Month</p>
+                          <select value={editForm.month || ''} onChange={ev => setEditForm(f => ({ ...f, month: ev.target.value }))} className="text-sm">
+                            <option value="">—</option>
+                            {MONTHS.map(m => <option key={m}>{m}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Description *</p>
+                        <textarea rows={3} value={editForm.description || ''}
+                          onChange={ev => setEditForm(f => ({ ...f, description: ev.target.value }))}
+                          className="text-sm" />
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Action Taken</p>
+                        <textarea rows={2} value={editForm.action_taken || ''}
+                          onChange={ev => setEditForm(f => ({ ...f, action_taken: ev.target.value }))}
+                          className="text-sm" />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
+                          <select value={editForm.status || 'Open'} onChange={ev => setEditForm(f => ({ ...f, status: ev.target.value }))} className="text-sm">
+                            <option>Open</option><option>In Progress</option><option>Partly Resolved</option><option>Resolved</option>
+                          </select>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
+                          <select value={editForm.ownership || ''} onChange={ev => setEditForm(f => ({ ...f, ownership: ev.target.value }))} className="text-sm">
+                            <option value="">—</option>
+                            {OWNERSHIP_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">ETA</p>
+                          <input type="date" value={editForm.eta || ''}
+                            onChange={ev => setEditForm(f => ({ ...f, eta: ev.target.value }))}
+                            className="text-sm" />
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
+                          {csms.length ? (
+                            <select value={editForm.csm || ''} onChange={ev => setEditForm(f => ({ ...f, csm: ev.target.value }))} className="text-sm">
+                              <option value="">—</option>
+                              {csms.map(c => <option key={c}>{c}</option>)}
+                            </select>
+                          ) : (
+                            <input type="text" value={editForm.csm || ''} onChange={ev => setEditForm(f => ({ ...f, csm: ev.target.value }))} className="text-sm" />
+                          )}
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
+                          <select value={editForm.ps_leader || ''} onChange={ev => setEditForm(f => ({ ...f, ps_leader: ev.target.value }))} className="text-sm">
+                            <option value="">—</option>
+                            {PS_LEADER_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
+                          <select value={editForm.escalated_by || ''} onChange={ev => setEditForm(f => ({ ...f, escalated_by: ev.target.value }))} className="text-sm">
+                            <option value="">—</option>
+                            {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email Subject</p>
+                        <input type="text" value={editForm.email_subject || ''} onChange={ev => setEditForm(f => ({ ...f, email_subject: ev.target.value }))} className="text-sm" placeholder="Email subject line (if any)" />
+                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-1">
+                      <button onClick={handleEditSave} disabled={editSaving || !editForm.description}
+                        className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+                        {editSaving ? 'Saving…' : 'Save Changes'}
+                      </button>
+                      <button onClick={() => setEditing(null)}
+                        className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg transition">Cancel</button>
+                    </div>
                   </div>
                 )}
               </div>

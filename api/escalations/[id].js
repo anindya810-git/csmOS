@@ -3,6 +3,7 @@ import { verifyToken } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
 
 const EDITABLE_FIELDS = [
+  'account_id', 'account_name', 'tenant_id',
   'date_of_escalation', 'month', 'description', 'action_taken',
   'ownership', 'status', 'csm', 'eta', 'email_subject', 'ps_leader', 'escalated_by'
 ];
