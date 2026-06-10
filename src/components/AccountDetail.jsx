@@ -189,7 +189,7 @@ export default function AccountDetail() {
     return (
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">{label}</p>
-        {options ? (
+        {options?.length ? (
           <select value={form[field] || ''} onChange={e => setForm(f => ({...f, [field]: e.target.value}))}>
             <option value="">—</option>
             {options.map(o => <option key={o}>{o}</option>)}
