@@ -44,58 +44,57 @@ function YNBadge({ value }) {
   return <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${yes ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{yes ? '✓ Yes' : '✗ No'}</span>;
 }
 
-function Section({ title, children }) {
+function Section({ title, children, defaultOpen = true }) {
+  const [open, setOpen] = React.useState(defaultOpen);
   return (
     <div className="card">
-      <h3 className="text-sm font-semibold text-gray-700 mb-4 pb-2 border-b border-gray-100">{title}</h3>
-      {children}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between pb-2 border-b border-gray-100 mb-4 group"
+      >
+        <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
+        <svg className={`w-4 h-4 text-gray-400 transition-transform duration-150 ${open ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && children}
     </div>
   );
 }
 
-function PocCard({ num, prefix, account, editing, form, setForm }) {
-  const nameKey  = `${prefix}_name`;
-  const emailKey = `${prefix}_email`;
-  const phoneKey = `${prefix}_phone`;
-  const desigKey = `${prefix}_designation`;
-
-  const hasData = account[nameKey] || account[emailKey] || account[phoneKey] || account[desigKey];
-
-  if (!editing && !hasData) return null;
-
-  if (!editing) {
-    return (
-      <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-1">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">POC {num}</p>
-        {account[nameKey]  && <p className="text-sm font-semibold text-gray-800">{account[nameKey]}</p>}
-        {account[desigKey] && <p className="text-xs text-gray-500">{account[desigKey]}</p>}
-        {account[emailKey] && (
-          <a href={`mailto:${account[emailKey]}`} className="text-xs text-brand-600 hover:underline block break-all">
-            {account[emailKey]}
-          </a>
-        )}
-        {account[phoneKey] && <p className="text-xs text-gray-600">{account[phoneKey]}</p>}
-      </div>
-    );
-  }
-
-  const inp = (key, placeholder) => (
-    <input
-      type="text"
-      placeholder={placeholder}
-      value={form[key] || ''}
-      onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-      className="!py-1.5 text-xs"
-    />
+function PocViewCard({ n, account }) {
+  const name  = account[`poc${n}_name`];
+  const email = account[`poc${n}_email`];
+  const phone = account[`poc${n}_phone`];
+  const desig = account[`poc${n}_designation`];
+  return (
+    <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 space-y-1">
+      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Contact {n}</p>
+      {name  && <p className="text-sm font-semibold text-gray-800">{name}</p>}
+      {desig && <p className="text-xs text-gray-500">{desig}</p>}
+      {email && <a href={`mailto:${email}`} className="text-xs text-brand-600 hover:underline block break-all">{email}</a>}
+      {phone && <p className="text-xs text-gray-600">{phone}</p>}
+    </div>
   );
+}
 
+function PocEditCard({ n, form, setForm, onRemove }) {
+  const inp = (field, placeholder) => (
+    <input type="text" placeholder={placeholder} value={form[field] || ''}
+      onChange={e => setForm(f => ({ ...f, [field]: e.target.value }))}
+      className="!py-1.5 text-xs" />
+  );
   return (
     <div className="rounded-lg border border-gray-200 p-3 space-y-2">
-      <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">POC {num}</p>
-      {inp(nameKey,  'Full name')}
-      {inp(desigKey, 'Designation')}
-      {inp(emailKey, 'Email')}
-      {inp(phoneKey, 'Phone')}
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Contact {n}</p>
+        <button type="button" onClick={onRemove} className="text-xs text-red-400 hover:text-red-600">Remove</button>
+      </div>
+      {inp(`poc${n}_name`,        'Full name')}
+      {inp(`poc${n}_designation`, 'Designation')}
+      {inp(`poc${n}_email`,       'Email')}
+      {inp(`poc${n}_phone`,       'Phone')}
     </div>
   );
 }
@@ -103,12 +102,31 @@ function PocCard({ num, prefix, account, editing, form, setForm }) {
 export default function AccountDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [account, setAccount] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error,   setError]   = useState(null);
-  const [editing, setEditing] = useState(false);
-  const [form,    setForm]    = useState({});
-  const [saving,  setSaving]  = useState(false);
+  const [account,   setAccount]   = useState(null);
+  const [loading,   setLoading]   = useState(true);
+  const [error,     setError]     = useState(null);
+  const [editing,   setEditing]   = useState(false);
+  const [form,      setForm]      = useState({});
+  const [saving,    setSaving]    = useState(false);
+  const [pocSlots,  setPocSlots]  = useState([]);
+
+  const startEditing = (acc) => {
+    const used = [1,2,3].filter(n =>
+      acc[`poc${n}_name`] || acc[`poc${n}_email`] || acc[`poc${n}_phone`] || acc[`poc${n}_designation`]
+    );
+    setPocSlots(used);
+    setEditing(true);
+  };
+
+  const addPocSlot = () => {
+    const next = [1,2,3].find(n => !pocSlots.includes(n));
+    if (next) setPocSlots(s => [...s, next]);
+  };
+
+  const removePocSlot = (n) => {
+    setPocSlots(s => s.filter(x => x !== n));
+    setForm(f => ({ ...f, [`poc${n}_name`]: '', [`poc${n}_email`]: '', [`poc${n}_phone`]: '', [`poc${n}_designation`]: '' }));
+  };
 
   useEffect(() => {
     setLoading(true);
@@ -137,6 +155,7 @@ export default function AccountDetail() {
       const r = await axios.put(`/api/accounts/${id}`, form);
       setAccount(r.data);
       setForm(r.data);
+      setPocSlots([]);
       setEditing(false);
     } catch (e) {
       alert('Save failed: ' + (e.response?.data?.error || e.message));
@@ -216,7 +235,9 @@ export default function AccountDetail() {
     );
   };
 
-  const hasPocs = !!(account.poc1_name || account.poc1_email || account.poc2_name || account.poc2_email || account.poc3_name || account.poc3_email);
+  const viewPocs = [1,2,3].filter(n =>
+    account[`poc${n}_name`] || account[`poc${n}_email`] || account[`poc${n}_phone`] || account[`poc${n}_designation`]
+  );
 
   return (
     <div className="space-y-5">
@@ -237,13 +258,13 @@ export default function AccountDetail() {
         <div className="flex gap-2 shrink-0">
           {editing ? (
             <>
-              <button onClick={() => { setEditing(false); setForm(account); }} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
+              <button onClick={() => { setEditing(false); setForm(account); setPocSlots([]); }} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
               <button onClick={handleSave} disabled={saving} className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
                 {saving ? 'Saving…' : 'Save Changes'}
               </button>
             </>
           ) : (
-            <button onClick={() => setEditing(true)} className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
+            <button onClick={() => startEditing(account)} className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
               Edit
             </button>
@@ -314,24 +335,29 @@ export default function AccountDetail() {
 
           {/* Points of Contact */}
           <Section title="Points of Contact">
-            {hasPocs || editing ? (
+            {!editing && viewPocs.length === 0 && (
+              <p className="text-sm text-gray-400 italic py-1">No contacts yet. Click Edit to add.</p>
+            )}
+            {!editing && viewPocs.length > 0 && (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {[1, 2, 3].map(n => (
-                  <PocCard
-                    key={n}
-                    num={n}
-                    prefix={`poc${n}`}
-                    account={account}
-                    editing={editing}
-                    form={form}
-                    setForm={setForm}
-                  />
-                ))}
+                {viewPocs.map(n => <PocViewCard key={n} n={n} account={account} />)}
               </div>
-            ) : (
-              <div className="flex items-center gap-3 py-2">
-                <p className="text-sm text-gray-400 italic">No contacts added yet.</p>
-                <button onClick={() => setEditing(true)} className="text-xs text-brand-600 hover:underline font-medium">+ Add contacts</button>
+            )}
+            {editing && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {pocSlots.map(n => (
+                    <PocEditCard key={n} n={n} form={form} setForm={setForm}
+                      onRemove={() => removePocSlot(n)} />
+                  ))}
+                </div>
+                {pocSlots.length < 3 && (
+                  <button type="button" onClick={addPocSlot}
+                    className="text-sm text-brand-600 hover:text-brand-800 font-medium flex items-center gap-1">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    Add Contact
+                  </button>
+                )}
               </div>
             )}
           </Section>
