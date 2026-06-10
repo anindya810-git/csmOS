@@ -185,7 +185,7 @@ export default function SettingsPage() {
     if (!ddAddValue.trim()) return;
     setDdAdding(true);
     try {
-      await axios.post('/api/admin/dropdown-config', {
+      await axios.post('/api/dropdown-config', {
         field_name: ddField,
         value: ddAddValue.trim(),
         parent_value: ddField === 'issue_sub_type' ? ddAddParent : null,
@@ -201,7 +201,7 @@ export default function SettingsPage() {
     if (!ddEditValue.trim()) return;
     setDdSaving(true);
     try {
-      await axios.put(`/api/admin/dropdown-config/${id}`, {
+      await axios.put(`/api/dropdown-config?id=${id}`, {
         value: ddEditValue.trim(),
         parent_value: ddField === 'issue_sub_type' ? ddEditParent : undefined,
       });
@@ -212,7 +212,7 @@ export default function SettingsPage() {
 
   const handleDdDelete = async (id, value) => {
     if (!window.confirm(`Delete "${value}"?`)) return;
-    try { await axios.delete(`/api/admin/dropdown-config/${id}`); loadDD(); }
+    try { await axios.delete(`/api/dropdown-config?id=${id}`); loadDD(); }
     catch (e) { alert(e.response?.data?.error || 'Failed to delete'); }
   };
 
