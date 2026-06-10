@@ -10,6 +10,7 @@ import RenewalDashboard from './components/RenewalDashboard';
 import RAGDashboard from './components/RAGDashboard';
 import EscalationsDashboard from './components/EscalationsDashboard';
 import WeeklyEscalationsDashboard from './components/WeeklyEscalationsDashboard';
+import IssuesDashboard from './components/IssuesDashboard';
 import SettingsPage from './components/SettingsPage';
 import AccountEdit from './components/AccountEdit';
 
@@ -43,6 +44,7 @@ function AppRoutes() {
         <Route path="rag" element={<RAGDashboard />} />
         <Route path="escalations" element={<EscalationsDashboard />} />
         <Route path="escalations/weekly" element={<WeeklyEscalationsDashboard />} />
+        <Route path="issues" element={<IssuesDashboard />} />
         <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
