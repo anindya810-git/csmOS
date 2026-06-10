@@ -106,6 +106,10 @@ function PocEditCard({ n, form, setForm, onRemove }) {
   );
 }
 
+const OWNERSHIP_OPTIONS = ['CSM','PS','CSM + PS','PS + CSM','Support + CSM','Sales + CSM','CSM + CP','CSM + CP + PS','CSM + PS + Engg','PS + CSM + Support','CSM + Engg + Support','CSM + Engg + PS','Support + Engg + PS + CSM','PS DEV + Product + CSM','Support + Product + CSM','CSM + Billings','Product'];
+const ESCALATED_BY_OPTIONS = ['CSM','Vivek','Pritam','Vivek / Pritam','Nilesh','Prashant'];
+const PS_LEADER_OPTIONS = ['Hirak','Ambrish'];
+
 const EMPTY_ESCAL = {
   date_of_escalation: '', month: '', description: '', action_taken: '',
   ownership: '', status: 'Open', csm: '', eta: '', email_subject: '',
@@ -530,27 +534,30 @@ export default function AccountDetail() {
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
-                <input type="text" value={escalForm.ownership}
-                  onChange={e => setEscalForm(f => ({ ...f, ownership: e.target.value }))}
-                  placeholder="e.g. CSM + PS" className="!py-1.5 text-sm" />
+                <select value={escalForm.ownership} onChange={e => setEscalForm(f => ({ ...f, ownership: e.target.value }))} className="!py-1.5 text-sm">
+                  <option value="">—</option>
+                  {OWNERSHIP_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                </select>
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">ETA</p>
-                <input type="text" value={escalForm.eta}
+                <input type="date" value={escalForm.eta}
                   onChange={e => setEscalForm(f => ({ ...f, eta: e.target.value }))}
-                  placeholder="e.g. 15/6/26" className="!py-1.5 text-sm" />
+                  className="!py-1.5 text-sm" />
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
-                <input type="text" value={escalForm.escalated_by}
-                  onChange={e => setEscalForm(f => ({ ...f, escalated_by: e.target.value }))}
-                  placeholder="e.g. Vivek / Prashant" className="!py-1.5 text-sm" />
+                <select value={escalForm.escalated_by} onChange={e => setEscalForm(f => ({ ...f, escalated_by: e.target.value }))} className="!py-1.5 text-sm">
+                  <option value="">—</option>
+                  {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                </select>
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
-                <input type="text" value={escalForm.ps_leader}
-                  onChange={e => setEscalForm(f => ({ ...f, ps_leader: e.target.value }))}
-                  placeholder="PS Leader name" className="!py-1.5 text-sm" />
+                <select value={escalForm.ps_leader} onChange={e => setEscalForm(f => ({ ...f, ps_leader: e.target.value }))} className="!py-1.5 text-sm">
+                  <option value="">—</option>
+                  {PS_LEADER_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                </select>
               </div>
               <div>
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>

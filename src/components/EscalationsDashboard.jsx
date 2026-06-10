@@ -18,6 +18,10 @@ const RAG_BADGE = {
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
+const OWNERSHIP_OPTIONS = ['CSM','PS','CSM + PS','PS + CSM','Support + CSM','Sales + CSM','CSM + CP','CSM + CP + PS','CSM + PS + Engg','PS + CSM + Support','CSM + Engg + Support','CSM + Engg + PS','Support + Engg + PS + CSM','PS DEV + Product + CSM','Support + Product + CSM','CSM + Billings','Product'];
+const ESCALATED_BY_OPTIONS = ['CSM','Vivek','Pritam','Vivek / Pritam','Nilesh','Prashant'];
+const PS_LEADER_OPTIONS = ['Hirak','Ambrish'];
+
 const EMPTY_FORM = {
   account_id: null, account_name: '', tenant_id: '',
   date_of_escalation: '', month: '', description: '', action_taken: '',
@@ -176,11 +180,16 @@ export default function EscalationsDashboard() {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
-              {inp('ownership', 'e.g. CSM + PS')}
+              <select value={form.ownership} onChange={e => setForm(f => ({ ...f, ownership: e.target.value }))} className="!py-1.5 text-sm">
+                <option value="">—</option>
+                {OWNERSHIP_OPTIONS.map(o => <option key={o}>{o}</option>)}
+              </select>
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">ETA</p>
-              {inp('eta', 'e.g. 15/6/26')}
+              <input type="date" value={form.eta}
+                onChange={e => setForm(f => ({ ...f, eta: e.target.value }))}
+                className="!py-1.5 text-sm" />
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
@@ -193,11 +202,17 @@ export default function EscalationsDashboard() {
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
-              {inp('ps_leader', 'PS Leader name')}
+              <select value={form.ps_leader} onChange={e => setForm(f => ({ ...f, ps_leader: e.target.value }))} className="!py-1.5 text-sm">
+                <option value="">—</option>
+                {PS_LEADER_OPTIONS.map(o => <option key={o}>{o}</option>)}
+              </select>
             </div>
             <div>
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
-              {inp('escalated_by', 'e.g. Vivek / Prashant')}
+              <select value={form.escalated_by} onChange={e => setForm(f => ({ ...f, escalated_by: e.target.value }))} className="!py-1.5 text-sm">
+                <option value="">—</option>
+                {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+              </select>
             </div>
             <div className="sm:col-span-2">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email Subject</p>
