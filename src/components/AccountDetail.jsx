@@ -109,6 +109,11 @@ export default function AccountDetail() {
   const [form,      setForm]      = useState({});
   const [saving,    setSaving]    = useState(false);
   const [pocSlots,  setPocSlots]  = useState([]);
+  const [csms,      setCsms]      = useState([]);
+
+  useEffect(() => {
+    axios.get('/api/accounts/filters').then(r => setCsms(r.data.csms || [])).catch(() => {});
+  }, []);
 
   const startEditing = (acc) => {
     const used = [1,2,3].filter(n =>
@@ -287,8 +292,8 @@ export default function AccountDetail() {
 
           <Section title="Team & Commercial">
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-              <F label="CSM Lead" field="csm_lead" />
-              <F label="CSM" field="csm" />
+              <F label="CSM Lead" field="csm_lead" options={csms} />
+              <F label="CSM" field="csm" options={csms} />
               <F label="CP" field="cp" />
               <F label="TAM Assigned" field="tam_assigned" />
               <F label="Billing Frequency" field="billing_frequency" options={['Monthly','Quarterly','Half Yearly','Yearly']} />
