@@ -36,7 +36,8 @@ export default async function handler(req, res) {
     const {
       account_id, tenant_id, account_name, date_of_escalation, month,
       description, action_taken, ownership, status, csm, eta,
-      email_subject, ps_leader, escalated_by
+      email_subject, ps_leader, escalated_by,
+      trigger_reason, source_of_escalation, issue_type, issue_sub_type
     } = req.body;
 
     if (!description) return res.status(400).json({ error: 'description required' });
@@ -61,6 +62,10 @@ export default async function handler(req, res) {
       email_subject: email_subject || null,
       ps_leader: ps_leader || null,
       escalated_by: escalated_by || null,
+      trigger_reason: trigger_reason || null,
+      source_of_escalation: source_of_escalation || null,
+      issue_type: issue_type || null,
+      issue_sub_type: issue_sub_type || null,
     }).select().single();
 
     if (error) return res.status(500).json({ error: error.message });

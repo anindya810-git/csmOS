@@ -27,6 +27,7 @@ const EMPTY_FORM = {
   date_of_escalation: '', month: '', description: '', action_taken: '',
   ownership: '', status: 'Open', csm: '', eta: '', email_subject: '',
   ps_leader: '', escalated_by: '',
+  trigger_reason: '', source_of_escalation: '', issue_type: '', issue_sub_type: '',
 };
 
 function StatusBadge({ status }) {
@@ -50,9 +51,10 @@ export default function EscalationsDashboard() {
   const [saving,      setSaving]      = useState(false);
   const [accounts,    setAccounts]    = useState([]);
   const [csms,        setCsms]        = useState([]);
-  const [editing,     setEditing]     = useState(null);   // escalation id being edited
-  const [editForm,    setEditForm]    = useState({});
-  const [editSaving,  setEditSaving]  = useState(false);
+  const [editing,       setEditing]       = useState(null);
+  const [editForm,      setEditForm]      = useState({});
+  const [editSaving,    setEditSaving]    = useState(false);
+  const [dropdownConfig, setDropdownConfig] = useState({});
 
   useEffect(() => {
     axios.get('/api/accounts').then(r => {
@@ -60,6 +62,7 @@ export default function EscalationsDashboard() {
       setAccounts(list.sort((a,b) => a.account_name.localeCompare(b.account_name)));
     }).catch(() => {});
     axios.get('/api/accounts/filters').then(r => setCsms(r.data.csms || [])).catch(() => {});
+    axios.get('/api/dropdown-config').then(r => setDropdownConfig(r.data || {})).catch(() => {});
   }, []);
 
   const load = useCallback(() => {
@@ -121,6 +124,10 @@ export default function EscalationsDashboard() {
       ps_leader: e.ps_leader || '',
       escalated_by: e.escalated_by || '',
       email_subject: e.email_subject || '',
+      trigger_reason: e.trigger_reason || '',
+      source_of_escalation: e.source_of_escalation || '',
+      issue_type: e.issue_type || '',
+      issue_sub_type: e.issue_sub_type || '',
     });
   };
 
@@ -307,6 +314,34 @@ export default function EscalationsDashboard() {
                 {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
               </select>
             </div>
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Trigger Reason</p>
+              <select value={form.trigger_reason} onChange={e => setForm(f => ({ ...f, trigger_reason: e.target.value }))} className="!py-1.5 text-sm">
+                <option value="">—</option>
+                {(dropdownConfig.trigger_reason || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+              </select>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source of Escalation</p>
+              <select value={form.source_of_escalation} onChange={e => setForm(f => ({ ...f, source_of_escalation: e.target.value }))} className="!py-1.5 text-sm">
+                <option value="">—</option>
+                {(dropdownConfig.source_of_escalation || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+              </select>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Type</p>
+              <select value={form.issue_type} onChange={e => setForm(f => ({ ...f, issue_type: e.target.value, issue_sub_type: '' }))} className="!py-1.5 text-sm">
+                <option value="">—</option>
+                {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+              </select>
+            </div>
+            <div>
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Sub-Type</p>
+              <select value={form.issue_sub_type} onChange={e => setForm(f => ({ ...f, issue_sub_type: e.target.value }))} className="!py-1.5 text-sm" disabled={!form.issue_type}>
+                <option value="">{form.issue_type ? '—' : 'Select Issue Type first'}</option>
+                {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === form.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+              </select>
+            </div>
             <div className="sm:col-span-2">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email Subject</p>
               {inp('email_subject', 'Email subject line (if any)')}
@@ -491,6 +526,10 @@ export default function EscalationsDashboard() {
                                 </div>
                               )}
                               <div className="sm:col-span-2 flex flex-wrap gap-4 text-xs text-gray-500">
+                                {e.trigger_reason && <span><span className="font-medium">Trigger:</span> {e.trigger_reason}</span>}
+                                {e.source_of_escalation && <span><span className="font-medium">Source:</span> {e.source_of_escalation}</span>}
+                                {e.issue_type && <span><span className="font-medium">Issue Type:</span> {e.issue_type}</span>}
+                                {e.issue_sub_type && <span><span className="font-medium">Sub-Type:</span> {e.issue_sub_type}</span>}
                                 {e.ps_leader && <span><span className="font-medium">PS Leader:</span> {e.ps_leader}</span>}
                                 {e.month && <span><span className="font-medium">Month:</span> {e.month}</span>}
                                 {e.account_id && (
@@ -588,6 +627,34 @@ export default function EscalationsDashboard() {
                                   <select value={editForm.escalated_by || ''} onChange={ev => setEditForm(f => ({ ...f, escalated_by: ev.target.value }))} className="!py-1.5 text-sm">
                                     <option value="">—</option>
                                     {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Trigger Reason</p>
+                                  <select value={editForm.trigger_reason || ''} onChange={ev => setEditForm(f => ({ ...f, trigger_reason: ev.target.value }))} className="!py-1.5 text-sm">
+                                    <option value="">—</option>
+                                    {(dropdownConfig.trigger_reason || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source of Escalation</p>
+                                  <select value={editForm.source_of_escalation || ''} onChange={ev => setEditForm(f => ({ ...f, source_of_escalation: ev.target.value }))} className="!py-1.5 text-sm">
+                                    <option value="">—</option>
+                                    {(dropdownConfig.source_of_escalation || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Type</p>
+                                  <select value={editForm.issue_type || ''} onChange={ev => setEditForm(f => ({ ...f, issue_type: ev.target.value, issue_sub_type: '' }))} className="!py-1.5 text-sm">
+                                    <option value="">—</option>
+                                    {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                                  </select>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Sub-Type</p>
+                                  <select value={editForm.issue_sub_type || ''} onChange={ev => setEditForm(f => ({ ...f, issue_sub_type: ev.target.value }))} className="!py-1.5 text-sm" disabled={!editForm.issue_type}>
+                                    <option value="">{editForm.issue_type ? '—' : 'Select Issue Type first'}</option>
+                                    {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === editForm.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                                   </select>
                                 </div>
                                 <div className="sm:col-span-2">
@@ -693,6 +760,10 @@ export default function EscalationsDashboard() {
                       {e.ownership && <span><span className="font-medium">Ownership:</span> {e.ownership}</span>}
                       {e.ps_leader && <span><span className="font-medium">PS Leader:</span> {e.ps_leader}</span>}
                       {e.escalated_by && <span><span className="font-medium">Escalated By:</span> {e.escalated_by}</span>}
+                      {e.trigger_reason && <span><span className="font-medium">Trigger:</span> {e.trigger_reason}</span>}
+                      {e.source_of_escalation && <span><span className="font-medium">Source:</span> {e.source_of_escalation}</span>}
+                      {e.issue_type && <span><span className="font-medium">Issue Type:</span> {e.issue_type}</span>}
+                      {e.issue_sub_type && <span><span className="font-medium">Sub-Type:</span> {e.issue_sub_type}</span>}
                       {e.month && <span><span className="font-medium">Month:</span> {e.month}</span>}
                     </div>
                     {e.account_id && (
@@ -792,6 +863,34 @@ export default function EscalationsDashboard() {
                           <select value={editForm.escalated_by || ''} onChange={ev => setEditForm(f => ({ ...f, escalated_by: ev.target.value }))} className="text-sm">
                             <option value="">—</option>
                             {ESCALATED_BY_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Trigger Reason</p>
+                          <select value={editForm.trigger_reason || ''} onChange={ev => setEditForm(f => ({ ...f, trigger_reason: ev.target.value }))} className="text-sm">
+                            <option value="">—</option>
+                            {(dropdownConfig.trigger_reason || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source of Escalation</p>
+                          <select value={editForm.source_of_escalation || ''} onChange={ev => setEditForm(f => ({ ...f, source_of_escalation: ev.target.value }))} className="text-sm">
+                            <option value="">—</option>
+                            {(dropdownConfig.source_of_escalation || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Type</p>
+                          <select value={editForm.issue_type || ''} onChange={ev => setEditForm(f => ({ ...f, issue_type: ev.target.value, issue_sub_type: '' }))} className="text-sm">
+                            <option value="">—</option>
+                            {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Sub-Type</p>
+                          <select value={editForm.issue_sub_type || ''} onChange={ev => setEditForm(f => ({ ...f, issue_sub_type: ev.target.value }))} className="text-sm" disabled={!editForm.issue_type}>
+                            <option value="">{editForm.issue_type ? '—' : 'Select Issue Type first'}</option>
+                            {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === editForm.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
                           </select>
                         </div>
                       </div>

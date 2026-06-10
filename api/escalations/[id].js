@@ -5,7 +5,8 @@ import { setCors } from '../_utils/cors.js';
 const EDITABLE_FIELDS = [
   'account_id', 'account_name', 'tenant_id',
   'date_of_escalation', 'month', 'description', 'action_taken',
-  'ownership', 'status', 'csm', 'eta', 'email_subject', 'ps_leader', 'escalated_by'
+  'ownership', 'status', 'csm', 'eta', 'email_subject', 'ps_leader', 'escalated_by',
+  'trigger_reason', 'source_of_escalation', 'issue_type', 'issue_sub_type',
 ];
 
 export default async function handler(req, res) {
