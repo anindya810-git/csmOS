@@ -99,14 +99,6 @@ export default function EscalationsDashboard() {
     }
   };
 
-  const stats = {
-    total:         displayed.length,
-    open:          displayed.filter(e => e.status === 'Open').length,
-    inProgress:    displayed.filter(e => e.status === 'In Progress').length,
-    partlyResolved:displayed.filter(e => e.status === 'Partly Resolved').length,
-    resolved:      displayed.filter(e => e.status === 'Resolved').length,
-  };
-
   const allCsms        = [...new Set(escalations.map(e => e.csm).filter(Boolean))].sort();
   const allMonths      = [...new Set(escalations.map(e => e.month).filter(Boolean))];
   allMonths.sort((a,b) => MONTHS.indexOf(a) - MONTHS.indexOf(b));
@@ -125,6 +117,14 @@ export default function EscalationsDashboard() {
     }
     return true;
   });
+
+  const stats = {
+    total:         displayed.length,
+    open:          displayed.filter(e => e.status === 'Open').length,
+    inProgress:    displayed.filter(e => e.status === 'In Progress').length,
+    partlyResolved:displayed.filter(e => e.status === 'Partly Resolved').length,
+    resolved:      displayed.filter(e => e.status === 'Resolved').length,
+  };
 
   const inp = (field, placeholder, type='text') => (
     <input type={type} value={form[field] || ''} placeholder={placeholder}
