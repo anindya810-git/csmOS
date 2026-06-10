@@ -42,5 +42,20 @@ export default async function handler(req, res) {
     return res.status(201).json(data);
   }
 
+  if (req.method === 'PATCH') {
+    if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    const { ids, field, value } = req.body;
+    const ALLOWED = ['csm','csm_lead','rag_status','region','mrr_tier','renewal_status',
+      'churn_status','implementation_status','contraction_risk','churn_risk','tam_assigned'];
+    if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });
+    if (!field || !ALLOWED.includes(field)) return res.status(400).json({ error: 'invalid field' });
+    const { error } = await supabase
+      .from('accounts')
+      .update({ [field]: value || null, updated_at: new Date().toISOString() })
+      .in('id', ids);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ updated: ids.length });
+  }
+
   res.status(405).json({ error: 'Method not allowed' });
 }

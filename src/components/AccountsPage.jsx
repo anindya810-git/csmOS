@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 function fmt(n) {
   if (!n) return '—';
@@ -116,6 +117,7 @@ function matchesCondition(account, cond, escalationMap, fieldDefs) {
 
 export default function AccountsPage() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [accounts,         setAccounts]         = useState([]);
   const [filters,          setFilters]          = useState({});
   const [loading,          setLoading]          = useState(true);
@@ -129,6 +131,12 @@ export default function AccountsPage() {
   const [conditionLogic,   setConditionLogic]   = useState('AND');
   const [escalationMap,    setEscalationMap]    = useState({});
   const [escalationsReady, setEscalationsReady] = useState(false);
+  const [ddConfig,         setDdConfig]         = useState({});
+  const [bulkOpen,         setBulkOpen]         = useState(false);
+  const [bulkField,        setBulkField]        = useState('csm');
+  const [bulkValue,        setBulkValue]        = useState('');
+  const [bulkConfirm,      setBulkConfirm]      = useState(false);
+  const [bulkSaving,       setBulkSaving]       = useState(false);
 
   // Field definitions with dynamic options from filters
   const fieldDefs = useMemo(() => [
@@ -155,7 +163,26 @@ export default function AccountsPage() {
     { key: 'has_escalation',        label: 'Has Any Escalation',       type: 'bool' },
   ], [filters]);
 
-  useEffect(() => { axios.get('/api/accounts/filters').then(r => setFilters(r.data)); }, []);
+  const bulkFieldDefs = useMemo(() => {
+    const dd = (key, fb) => ddConfig[key]?.length ? ddConfig[key].map(o => o.value) : fb;
+    return [
+      { key: 'csm',                  label: 'CSM',                   opts: filters.csms   || [] },
+      { key: 'csm_lead',             label: 'CSM Lead',              opts: filters.csmLeads || [] },
+      { key: 'rag_status',           label: 'RAG Status',            opts: dd('rag_status', ['Green','Amber','Red']) },
+      { key: 'region',               label: 'Region',                opts: filters.regions || [] },
+      { key: 'mrr_tier',             label: 'MRR Tier',              opts: filters.tiers  || [] },
+      { key: 'renewal_status',       label: 'Renewal Status',        opts: dd('renewal_status', ['Renewed','At Risk','Lost','Pending']) },
+      { key: 'churn_status',         label: 'Churn Status',          opts: dd('churn_status', ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted']) },
+      { key: 'implementation_status',label: 'Implementation Status', opts: dd('implementation_status', ['Not Started','In Progress','Completed','On Hold']) },
+      { key: 'contraction_risk',     label: 'Contraction Risk',      opts: dd('contraction_risk', ['High','Medium','Low','None']) },
+      { key: 'churn_risk',           label: 'Churn Risk',            opts: dd('churn_risk', ['High','Medium','Low','None']) },
+    ];
+  }, [filters, ddConfig]);
+
+  useEffect(() => {
+    axios.get('/api/accounts/filters').then(r => setFilters(r.data));
+    axios.get('/api/dropdown-config').then(r => setDdConfig(r.data || {})).catch(() => {});
+  }, []);
 
   const fetchAccounts = useCallback(() => {
     setLoading(true);
@@ -224,6 +251,21 @@ export default function AccountsPage() {
     else { setSortField(field); setSortDir('asc'); }
   };
 
+  const handleBulkApply = async () => {
+    setBulkSaving(true);
+    try {
+      await axios.patch('/api/accounts', { ids: displayed.map(a => a.id), field: bulkField, value: bulkValue });
+      setBulkConfirm(false);
+      setBulkOpen(false);
+      setBulkValue('');
+      fetchAccounts();
+    } catch (e) {
+      alert(e.response?.data?.error || 'Bulk update failed');
+    } finally {
+      setBulkSaving(false);
+    }
+  };
+
   const Th = ({ label, field }) => (
     <th onClick={() => handleSort(field)} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide cursor-pointer select-none hover:text-gray-700 whitespace-nowrap">
       {label} {sortField === field && (sortDir === 'asc' ? '↑' : '↓')}
@@ -241,10 +283,24 @@ export default function AccountsPage() {
               : `${accounts.length} accounts`}
           </p>
         </div>
-        <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Add Account
-        </button>
+        <div className="flex items-center gap-2">
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => { setBulkOpen(o => !o); setBulkValue(''); }}
+              className={`inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg border transition
+                ${bulkOpen ? 'bg-amber-50 border-amber-300 text-amber-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              Bulk Update
+            </button>
+          )}
+          <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            Add Account
+          </button>
+        </div>
       </div>
 
       <div className="card p-4 space-y-3">
@@ -428,6 +484,55 @@ export default function AccountsPage() {
         )}
       </div>
 
+      {/* Bulk update toolbar */}
+      {bulkOpen && (
+        <div className="card border-amber-200 bg-amber-50/60 p-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-1.5 shrink-0">
+              <svg className="w-4 h-4 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+              </svg>
+              <span className="text-sm font-semibold text-amber-800">Bulk Update</span>
+            </div>
+            <span className="text-sm text-amber-700">Set</span>
+            <select
+              value={bulkField}
+              onChange={e => { setBulkField(e.target.value); setBulkValue(''); }}
+              className="!w-auto text-sm !py-1.5 border-amber-200 bg-white"
+            >
+              {bulkFieldDefs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+            </select>
+            <span className="text-sm text-amber-700">to</span>
+            <select
+              value={bulkValue}
+              onChange={e => setBulkValue(e.target.value)}
+              className="!w-auto text-sm !py-1.5 border-amber-200 bg-white"
+            >
+              <option value="">— Select value —</option>
+              {(bulkFieldDefs.find(f => f.key === bulkField)?.opts || []).map(o => (
+                <option key={o} value={o}>{o}</option>
+              ))}
+            </select>
+            <span className="text-sm text-amber-700">
+              for <strong className="text-amber-900">{displayed.length}</strong> account{displayed.length !== 1 ? 's' : ''}
+            </span>
+            <button
+              onClick={() => setBulkConfirm(true)}
+              disabled={!bulkValue || displayed.length === 0}
+              className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-sm font-medium rounded-lg transition ml-1"
+            >
+              Apply →
+            </button>
+            <button
+              onClick={() => { setBulkOpen(false); setBulkValue(''); }}
+              className="text-sm text-amber-600 hover:text-amber-800 transition ml-auto"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Desktop table */}
       <div className="card p-0 overflow-hidden hidden md:block">
         <div className="overflow-x-auto">
@@ -511,6 +616,31 @@ export default function AccountsPage() {
           </button>
         ))}
       </div>
+
+      {bulkConfirm && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+            <div>
+              <h3 className="text-base font-semibold text-gray-900">Confirm Bulk Update</h3>
+              <p className="text-sm text-gray-500 mt-0.5">This will overwrite existing values and cannot be undone.</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
+              Set <strong>{bulkFieldDefs.find(f => f.key === bulkField)?.label}</strong> to{' '}
+              <strong>"{bulkValue}"</strong> for{' '}
+              <strong>{displayed.length} account{displayed.length !== 1 ? 's' : ''}</strong>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setBulkConfirm(false)} disabled={bulkSaving} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">
+                Cancel
+              </button>
+              <button onClick={handleBulkApply} disabled={bulkSaving}
+                className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+                {bulkSaving ? 'Updating…' : `Update ${displayed.length} account${displayed.length !== 1 ? 's' : ''}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showAdd && <AddAccountModal onClose={() => setShowAdd(false)} onSave={() => { setShowAdd(false); fetchAccounts(); }} />}
     </div>
