@@ -96,10 +96,19 @@ export default function AccountDetail() {
     setLoading(true);
     setError(null);
     axios.get(`/api/accounts/${id}`)
-      .then(r => { setAccount(r.data); setForm(r.data); })
+      .then(r => {
+        const d = r.data;
+        if (!d || typeof d !== 'object' || Array.isArray(d)) {
+          setError(`Unexpected API response (got ${Array.isArray(d) ? 'array' : typeof d}). Check /api/debug for diagnostics.`);
+          return;
+        }
+        setAccount(d);
+        setForm(d);
+      })
       .catch(e => {
         const msg = e.response?.data?.error || e.message || 'Unknown error';
-        setError(`Failed to load account: ${msg} (status ${e.response?.status ?? 'network error'})`);
+        const status = e.response?.status ?? 'network error';
+        setError(`API error ${status}: ${msg}. Visit /api/debug to check connectivity.`);
       })
       .finally(() => setLoading(false));
   }, [id]);
@@ -164,7 +173,7 @@ export default function AccountDetail() {
     );
   };
 
-  const hasPocs = account.poc1_name || account.poc1_email || account.poc2_name || account.poc2_email || account.poc3_name || account.poc3_email;
+  const hasPocs = !!(account.poc1_name || account.poc1_email || account.poc2_name || account.poc2_email || account.poc3_name || account.poc3_email);
 
   return (
     <div className="space-y-5">
@@ -263,8 +272,8 @@ export default function AccountDetail() {
           </Section>
 
           {/* Points of Contact */}
-          {(editing || hasPocs) && (
-            <Section title="Points of Contact">
+          <Section title="Points of Contact">
+            {hasPocs || editing ? (
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {[1, 2, 3].map(n => (
                   <PocCard
@@ -278,11 +287,13 @@ export default function AccountDetail() {
                   />
                 ))}
               </div>
-              {!editing && !hasPocs && (
-                <p className="text-sm text-gray-400 italic">No contacts added yet. Click Edit to add.</p>
-              )}
-            </Section>
-          )}
+            ) : (
+              <div className="flex items-center gap-3 py-2">
+                <p className="text-sm text-gray-400 italic">No contacts added yet.</p>
+                <button onClick={() => setEditing(true)} className="text-xs text-brand-600 hover:underline font-medium">+ Add contacts</button>
+              </div>
+            )}
+          </Section>
         </div>
 
         <div className="space-y-5">
