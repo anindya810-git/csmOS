@@ -114,9 +114,32 @@ function OrgNode({ u, childrenMap, currentUserId, onEdit, onDelete, deleting }) 
   );
 }
 
+const NAV_ITEMS = [
+  {
+    key: 'users',
+    label: 'Manage Users',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'fields',
+    label: 'Field Management',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h7M4 18h7m4 0l2 2 4-4" />
+      </svg>
+    ),
+  },
+];
+
 export default function SettingsPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
+
+  const [settingsPage, setSettingsPage] = useState('users');
 
   // Users state
   const [users,     setUsers]     = useState([]);
@@ -132,7 +155,7 @@ export default function SettingsPage() {
   // Dropdown config state
   const [ddData,      setDdData]      = useState({});
   const [ddLoading,   setDdLoading]   = useState(true);
-  const [ddField,     setDdField]     = useState('trigger_reason');
+  const [ddField,     setDdField]     = useState('escalation_status');
   const [ddAddValue,  setDdAddValue]  = useState('');
   const [ddAddParent, setDdAddParent] = useState('');
   const [ddAdding,    setDdAdding]    = useState(false);
@@ -238,215 +261,236 @@ export default function SettingsPage() {
   const currentDdItems = ddData[ddField] || [];
   const issueTypes = (ddData.issue_type || []).map(x => x.value);
 
+  const ddSections = Object.entries(
+    DD_FIELDS.reduce((acc, f) => { (acc[f.section] = acc[f.section] || []).push(f); return acc; }, {})
+  );
+
   return (
-    <div className="space-y-6 max-w-5xl">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Settings</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Manage users, CSMs and dropdown fields</p>
-      </div>
+    <div className="flex gap-0 -mx-4 sm:-mx-6 -mt-5 sm:-mt-6 min-h-[calc(100vh-3.5rem)]">
 
-      {/* ── Users & CSMs ─────────────────────────────────────────────── */}
-      <div className="card p-0 overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-          <div>
-            <h2 className="text-sm font-semibold text-gray-900">Users & CSMs</h2>
-            <p className="text-xs text-gray-400 mt-0.5">{users.length} user{users.length !== 1 ? 's' : ''}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
-              <button onClick={() => setViewMode('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
-                List
-              </button>
-              <button onClick={() => setViewMode('tree')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'tree' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
-                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm0 8a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1zm8-8a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2h-1a2 2 0 01-2-2V5zm0 8a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2h-1a2 2 0 01-2-2v-1z" /></svg>
-                Tree
-              </button>
-            </div>
-            <button onClick={openAdd} className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              Add User
+      {/* ── Left Navigation ───────────────────────────────────────────── */}
+      <div className="w-56 shrink-0 bg-white border-r border-gray-100 flex flex-col">
+        <div className="px-5 py-5 border-b border-gray-100">
+          <h1 className="text-base font-bold text-gray-900">Settings</h1>
+          <p className="text-xs text-gray-400 mt-0.5">Admin controls</p>
+        </div>
+        <nav className="py-3 flex-1">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.key}
+              onClick={() => setSettingsPage(item.key)}
+              className={`w-full flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition text-left
+                ${settingsPage === item.key
+                  ? 'bg-brand-50 text-brand-700 border-r-2 border-brand-600'
+                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'}`}
+            >
+              {item.icon}
+              {item.label}
             </button>
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="py-12 text-center text-gray-400">Loading…</div>
-        ) : users.length === 0 ? (
-          <div className="py-12 text-center text-gray-400">No users found.</div>
-        ) : viewMode === 'list' ? (
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 border-b border-gray-100">
-              <tr>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM Display Name</th>
-                <th className="px-5 py-3 w-20"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {users.map(u => (
-                <tr key={u.id} className="hover:bg-gray-50 transition">
-                  <td className="px-5 py-3 font-medium text-gray-900">
-                    {u.name}{u.id === user?.id && <span className="ml-2 text-xs text-gray-400">(you)</span>}
-                  </td>
-                  <td className="px-5 py-3 text-gray-600">{u.email}</td>
-                  <td className="px-5 py-3">
-                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
-                  </td>
-                  <td className="px-5 py-3 text-gray-600">{u.csm_name || <span className="text-gray-300">—</span>}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => openEdit(u)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded-md transition" title="Edit user">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                      </button>
-                      {u.id !== user?.id && (
-                        <button onClick={() => handleDelete(u)} disabled={deleting === u.id} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-50" title="Delete user">
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        ) : (
-          <div className="overflow-x-auto">
-            <div className="flex gap-16 justify-center py-8 px-6 min-w-max">
-              {roots.map(u => (
-                <OrgNode key={u.id} u={u} childrenMap={childrenMap} currentUserId={user?.id} onEdit={openEdit} onDelete={handleDelete} deleting={deleting} />
-              ))}
-            </div>
-          </div>
-        )}
+          ))}
+        </nav>
       </div>
 
-      {/* ── Dropdown Fields ──────────────────────────────────────────── */}
-      <div className="card p-0 overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-100">
-          <h2 className="text-sm font-semibold text-gray-900">Dropdown Fields</h2>
-          <p className="text-xs text-gray-400 mt-0.5">Manage values for escalation dropdown fields</p>
-        </div>
-        <div className="flex min-h-[320px]">
-          {/* Left: field selector */}
-          <div className="w-52 shrink-0 border-r border-gray-100 bg-gray-50 overflow-y-auto">
-            {Object.entries(DD_FIELDS.reduce((acc, f) => { (acc[f.section] = acc[f.section] || []).push(f); return acc; }, {})).map(([section, fields]) => (
-              <div key={section}>
-                <p className="px-4 pt-3 pb-1 text-xs font-bold text-gray-400 uppercase tracking-widest">{section}</p>
-                {fields.map(f => (
-                  <button
-                    key={f.key}
-                    onClick={() => { setDdField(f.key); setDdEditId(null); setDdAddValue(''); setDdAddParent(''); }}
-                    className={`w-full text-left px-4 py-2.5 text-sm transition border-b border-gray-100 last:border-0 ${ddField === f.key ? 'bg-white font-semibold text-brand-700 border-r-2 border-brand-600' : 'text-gray-600 hover:bg-white'}`}
-                  >
-                    {f.label}
-                    <span className="ml-1 text-xs font-normal text-gray-400">({(ddData[f.key] || []).length})</span>
-                  </button>
-                ))}
-              </div>
-            ))}
-          </div>
+      {/* ── Main Content ──────────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 p-6 space-y-6">
 
-          {/* Right: values panel */}
-          <div className="flex-1 p-4 space-y-3 min-w-0">
-            {ddLoading ? (
-              <div className="text-sm text-gray-400">Loading…</div>
-            ) : (
-              <>
-                {/* Add new value */}
-                <div className="flex items-center gap-2">
-                  {ddField === 'issue_sub_type' && (
-                    <select
-                      value={ddAddParent}
-                      onChange={e => setDdAddParent(e.target.value)}
-                      className="!w-44 !py-1.5 text-sm shrink-0"
-                    >
-                      <option value="">— Parent Type —</option>
-                      {issueTypes.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
-                  )}
-                  <input
-                    value={ddAddValue}
-                    onChange={e => setDdAddValue(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleDdAdd()}
-                    placeholder={`Add new ${DD_FIELDS.find(f => f.key === ddField)?.label} value…`}
-                    className="flex-1 !py-1.5 text-sm"
-                  />
-                  <button
-                    onClick={handleDdAdd}
-                    disabled={ddAdding || !ddAddValue.trim() || (ddField === 'issue_sub_type' && !ddAddParent)}
-                    className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50 shrink-0"
-                  >
-                    {ddAdding ? '…' : '+ Add'}
+        {/* ── Manage Users page ─────────────────────────────────────── */}
+        {settingsPage === 'users' && (
+          <>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Manage Users</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Add, edit, and manage team members</p>
+            </div>
+
+            <div className="card p-0 overflow-hidden">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <p className="text-xs text-gray-400">{users.length} user{users.length !== 1 ? 's' : ''}</p>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
+                    <button onClick={() => setViewMode('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+                      List
+                    </button>
+                    <button onClick={() => setViewMode('tree')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'tree' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm0 8a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2H5a2 2 0 01-2-2v-1zm8-8a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2h-1a2 2 0 01-2-2V5zm0 8a2 2 0 012-2h1a2 2 0 012 2v1a2 2 0 01-2 2h-1a2 2 0 01-2-2v-1z" /></svg>
+                      Tree
+                    </button>
+                  </div>
+                  <button onClick={openAdd} className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    Add User
                   </button>
                 </div>
+              </div>
 
-                {/* Values list */}
-                {currentDdItems.length === 0 ? (
-                  <p className="text-sm text-gray-400 italic">No values yet.</p>
-                ) : ddField === 'issue_sub_type' ? (
-                  /* Grouped by parent for issue_sub_type */
-                  <div className="space-y-3">
-                    {issueTypes.map(parent => {
-                      const items = currentDdItems.filter(x => x.parent_value === parent);
-                      if (!items.length) return null;
-                      return (
-                        <div key={parent}>
-                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{parent}</p>
-                          <div className="space-y-1">
-                            {items.map(item => (
-                              <DdRow
-                                key={item.id}
-                                item={item}
-                                isEditing={ddEditId === item.id}
-                                editValue={ddEditValue}
-                                editParent={ddEditParent}
-                                showParent={true}
-                                issueTypes={issueTypes}
-                                onStartEdit={() => startDdEdit(item)}
-                                onCancelEdit={() => setDdEditId(null)}
-                                onSaveEdit={() => handleDdEdit(item.id)}
-                                onDelete={() => handleDdDelete(item.id, item.value)}
-                                onChangeValue={setDdEditValue}
-                                onChangeParent={setDdEditParent}
-                                saving={ddSaving}
-                              />
-                            ))}
+              {loading ? (
+                <div className="py-12 text-center text-gray-400">Loading…</div>
+              ) : users.length === 0 ? (
+                <div className="py-12 text-center text-gray-400">No users found.</div>
+              ) : viewMode === 'list' ? (
+                <table className="w-full text-sm">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM Display Name</th>
+                      <th className="px-5 py-3 w-20"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {users.map(u => (
+                      <tr key={u.id} className="hover:bg-gray-50 transition">
+                        <td className="px-5 py-3 font-medium text-gray-900">
+                          {u.name}{u.id === user?.id && <span className="ml-2 text-xs text-gray-400">(you)</span>}
+                        </td>
+                        <td className="px-5 py-3 text-gray-600">{u.email}</td>
+                        <td className="px-5 py-3">
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
+                        </td>
+                        <td className="px-5 py-3 text-gray-600">{u.csm_name || <span className="text-gray-300">—</span>}</td>
+                        <td className="px-5 py-3">
+                          <div className="flex items-center gap-1">
+                            <button onClick={() => openEdit(u)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded-md transition" title="Edit user">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                            {u.id !== user?.id && (
+                              <button onClick={() => handleDelete(u)} disabled={deleting === u.id} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-50" title="Delete user">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            )}
                           </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              ) : (
+                <div className="overflow-x-auto">
+                  <div className="flex gap-16 justify-center py-8 px-6 min-w-max">
+                    {roots.map(u => (
+                      <OrgNode key={u.id} u={u} childrenMap={childrenMap} currentUserId={user?.id} onEdit={openEdit} onDelete={handleDelete} deleting={deleting} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* ── Field Management page ──────────────────────────────────── */}
+        {settingsPage === 'fields' && (
+          <>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Field Management</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Manage dropdown values for escalation and account fields</p>
+            </div>
+
+            <div className="card p-0 overflow-hidden">
+              <div className="flex" style={{ minHeight: 420 }}>
+                {/* Left: field selector */}
+                <div className="w-52 shrink-0 border-r border-gray-100 bg-gray-50 overflow-y-auto">
+                  {ddSections.map(([section, fields]) => (
+                    <div key={section}>
+                      <p className="px-4 pt-3 pb-1 text-xs font-bold text-gray-400 uppercase tracking-widest">{section}</p>
+                      {fields.map(f => (
+                        <button
+                          key={f.key}
+                          onClick={() => { setDdField(f.key); setDdEditId(null); setDdAddValue(''); setDdAddParent(''); }}
+                          className={`w-full text-left px-4 py-2.5 text-sm transition border-b border-gray-100 last:border-0
+                            ${ddField === f.key ? 'bg-white font-semibold text-brand-700 border-r-2 border-brand-600' : 'text-gray-600 hover:bg-white'}`}
+                        >
+                          {f.label}
+                          <span className="ml-1 text-xs font-normal text-gray-400">({(ddData[f.key] || []).length})</span>
+                        </button>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Right: values panel */}
+                <div className="flex-1 p-4 space-y-3 min-w-0">
+                  {ddLoading ? (
+                    <div className="text-sm text-gray-400">Loading…</div>
+                  ) : (
+                    <>
+                      {/* Add new value */}
+                      <div className="flex items-center gap-2">
+                        {ddField === 'issue_sub_type' && (
+                          <select
+                            value={ddAddParent}
+                            onChange={e => setDdAddParent(e.target.value)}
+                            className="!w-44 !py-1.5 text-sm shrink-0"
+                          >
+                            <option value="">— Parent Type —</option>
+                            {issueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+                          </select>
+                        )}
+                        <input
+                          value={ddAddValue}
+                          onChange={e => setDdAddValue(e.target.value)}
+                          onKeyDown={e => e.key === 'Enter' && handleDdAdd()}
+                          placeholder={`Add new ${DD_FIELDS.find(f => f.key === ddField)?.label} value…`}
+                          className="flex-1 !py-1.5 text-sm"
+                        />
+                        <button
+                          onClick={handleDdAdd}
+                          disabled={ddAdding || !ddAddValue.trim() || (ddField === 'issue_sub_type' && !ddAddParent)}
+                          className="px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50 shrink-0"
+                        >
+                          {ddAdding ? '…' : '+ Add'}
+                        </button>
+                      </div>
+
+                      {/* Values list */}
+                      {currentDdItems.length === 0 ? (
+                        <p className="text-sm text-gray-400 italic">No values yet.</p>
+                      ) : ddField === 'issue_sub_type' ? (
+                        <div className="space-y-3">
+                          {issueTypes.map(parent => {
+                            const items = currentDdItems.filter(x => x.parent_value === parent);
+                            if (!items.length) return null;
+                            return (
+                              <div key={parent}>
+                                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">{parent}</p>
+                                <div className="space-y-1">
+                                  {items.map(item => (
+                                    <DdRow key={item.id} item={item} isEditing={ddEditId === item.id}
+                                      editValue={ddEditValue} editParent={ddEditParent} showParent issueTypes={issueTypes}
+                                      onStartEdit={() => startDdEdit(item)} onCancelEdit={() => setDdEditId(null)}
+                                      onSaveEdit={() => handleDdEdit(item.id)} onDelete={() => handleDdDelete(item.id, item.value)}
+                                      onChangeValue={setDdEditValue} onChangeParent={setDdEditParent} saving={ddSaving} />
+                                  ))}
+                                </div>
+                              </div>
+                            );
+                          })}
+                          {currentDdItems.filter(x => !issueTypes.includes(x.parent_value)).map(item => (
+                            <DdRow key={item.id} item={item} isEditing={ddEditId === item.id}
+                              editValue={ddEditValue} editParent={ddEditParent} showParent issueTypes={issueTypes}
+                              onStartEdit={() => startDdEdit(item)} onCancelEdit={() => setDdEditId(null)}
+                              onSaveEdit={() => handleDdEdit(item.id)} onDelete={() => handleDdDelete(item.id, item.value)}
+                              onChangeValue={setDdEditValue} onChangeParent={setDdEditParent} saving={ddSaving} />
+                          ))}
                         </div>
-                      );
-                    })}
-                    {/* Sub-types with no matching parent */}
-                    {currentDdItems.filter(x => !issueTypes.includes(x.parent_value)).map(item => (
-                      <DdRow key={item.id} item={item} isEditing={ddEditId === item.id} editValue={ddEditValue} editParent={ddEditParent} showParent issueTypes={issueTypes}
-                        onStartEdit={() => startDdEdit(item)} onCancelEdit={() => setDdEditId(null)} onSaveEdit={() => handleDdEdit(item.id)}
-                        onDelete={() => handleDdDelete(item.id, item.value)} onChangeValue={setDdEditValue} onChangeParent={setDdEditParent} saving={ddSaving} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-1">
-                    {currentDdItems.map(item => (
-                      <DdRow
-                        key={item.id}
-                        item={item}
-                        isEditing={ddEditId === item.id}
-                        editValue={ddEditValue}
-                        onStartEdit={() => startDdEdit(item)}
-                        onCancelEdit={() => setDdEditId(null)}
-                        onSaveEdit={() => handleDdEdit(item.id)}
-                        onDelete={() => handleDdDelete(item.id, item.value)}
-                        onChangeValue={setDdEditValue}
-                        saving={ddSaving}
-                      />
-                    ))}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        </div>
+                      ) : (
+                        <div className="space-y-1">
+                          {currentDdItems.map(item => (
+                            <DdRow key={item.id} item={item} isEditing={ddEditId === item.id}
+                              editValue={ddEditValue} onStartEdit={() => startDdEdit(item)}
+                              onCancelEdit={() => setDdEditId(null)} onSaveEdit={() => handleDdEdit(item.id)}
+                              onDelete={() => handleDdDelete(item.id, item.value)}
+                              onChangeValue={setDdEditValue} saving={ddSaving} />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* ── Add/Edit User Modal ───────────────────────────────────────── */}
