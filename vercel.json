@@ -3,5 +3,12 @@
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
   "installCommand": "npm install",
-  "rewrites": [{ "source": "/:path*", "destination": "/index.html" }]
+  "rewrites": [
+    { "source": "/login",          "destination": "/index.html" },
+    { "source": "/accounts",       "destination": "/index.html" },
+    { "source": "/accounts/:id",   "destination": "/index.html" },
+    { "source": "/renewal",        "destination": "/index.html" },
+    { "source": "/rag",            "destination": "/index.html" },
+    { "source": "/",               "destination": "/index.html" }
+  ]
 }
