@@ -12,25 +12,130 @@ function fmt(n) {
 const RAG_BADGE = {
   Green: 'bg-green-100 text-green-800 border border-green-200',
   Amber: 'bg-amber-100 text-amber-800 border border-amber-200',
-  Red: 'bg-red-100 text-red-800 border border-red-200',
+  Red:   'bg-red-100 text-red-800 border border-red-200',
 };
 
 const CHURN_BADGE = {
-  'Churn Activated': 'bg-red-100 text-red-700 border border-red-200',
-  'Churn Predicted': 'bg-orange-100 text-orange-700 border border-orange-200',
-  'Churn Executed': 'bg-gray-100 text-gray-600 border border-gray-200',
+  'Churn Activated':    'bg-red-100 text-red-700 border border-red-200',
+  'Churn Predicted':    'bg-orange-100 text-orange-700 border border-orange-200',
+  'Churn Executed':     'bg-gray-100 text-gray-600 border border-gray-200',
   'Contraction Predicted': 'bg-yellow-100 text-yellow-700 border border-yellow-200',
 };
 
+const FIELD_DEFS = [
+  { key: 'account_name',   label: 'Account Name',             type: 'text' },
+  { key: 'tenant_id',      label: 'Tenant ID',                type: 'text' },
+  { key: 'industry',       label: 'Industry',                 type: 'text' },
+  { key: 'region',         label: 'Region',                   type: 'select', opts: ['North','South','East','West'] },
+  { key: 'rag_status',     label: 'RAG Status',               type: 'select', opts: ['Green','Amber','Red'] },
+  { key: 'csm',            label: 'CSM',                      type: 'text' },
+  { key: 'csm_lead',       label: 'CSM Lead',                 type: 'text' },
+  { key: 'mrr',            label: 'MRR (₹)',                  type: 'number' },
+  { key: 'mrr_tier',       label: 'MRR Tier',                 type: 'text' },
+  { key: 'renewal_date',   label: 'Renewal Date',             type: 'date' },
+  { key: 'renewal_status', label: 'Renewal Status',           type: 'text' },
+  { key: 'churn_status',   label: 'Churn Status',             type: 'select', opts: ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted'] },
+  { key: 'implementation_status', label: 'Implementation Status', type: 'text' },
+  { key: 'meeting_done',   label: 'Ring Fence Meeting Done',  type: 'select', opts: ['Yes','No'] },
+  { key: 'adoption_score', label: 'Adoption Score',           type: 'number' },
+  { key: 'stickiness_score', label: 'Stickiness Score',       type: 'number' },
+  { key: 'poc_name',       label: 'POC Name',                 type: 'text' },
+  { key: 'poc_email',      label: 'POC Email',                type: 'text' },
+  { key: 'has_escalation',      label: 'Has Any Escalation',  type: 'bool' },
+  { key: 'has_open_escalation', label: 'Has Open Escalation', type: 'bool' },
+];
+
+const OPS_TEXT   = ['contains','does not contain','is','is not','is empty','is not empty'];
+const OPS_SELECT = ['is','is not','is empty','is not empty'];
+const OPS_NUM    = ['=','>','<','>=','<=','is empty','is not empty'];
+const OPS_DATE   = ['is','before','after','is empty','is not empty'];
+const OPS_BOOL   = ['is yes','is no'];
+
+function getOps(type) {
+  if (type === 'number') return OPS_NUM;
+  if (type === 'select') return OPS_SELECT;
+  if (type === 'date')   return OPS_DATE;
+  if (type === 'bool')   return OPS_BOOL;
+  return OPS_TEXT;
+}
+
+function needsValue(op) {
+  return !['is empty','is not empty','is yes','is no'].includes(op);
+}
+
+function matchesCondition(account, cond, escalationMap) {
+  const { field, operator, value } = cond;
+  const def = FIELD_DEFS.find(f => f.key === field);
+  if (!def) return true;
+
+  if (field === 'poc_name') {
+    const all = [account.poc1_name, account.poc2_name, account.poc3_name].filter(Boolean).join(' ').toLowerCase();
+    if (operator === 'contains')          return all.includes(value.toLowerCase());
+    if (operator === 'does not contain')  return !all.includes(value.toLowerCase());
+    if (operator === 'is empty')          return !all;
+    if (operator === 'is not empty')      return !!all;
+    return all === value.toLowerCase();
+  }
+  if (field === 'poc_email') {
+    const all = [account.poc1_email, account.poc2_email, account.poc3_email].filter(Boolean).join(' ').toLowerCase();
+    if (operator === 'contains')          return all.includes(value.toLowerCase());
+    if (operator === 'does not contain')  return !all.includes(value.toLowerCase());
+    if (operator === 'is empty')          return !all;
+    if (operator === 'is not empty')      return !!all;
+    return all === value.toLowerCase();
+  }
+  if (field === 'has_escalation') {
+    const has = !!(escalationMap[account.id]?.length);
+    return operator === 'is yes' ? has : !has;
+  }
+  if (field === 'has_open_escalation') {
+    const has = !!(escalationMap[account.id]?.some(e => e.status === 'Open'));
+    return operator === 'is yes' ? has : !has;
+  }
+
+  const raw = account[field];
+  if (operator === 'is empty')     return raw === null || raw === undefined || raw === '';
+  if (operator === 'is not empty') return raw !== null && raw !== undefined && raw !== '';
+
+  if (def.type === 'number') {
+    const v = parseFloat(value), r = parseFloat(raw);
+    if (isNaN(v) || isNaN(r)) return true;
+    if (operator === '=')  return r === v;
+    if (operator === '>')  return r > v;
+    if (operator === '<')  return r < v;
+    if (operator === '>=') return r >= v;
+    if (operator === '<=') return r <= v;
+  }
+  if (def.type === 'date') {
+    if (!raw) return false;
+    const rD = new Date(raw), vD = new Date(value);
+    if (operator === 'is')     return rD.toDateString() === vD.toDateString();
+    if (operator === 'before') return rD < vD;
+    if (operator === 'after')  return rD > vD;
+  }
+  const r = String(raw ?? '').toLowerCase();
+  const v = String(value ?? '').toLowerCase();
+  if (operator === 'contains')         return r.includes(v);
+  if (operator === 'does not contain') return !r.includes(v);
+  if (operator === 'is')               return r === v;
+  if (operator === 'is not')           return r !== v;
+  return true;
+}
+
 export default function AccountsPage() {
   const navigate = useNavigate();
-  const [accounts, setAccounts] = useState([]);
-  const [filters, setFilters] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState({ search: '', csm: '', industry: '', region: '', rag_status: '', mrr_tier: '' });
-  const [showAdd, setShowAdd] = useState(false);
-  const [sortField, setSortField] = useState('account_name');
-  const [sortDir, setSortDir] = useState('asc');
+  const [accounts,        setAccounts]        = useState([]);
+  const [filters,         setFilters]         = useState({});
+  const [loading,         setLoading]         = useState(true);
+  const [query,           setQuery]           = useState({ csm: '', industry: '', region: '', rag_status: '', mrr_tier: '' });
+  const [search,          setSearch]          = useState('');
+  const [showAdd,         setShowAdd]         = useState(false);
+  const [sortField,       setSortField]       = useState('account_name');
+  const [sortDir,         setSortDir]         = useState('asc');
+  const [advancedOpen,    setAdvancedOpen]    = useState(false);
+  const [conditions,      setConditions]      = useState([]);
+  const [escalationMap,   setEscalationMap]   = useState({});
+  const [escalationsReady, setEscalationsReady] = useState(false);
 
   useEffect(() => { axios.get('/api/accounts/filters').then(r => setFilters(r.data)); }, []);
 
@@ -42,11 +147,61 @@ export default function AccountsPage() {
 
   useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
 
+  useEffect(() => {
+    if (advancedOpen && !escalationsReady) {
+      axios.get('/api/escalations').then(r => {
+        const map = {};
+        for (const e of r.data || []) {
+          if (e.account_id) {
+            if (!map[e.account_id]) map[e.account_id] = [];
+            map[e.account_id].push(e);
+          }
+        }
+        setEscalationMap(map);
+        setEscalationsReady(true);
+      }).catch(() => {});
+    }
+  }, [advancedOpen, escalationsReady]);
+
   const sorted = [...accounts].sort((a, b) => {
     let va = a[sortField], vb = b[sortField];
     if (sortField === 'mrr') { va = va || 0; vb = vb || 0; return sortDir === 'asc' ? va - vb : vb - va; }
     return sortDir === 'asc' ? String(va||'').localeCompare(String(vb||'')) : String(vb||'').localeCompare(String(va||''));
   });
+
+  const displayed = sorted.filter(a => {
+    if (search) {
+      const q = search.toLowerCase();
+      const blob = [
+        a.account_name, a.tenant_id, a.csm, a.industry, a.region,
+        a.poc1_name, a.poc2_name, a.poc3_name,
+        a.poc1_email, a.poc2_email, a.poc3_email,
+      ].filter(Boolean).join(' ').toLowerCase();
+      if (!blob.includes(q)) return false;
+    }
+    for (const cond of conditions) {
+      if (!cond.field || !cond.operator) continue;
+      if (!matchesCondition(a, cond, escalationMap)) return false;
+    }
+    return true;
+  });
+
+  const addCondition = () =>
+    setConditions(c => [...c, { id: Date.now(), field: 'account_name', operator: 'contains', value: '' }]);
+
+  const updateCondition = (id, updates) =>
+    setConditions(c => c.map(cond => cond.id === id ? { ...cond, ...updates } : cond));
+
+  const removeCondition = (id) =>
+    setConditions(c => c.filter(cond => cond.id !== id));
+
+  const clearAll = () => {
+    setSearch('');
+    setQuery({ csm: '', industry: '', region: '', rag_status: '', mrr_tier: '' });
+    setConditions([]);
+  };
+
+  const hasFilters = search || Object.values(query).some(Boolean) || conditions.length > 0;
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -64,7 +219,11 @@ export default function AccountsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Accounts</h1>
-          <p className="text-gray-500 text-sm">{accounts.length} accounts</p>
+          <p className="text-gray-500 text-sm">
+            {displayed.length !== accounts.length
+              ? `${displayed.length} of ${accounts.length} accounts`
+              : `${accounts.length} accounts`}
+          </p>
         </div>
         <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -72,30 +231,122 @@ export default function AccountsPage() {
         </button>
       </div>
 
-      <div className="card p-4">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-          <input placeholder="Search accounts…" value={query.search} onChange={e => setQuery(q => ({...q, search: e.target.value}))} />
-          <select value={query.rag_status} onChange={e => setQuery(q => ({...q, rag_status: e.target.value}))}>
+      <div className="card p-4 space-y-3">
+        {/* Main search bar */}
+        <div className="relative">
+          <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search by account name, tenant ID, POC name or email…"
+            className="pl-11 pr-4 !py-2.5 text-base w-full"
+          />
+          {search && (
+            <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          )}
+        </div>
+
+        {/* Quick filters */}
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={query.rag_status} onChange={e => setQuery(q => ({...q, rag_status: e.target.value}))} className="!w-auto text-sm !py-1.5">
             <option value="">All RAG</option>
             <option>Green</option><option>Amber</option><option>Red</option>
           </select>
-          <select value={query.csm} onChange={e => setQuery(q => ({...q, csm: e.target.value}))}>
+          <select value={query.csm} onChange={e => setQuery(q => ({...q, csm: e.target.value}))} className="!w-auto text-sm !py-1.5">
             <option value="">All CSMs</option>
             {filters.csms?.map(c => <option key={c}>{c}</option>)}
           </select>
-          <select value={query.industry} onChange={e => setQuery(q => ({...q, industry: e.target.value}))}>
+          <select value={query.industry} onChange={e => setQuery(q => ({...q, industry: e.target.value}))} className="!w-auto text-sm !py-1.5">
             <option value="">All Industries</option>
             {filters.industries?.map(i => <option key={i}>{i}</option>)}
           </select>
-          <select value={query.region} onChange={e => setQuery(q => ({...q, region: e.target.value}))}>
+          <select value={query.region} onChange={e => setQuery(q => ({...q, region: e.target.value}))} className="!w-auto text-sm !py-1.5">
             <option value="">All Regions</option>
             {filters.regions?.map(r => <option key={r}>{r}</option>)}
           </select>
-          <select value={query.mrr_tier} onChange={e => setQuery(q => ({...q, mrr_tier: e.target.value}))}>
+          <select value={query.mrr_tier} onChange={e => setQuery(q => ({...q, mrr_tier: e.target.value}))} className="!w-auto text-sm !py-1.5">
             <option value="">All Tiers</option>
             {filters.tiers?.map(t => <option key={t}>{t}</option>)}
           </select>
+
+          <button
+            onClick={() => setAdvancedOpen(o => !o)}
+            className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
+              ${advancedOpen || conditions.length > 0
+                ? 'bg-brand-50 border-brand-300 text-brand-700'
+                : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2a1 1 0 01-.293.707L13 13.414V19a1 1 0 01-.553.894l-4 2A1 1 0 017 21v-7.586L3.293 6.707A1 1 0 013 6V4z" />
+            </svg>
+            Advanced{conditions.length > 0 ? ` (${conditions.length})` : ''}
+          </button>
+
+          {hasFilters && (
+            <button onClick={clearAll} className="text-sm text-gray-400 hover:text-gray-600 underline">Clear all</button>
+          )}
         </div>
+
+        {/* Advanced conditions panel */}
+        {advancedOpen && (
+          <div className="border-t border-gray-100 pt-3 space-y-2">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Filter conditions — all must match</p>
+            {conditions.length === 0 && (
+              <p className="text-sm text-gray-400 italic">No conditions yet. Add one below.</p>
+            )}
+            {conditions.map(cond => {
+              const def = FIELD_DEFS.find(f => f.key === cond.field);
+              const ops = getOps(def?.type || 'text');
+              return (
+                <div key={cond.id} className="flex items-center gap-2 flex-wrap">
+                  <select
+                    value={cond.field}
+                    onChange={e => {
+                      const nd = FIELD_DEFS.find(f => f.key === e.target.value);
+                      const no = getOps(nd?.type || 'text');
+                      updateCondition(cond.id, { field: e.target.value, operator: no[0], value: '' });
+                    }}
+                    className="!w-auto text-sm !py-1.5"
+                  >
+                    {FIELD_DEFS.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
+                  </select>
+                  <select
+                    value={cond.operator}
+                    onChange={e => updateCondition(cond.id, { operator: e.target.value, value: '' })}
+                    className="!w-auto text-sm !py-1.5"
+                  >
+                    {ops.map(op => <option key={op}>{op}</option>)}
+                  </select>
+                  {needsValue(cond.operator) && (
+                    def?.type === 'select' ? (
+                      <select value={cond.value} onChange={e => updateCondition(cond.id, { value: e.target.value })} className="!w-auto text-sm !py-1.5">
+                        <option value="">—</option>
+                        {def.opts.map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    ) : def?.type === 'number' ? (
+                      <input type="number" value={cond.value} onChange={e => updateCondition(cond.id, { value: e.target.value })} className="!w-32 text-sm !py-1.5" placeholder="Value" />
+                    ) : def?.type === 'date' ? (
+                      <input type="date" value={cond.value} onChange={e => updateCondition(cond.id, { value: e.target.value })} className="!w-auto text-sm !py-1.5" />
+                    ) : (
+                      <input type="text" value={cond.value} onChange={e => updateCondition(cond.id, { value: e.target.value })} className="!w-48 text-sm !py-1.5" placeholder="Value…" />
+                    )
+                  )}
+                  <button onClick={() => removeCondition(cond.id)} className="p-1 text-gray-400 hover:text-red-500 transition" title="Remove condition">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              );
+            })}
+            <button onClick={addCondition} className="inline-flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700 mt-1">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add condition
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Desktop table */}
@@ -118,9 +369,9 @@ export default function AccountsPage() {
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr><td colSpan={9} className="py-12 text-center text-gray-400">Loading…</td></tr>
-              ) : sorted.length === 0 ? (
+              ) : displayed.length === 0 ? (
                 <tr><td colSpan={9} className="py-12 text-center text-gray-400">No accounts found.</td></tr>
-              ) : sorted.map(a => (
+              ) : displayed.map(a => (
                 <tr key={a.id} onClick={() => navigate(`/accounts/${a.id}`)} className="hover:bg-gray-50 cursor-pointer transition">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900 max-w-xs truncate">{a.account_name}</div>
@@ -151,9 +402,9 @@ export default function AccountsPage() {
       <div className="md:hidden space-y-3">
         {loading ? (
           <div className="card text-center py-10 text-gray-400">Loading…</div>
-        ) : sorted.length === 0 ? (
+        ) : displayed.length === 0 ? (
           <div className="card text-center py-10 text-gray-400">No accounts found.</div>
-        ) : sorted.map(a => (
+        ) : displayed.map(a => (
           <button key={a.id} onClick={() => navigate(`/accounts/${a.id}`)}
             className="card w-full text-left active:bg-gray-50 transition">
             <div className="flex items-start justify-between gap-3">
