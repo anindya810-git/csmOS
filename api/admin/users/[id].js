@@ -14,19 +14,20 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   if (req.method === 'PUT') {
-    const { name, email, role, csm_name, password } = req.body;
+    const { name, email, role, csm_name, csm_lead, password } = req.body;
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (email !== undefined) updates.email = email.toLowerCase().trim();
     if (role !== undefined) updates.role = role;
     if (csm_name !== undefined) updates.csm_name = csm_name || null;
+    if (csm_lead !== undefined) updates.csm_lead = csm_lead || null;
     if (password) updates.password_hash = bcrypt.hashSync(password, 10);
 
     const { data, error } = await supabase
       .from('users')
       .update(updates)
       .eq('id', id)
-      .select('id, name, email, role, csm_name')
+      .select('id, name, email, role, csm_name, csm_lead')
       .single();
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);

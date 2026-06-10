@@ -14,21 +14,21 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('users')
-      .select('id, name, email, role, csm_name')
+      .select('id, name, email, role, csm_name, csm_lead')
       .order('name');
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
 
   if (req.method === 'POST') {
-    const { name, email, password, role, csm_name } = req.body;
+    const { name, email, password, role, csm_name, csm_lead } = req.body;
     if (!name || !email || !password)
       return res.status(400).json({ error: 'name, email and password are required' });
     const password_hash = bcrypt.hashSync(password, 10);
     const { data, error } = await supabase
       .from('users')
-      .insert({ name, email: email.toLowerCase().trim(), password_hash, role: role || 'csm', csm_name: csm_name || null })
-      .select('id, name, email, role, csm_name')
+      .insert({ name, email: email.toLowerCase().trim(), password_hash, role: role || 'csm', csm_name: csm_name || null, csm_lead: csm_lead || null })
+      .select('id, name, email, role, csm_name, csm_lead')
       .single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json(data);

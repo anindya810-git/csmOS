@@ -36,6 +36,21 @@ export default function AccountEdit() {
   const [error, setError] = useState(null);
   const [saveError, setSaveError] = useState(null);
   const [form, setForm] = useState({});
+  const [csms, setCsms] = useState([]);
+  const [csmLeads, setCsmLeads] = useState([]);
+  const [csmLeadMap, setCsmLeadMap] = useState({});
+  const [tiers, setTiers] = useState([]);
+
+  useEffect(() => {
+    axios.get('/api/accounts/filters')
+      .then(r => {
+        setCsms(r.data.csms || []);
+        setCsmLeads(r.data.csmLeads || []);
+        setCsmLeadMap(r.data.csmLeadMap || {});
+        setTiers(r.data.tiers || []);
+      })
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     setLoading(true);
@@ -65,7 +80,13 @@ export default function AccountEdit() {
       .finally(() => setLoading(false));
   }, [id]);
 
-  const set = (field, value) => setForm(f => ({ ...f, [field]: value }));
+  const set = (field, value) => {
+    setForm(f => {
+      const next = { ...f, [field]: value };
+      if (field === 'csm' && csmLeadMap[value]) next.csm_lead = csmLeadMap[value];
+      return next;
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -151,7 +172,7 @@ export default function AccountEdit() {
         <Field label="MRR Tier">
           <select className={selectCls} value={form.mrr_tier || ''} onChange={e => set('mrr_tier', e.target.value)}>
             <option value="">— Select —</option>
-            {['Enterprise','Mid-Market','SMB','Startup'].map(t => <option key={t} value={t}>{t}</option>)}
+            {tiers.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
         </Field>
         <Field label="MRR (₹)">
@@ -161,11 +182,17 @@ export default function AccountEdit() {
 
       {/* Team & Commercial */}
       <Section title="Team & Commercial">
-        <Field label="CSM Lead">
-          <input className={inputCls} value={form.csm_lead || ''} onChange={e => set('csm_lead', e.target.value)} />
-        </Field>
         <Field label="CSM">
-          <input className={inputCls} value={form.csm || ''} onChange={e => set('csm', e.target.value)} />
+          <select className={selectCls} value={form.csm || ''} onChange={e => set('csm', e.target.value)}>
+            <option value="">— Select —</option>
+            {csms.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </Field>
+        <Field label="CSM Lead">
+          <select className={selectCls} value={form.csm_lead || ''} onChange={e => set('csm_lead', e.target.value)}>
+            <option value="">— Select —</option>
+            {csmLeads.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
         </Field>
         <Field label="CP">
           <input className={inputCls} value={form.cp || ''} onChange={e => set('cp', e.target.value)} />

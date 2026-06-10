@@ -8,7 +8,7 @@ const ROLE_BADGE = {
   csm:   'bg-gray-100 text-gray-600',
 };
 
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'csm', csm_name: '' };
+const EMPTY_FORM = { name: '', email: '', password: '', role: 'csm', csm_name: '', csm_lead: '' };
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -44,7 +44,7 @@ export default function SettingsPage() {
 
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ name: u.name, email: u.email, password: '', role: u.role, csm_name: u.csm_name || '' });
+    setForm({ name: u.name, email: u.email, password: '', role: u.role, csm_name: u.csm_name || '', csm_lead: u.csm_lead || '' });
     setError('');
     setShowModal(true);
   };
@@ -55,7 +55,7 @@ export default function SettingsPage() {
     setSaving(true);
     setError('');
     try {
-      const payload = { name: form.name, email: form.email, role: form.role, csm_name: form.csm_name };
+      const payload = { name: form.name, email: form.email, role: form.role, csm_name: form.csm_name, csm_lead: form.csm_lead };
       if (form.password) payload.password = form.password;
       if (editUser) {
         await axios.put(`/api/admin/users/${editUser.id}`, payload);
@@ -198,6 +198,21 @@ export default function SettingsPage() {
                   CSM Display Name <span className="text-gray-400 font-normal">(shown in account CSM field)</span>
                 </label>
                 <input value={form.csm_name} onChange={e => setForm(f => ({...f, csm_name: e.target.value}))} placeholder="e.g. Amarjeet" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  CSM Lead <span className="text-gray-400 font-normal">(manager / lead for this CSM)</span>
+                </label>
+                <select
+                  value={form.csm_lead}
+                  onChange={e => setForm(f => ({...f, csm_lead: e.target.value}))}
+                  className="w-full"
+                >
+                  <option value="">— Select CSM Lead —</option>
+                  {[...new Set(users.filter(u => u.csm_name).map(u => u.csm_name))].sort().map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex justify-end gap-3 px-5 pb-5">
