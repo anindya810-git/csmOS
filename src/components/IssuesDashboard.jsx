@@ -209,6 +209,7 @@ export default function IssuesDashboard() {
       setBulkConfirm(false);
       setBulkOpen(false);
       setBulkValue('');
+      clearAll();
       setReload(r => r + 1);
     } catch (e) {
       alert(e.response?.data?.error || 'Bulk update failed');
