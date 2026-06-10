@@ -105,17 +105,18 @@ export default function EscalationsDashboard() {
   const startEdit = (e) => {
     setEditing(e.id);
     setExpanded(null);
+    const acct = accounts.find(a => String(a.id) === String(e.account_id));
     setEditForm({
       account_id: e.account_id || '',
-      account_name: e.account_name || '',
-      tenant_id: e.tenant_id || '',
+      account_name: acct?.account_name || e.account_name || '',
+      tenant_id: acct?.tenant_id || e.tenant_id || '',
       date_of_escalation: e.date_of_escalation ? e.date_of_escalation.slice(0, 10) : '',
       month: e.month || '',
       description: e.description || '',
       action_taken: e.action_taken || '',
       ownership: e.ownership || '',
       status: e.status || 'Open',
-      csm: e.csm || '',
+      csm: acct?.csm || e.csm || '',
       eta: e.eta || '',
       ps_leader: e.ps_leader || '',
       escalated_by: e.escalated_by || '',
@@ -550,15 +551,8 @@ export default function EscalationsDashboard() {
                                     className="!py-1.5 text-sm" />
                                 </div>
                                 <div>
-                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
-                                  {csms.length ? (
-                                    <select value={editForm.csm || ''} onChange={ev => setEditForm(f => ({ ...f, csm: ev.target.value }))} className="!py-1.5 text-sm">
-                                      <option value="">—</option>
-                                      {csms.map(c => <option key={c}>{c}</option>)}
-                                    </select>
-                                  ) : (
-                                    <input type="text" value={editForm.csm || ''} onChange={ev => setEditForm(f => ({ ...f, csm: ev.target.value }))} className="!py-1.5 text-sm" />
-                                  )}
+                                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM <span className="text-gray-300 font-normal normal-case">(read-only)</span></p>
+                                  <input type="text" value={editForm.csm || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
                                 </div>
                                 <div>
                                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
@@ -749,14 +743,7 @@ export default function EscalationsDashboard() {
                         </div>
                         <div>
                           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
-                          {csms.length ? (
-                            <select value={editForm.csm || ''} onChange={ev => setEditForm(f => ({ ...f, csm: ev.target.value }))} className="text-sm">
-                              <option value="">—</option>
-                              {csms.map(c => <option key={c}>{c}</option>)}
-                            </select>
-                          ) : (
-                            <input type="text" value={editForm.csm || ''} onChange={ev => setEditForm(f => ({ ...f, csm: ev.target.value }))} className="text-sm" />
-                          )}
+                          <input type="text" value={editForm.csm || ''} readOnly className="text-sm bg-gray-100 cursor-not-allowed" />
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-3">
