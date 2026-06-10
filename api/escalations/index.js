@@ -14,7 +14,7 @@ export default async function handler(req, res) {
 
     let query = supabase
       .from('escalations')
-      .select('*')
+      .select('*, accounts(id, rag_status)')
       .order('date_of_escalation', { ascending: false });
 
     if (user.role === 'csm') {
