@@ -100,7 +100,7 @@ export default function IssuesDashboard() {
   const [editForm,     setEditForm]     = useState({});
   const [editSaving,   setEditSaving]   = useState(false);
 
-  const [filters,      setFilters]      = useState({ status: [], priority: '', issue_type: '', owner_team: '', csm: [], month: '', account_name: '' });
+  const [filters,      setFilters]      = useState({ status: [], priority: [], issue_type: [], owner_team: [], csm: [], month: [], account_name: [] });
   const [search,       setSearch]       = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [conditions,   setConditions]   = useState([]);
@@ -266,11 +266,11 @@ export default function IssuesDashboard() {
 
   const clearAll = () => {
     setSearch('');
-    setFilters({ status: [], priority: '', issue_type: '', owner_team: '', csm: [], month: '', account_name: '' });
+    setFilters({ status: [], priority: [], issue_type: [], owner_team: [], csm: [], month: [], account_name: [] });
     setConditions([]);
     setPage(1);
   };
-  const hasFilters = !!(search || filters.status.length || filters.priority || filters.issue_type || filters.owner_team || filters.csm.length || filters.month || filters.account_name || conditions.length > 0);
+  const hasFilters = !!(search || filters.status.length || filters.priority.length || filters.issue_type.length || filters.owner_team.length || filters.csm.length || filters.month.length || filters.account_name.length || conditions.length > 0);
   const activeConditions = conditions.filter(c => c.field && c.operator);
 
   const displayed = issues.filter(issue => {
@@ -280,16 +280,17 @@ export default function IssuesDashboard() {
         .filter(Boolean).join(' ').toLowerCase();
       if (!blob.includes(q)) return false;
     }
-    if (filters.account_name && issue.account_name !== filters.account_name) return false;
-    if (filters.status.length > 0 && !filters.status.includes(issue.status)) return false;
-    if (filters.priority   && issue.priority   !== filters.priority)   return false;
-    if (filters.issue_type && issue.issue_type !== filters.issue_type) return false;
-    if (filters.owner_team && issue.owner_team !== filters.owner_team) return false;
-    if (filters.csm.length > 0 && !filters.csm.includes(issue.csm))   return false;
-    if (filters.month && issue.reported_date) {
+    if (filters.account_name.length > 0 && !filters.account_name.includes(issue.account_name)) return false;
+    if (filters.status.length > 0      && !filters.status.includes(issue.status))              return false;
+    if (filters.priority.length > 0    && !filters.priority.includes(issue.priority))          return false;
+    if (filters.issue_type.length > 0  && !filters.issue_type.includes(issue.issue_type))      return false;
+    if (filters.owner_team.length > 0  && !filters.owner_team.includes(issue.owner_team))      return false;
+    if (filters.csm.length > 0         && !filters.csm.includes(issue.csm))                    return false;
+    if (filters.month.length > 0) {
+      if (!issue.reported_date) return false;
       const m = MONTHS[new Date(issue.reported_date + 'T00:00:00').getMonth()];
-      if (m !== filters.month) return false;
-    } else if (filters.month && !issue.reported_date) return false;
+      if (!filters.month.includes(m)) return false;
+    }
     if (activeConditions.length === 0) return true;
     const results = activeConditions.map(c => matchesCondition(issue, c, fieldDefs));
     return conditionLogic === 'OR' ? results.some(Boolean) : results.every(Boolean);
@@ -483,40 +484,15 @@ export default function IssuesDashboard() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select value={filters.account_name} onChange={e => setFilter('account_name', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Accounts</option>
-            {[...new Set(issues.map(i => i.account_name).filter(Boolean))].sort().map(a => <option key={a}>{a}</option>)}
-          </select>
-          <MultiSelectDropdown
-            placeholder="All Statuses"
-            options={['Open','In Progress','Deferred','Resolved','Closed']}
-            value={filters.status}
-            onChange={v => setFilter('status', v)}
-          />
-          <select value={filters.priority} onChange={e => setFilter('priority', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Priorities</option>
-            {['P0','P1','P2','P3'].map(p => <option key={p}>{p}</option>)}
-          </select>
-          <select value={filters.issue_type} onChange={e => setFilter('issue_type', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Issue Types</option>
-            {[...new Set(issues.map(i => i.issue_type).filter(Boolean))].sort().map(t => <option key={t}>{t}</option>)}
-          </select>
-          <select value={filters.owner_team} onChange={e => setFilter('owner_team', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Owners</option>
-            {allOwnerTeams.map(o => <option key={o}>{o}</option>)}
-          </select>
+          <MultiSelectDropdown placeholder="All Accounts" options={[...new Set(issues.map(i => i.account_name).filter(Boolean))].sort()} value={filters.account_name} onChange={v => setFilter('account_name', v)} />
+          <MultiSelectDropdown placeholder="All Statuses" options={['Open','In Progress','Deferred','Resolved','Closed']} value={filters.status} onChange={v => setFilter('status', v)} />
+          <MultiSelectDropdown placeholder="All Priorities" options={['P0','P1','P2','P3']} value={filters.priority} onChange={v => setFilter('priority', v)} />
+          <MultiSelectDropdown placeholder="All Issue Types" options={[...new Set(issues.map(i => i.issue_type).filter(Boolean))].sort()} value={filters.issue_type} onChange={v => setFilter('issue_type', v)} />
+          <MultiSelectDropdown placeholder="All Owners" options={allOwnerTeams} value={filters.owner_team} onChange={v => setFilter('owner_team', v)} />
           {user?.role === 'admin' && (
-            <MultiSelectDropdown
-              placeholder="All CSMs"
-              options={allCsms}
-              value={filters.csm}
-              onChange={v => setFilter('csm', v)}
-            />
+            <MultiSelectDropdown placeholder="All CSMs" options={allCsms} value={filters.csm} onChange={v => setFilter('csm', v)} />
           )}
-          <select value={filters.month} onChange={e => setFilter('month', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Months</option>
-            {allMonths.map(m => <option key={m}>{m}</option>)}
-          </select>
+          <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition

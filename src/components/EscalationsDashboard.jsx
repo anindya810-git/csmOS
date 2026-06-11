@@ -78,7 +78,7 @@ export default function EscalationsDashboard() {
   const navigate = useNavigate();
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [filters,     setFilters]     = useState({ status: [], csm: [], ownership: '', issue_type: '', month: '' });
+  const [filters,     setFilters]     = useState({ status: [], csm: [], ownership: [], issue_type: [], month: [] });
   const [search,      setSearch]      = useState('');
   const [advancedOpen,setAdvancedOpen]= useState(false);
   const [conditions,  setConditions]  = useState([]);
@@ -274,11 +274,11 @@ export default function EscalationsDashboard() {
 
   const clearAll = () => {
     setSearch('');
-    setFilters({ status: [], csm: [], ownership: '', issue_type: '', month: '' });
+    setFilters({ status: [], csm: [], ownership: [], issue_type: [], month: [] });
     setConditions([]);
     setPage(1);
   };
-  const hasFilters = !!(search || filters.status.length || filters.csm.length || filters.ownership || filters.issue_type || filters.month || conditions.length > 0);
+  const hasFilters = !!(search || filters.status.length || filters.csm.length || filters.ownership.length || filters.issue_type.length || filters.month.length || conditions.length > 0);
   const activeConditions = conditions.filter(c => c.field && c.operator);
   // paginated is derived after displayed is computed below
 
@@ -288,11 +288,11 @@ export default function EscalationsDashboard() {
       const blob = [e.account_name, e.description, e.csm, e.ownership, e.escalated_by, e.issue_type].filter(Boolean).join(' ').toLowerCase();
       if (!blob.includes(q)) return false;
     }
-    if (filters.status.length > 0 && !filters.status.includes(e.status)) return false;
-    if (filters.csm.length > 0 && !filters.csm.includes(e.csm))   return false;
-    if (filters.ownership  && e.ownership  !== filters.ownership)  return false;
-    if (filters.issue_type && e.issue_type !== filters.issue_type) return false;
-    if (filters.month      && e.month      !== filters.month)      return false;
+    if (filters.status.length > 0    && !filters.status.includes(e.status))       return false;
+    if (filters.csm.length > 0       && !filters.csm.includes(e.csm))             return false;
+    if (filters.ownership.length > 0  && !filters.ownership.includes(e.ownership)) return false;
+    if (filters.issue_type.length > 0 && !filters.issue_type.includes(e.issue_type)) return false;
+    if (filters.month.length > 0      && !filters.month.includes(e.month))        return false;
     if (activeConditions.length === 0) return true;
     const results = activeConditions.map(c => matchesEscalationCondition(e, c, fieldDefs));
     return conditionLogic === 'OR' ? results.some(Boolean) : results.every(Boolean);
@@ -531,18 +531,9 @@ export default function EscalationsDashboard() {
               onChange={v => setFilter('csm', v)}
             />
           )}
-          <select value={filters.ownership} onChange={e => setFilter('ownership', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Ownerships</option>
-            {allOwnerships.map(o => <option key={o}>{o}</option>)}
-          </select>
-          <select value={filters.issue_type} onChange={e => setFilter('issue_type', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Issue Types</option>
-            {allIssueTypes.map(t => <option key={t}>{t}</option>)}
-          </select>
-          <select value={filters.month} onChange={e => setFilter('month', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Months</option>
-            {allMonths.map(m => <option key={m}>{m}</option>)}
-          </select>
+          <MultiSelectDropdown placeholder="All Ownerships" options={allOwnerships} value={filters.ownership} onChange={v => setFilter('ownership', v)} />
+          <MultiSelectDropdown placeholder="All Issue Types" options={allIssueTypes} value={filters.issue_type} onChange={v => setFilter('issue_type', v)} />
+          <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
