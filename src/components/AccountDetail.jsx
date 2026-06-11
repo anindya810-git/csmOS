@@ -168,8 +168,8 @@ export default function AccountDetail() {
         <MetricCard label="MRR" value={fmt(a.mrr)} sub={a.mrr_tier} />
         <MetricCard label="Renewal" value={fmtDate(a.renewal_date)} sub={a.renewal_status} colorClass={a.renewal_status === 'Renewed' ? 'text-green-700' : 'text-gray-900'} />
         <MetricCard label="RAG" value={a.rag_status || '—'} colorClass={a.rag_status === 'Green' ? 'text-green-700' : a.rag_status === 'Red' ? 'text-red-700' : a.rag_status === 'Amber' ? 'text-amber-700' : 'text-gray-400'} />
-        <MetricCard label="Escalations" value={activeEscal > 0 ? `${activeEscal} active` : escalations.length > 0 ? `${escalations.length} total` : '—'} sub={openEscal > 0 ? `${openEscal} open` : 'all resolved'} colorClass={openEscal > 0 ? 'text-red-600' : activeEscal > 0 ? 'text-amber-600' : 'text-gray-400'} />
-        <MetricCard label="Issues" value={activeIssues > 0 ? `${activeIssues} active` : issues.length > 0 ? `${issues.length} total` : '—'} sub={openIssues > 0 ? `${openIssues} open` : issues.length > 0 ? 'all resolved' : undefined} colorClass={openIssues > 0 ? 'text-red-600' : activeIssues > 0 ? 'text-amber-600' : 'text-gray-400'} />
+        <MetricCard label="Escalations" value={activeEscal > 0 ? `${activeEscal} active` : escalations.length > 0 ? `${escalations.length} total` : '—'} sub={openEscal > 0 ? `${openEscal} open` : activeEscal === 0 && escalations.length > 0 ? 'all resolved' : undefined} colorClass={openEscal > 0 ? 'text-red-600' : activeEscal > 0 ? 'text-amber-600' : 'text-gray-400'} />
+        <MetricCard label="Issues" value={activeIssues > 0 ? `${activeIssues} active` : issues.length > 0 ? `${issues.length} total` : '—'} sub={openIssues > 0 ? `${openIssues} open` : activeIssues === 0 && issues.length > 0 ? 'all resolved' : undefined} colorClass={openIssues > 0 ? 'text-red-600' : activeIssues > 0 ? 'text-amber-600' : 'text-gray-400'} />
         <MetricCard label="Adoption" value={a.adoption_score != null ? `${a.adoption_score}` : '—'} sub="score" />
         <MetricCard label="NPS" value={a.nps != null ? `${a.nps}` : '—'} />
       </div>
