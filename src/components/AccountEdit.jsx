@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import SelectDropdown from './SelectDropdown';
 
 /* ── Toggle switch ─────────────────────────────────────────── */
 function Toggle({ value, onChange }) {
@@ -229,10 +230,7 @@ export default function AccountEdit() {
           <input className={inp} value={form.tenant_id || ''} onChange={e => set('tenant_id', e.target.value)} placeholder="e.g. 5528" />
         </Field>
         <Field label="Region">
-          <select className={sel} value={form.region || ''} onChange={e => set('region', e.target.value)}>
-            <option value="">— Select Region —</option>
-            {['North','South','East','West'].map(r => <option key={r} value={r}>{r}</option>)}
-          </select>
+          <SelectDropdown options={['North','South','East','West']} value={form.region || ''} onChange={v => set('region', v)} placeholder="— Select Region —" />
         </Field>
         <Field label="Go-live Date">
           <input type="date" className={inp} value={form.golive_date ? form.golive_date.substring(0,10) : ''} onChange={e => set('golive_date', e.target.value)} />
@@ -241,10 +239,7 @@ export default function AccountEdit() {
           <input className={inp} value={form.industry || ''} onChange={e => set('industry', e.target.value)} placeholder="e.g. Real Estate" />
         </Field>
         <Field label="MRR Tier">
-          <select className={sel} value={form.mrr_tier || ''} onChange={e => set('mrr_tier', e.target.value)}>
-            <option value="">— Select tier —</option>
-            {tiers.map(t => <option key={t} value={t}>{t}</option>)}
-          </select>
+          <SelectDropdown options={tiers} value={form.mrr_tier || ''} onChange={v => set('mrr_tier', v)} placeholder="— Select tier —" />
         </Field>
         <Field label="MRR (₹)">
           <PrefixInput prefix="₹" type="number" value={form.mrr || ''} onChange={e => set('mrr', e.target.value)} placeholder="0" />
@@ -256,16 +251,10 @@ export default function AccountEdit() {
         icon={<svg className="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
       >
         <Field label="CSM">
-          <select className={sel} value={form.csm || ''} onChange={e => set('csm', e.target.value)}>
-            <option value="">— Select CSM —</option>
-            {csms.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <SelectDropdown options={csms} value={form.csm || ''} onChange={v => set('csm', v)} placeholder="— Select CSM —" />
         </Field>
         <Field label="CSM Lead">
-          <select className={sel} value={form.csm_lead || ''} onChange={e => set('csm_lead', e.target.value)}>
-            <option value="">— Select Lead —</option>
-            {csmLeads.map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          <SelectDropdown options={csmLeads} value={form.csm_lead || ''} onChange={v => set('csm_lead', v)} placeholder="— Select Lead —" />
         </Field>
         <Field label="CP">
           <input className={inp} value={form.cp || ''} onChange={e => set('cp', e.target.value)} placeholder="Channel partner" />
@@ -274,26 +263,16 @@ export default function AccountEdit() {
           <input className={inp} value={form.sa_status || ''} onChange={e => set('sa_status', e.target.value)} placeholder="e.g. Open" />
         </Field>
         <Field label="TAM Assigned">
-          <select className={sel} value={form.tam_assigned || ''} onChange={e => set('tam_assigned', e.target.value)}>
-            <option value="">— Select —</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
+          <SelectDropdown options={['Yes','No']} value={form.tam_assigned || ''} onChange={v => set('tam_assigned', v)} />
         </Field>
         <Field label="Billing Frequency">
-          <select className={sel} value={form.billing_frequency || ''} onChange={e => set('billing_frequency', e.target.value)}>
-            <option value="">— Select —</option>
-            {opts('billing_frequency', ['Monthly','Quarterly','Half-Yearly','Annually']).map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
+          <SelectDropdown options={opts('billing_frequency', ['Monthly','Quarterly','Half-Yearly','Annually'])} value={form.billing_frequency || ''} onChange={v => set('billing_frequency', v)} />
         </Field>
         <Field label="Renewal Date">
           <input type="date" className={inp} value={form.renewal_date ? form.renewal_date.substring(0,10) : ''} onChange={e => set('renewal_date', e.target.value)} />
         </Field>
         <Field label="Renewal Status">
-          <select className={sel} value={form.renewal_status || ''} onChange={e => set('renewal_status', e.target.value)}>
-            <option value="">— Select —</option>
-            {opts('renewal_status', ['Renewed','At Risk','Lost','Pending']).map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
+          <SelectDropdown options={opts('renewal_status', ['Renewed','At Risk','Lost','Pending'])} value={form.renewal_status || ''} onChange={v => set('renewal_status', v)} />
         </Field>
         <Field label="Closure ETA">
           <input type="date" className={inp} value={form.closure_eta ? form.closure_eta.substring(0,10) : ''} onChange={e => set('closure_eta', e.target.value)} />
@@ -305,22 +284,13 @@ export default function AccountEdit() {
         icon={<svg className="w-4 h-4 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>}
       >
         <Field label="Churn Status">
-          <select className={sel} value={form.churn_status || ''} onChange={e => set('churn_status', e.target.value)}>
-            <option value="">— None —</option>
-            {opts('churn_status', ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted']).map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
+          <SelectDropdown options={opts('churn_status', ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted'])} value={form.churn_status || ''} onChange={v => set('churn_status', v)} placeholder="— None —" />
         </Field>
         <Field label="Contraction Risk">
-          <select className={sel} value={form.contraction_risk || ''} onChange={e => set('contraction_risk', e.target.value)}>
-            <option value="">— Select —</option>
-            {opts('contraction_risk', ['High','Medium','Low','None']).map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
+          <SelectDropdown options={opts('contraction_risk', ['High','Medium','Low','None'])} value={form.contraction_risk || ''} onChange={v => set('contraction_risk', v)} />
         </Field>
         <Field label="Churn Risk">
-          <select className={sel} value={form.churn_risk || ''} onChange={e => set('churn_risk', e.target.value)}>
-            <option value="">— Select —</option>
-            {opts('churn_risk', ['High','Medium','Low','None']).map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
+          <SelectDropdown options={opts('churn_risk', ['High','Medium','Low','None'])} value={form.churn_risk || ''} onChange={v => set('churn_risk', v)} />
         </Field>
         <Field label="GRR (%)">
           <div className="relative">
@@ -371,20 +341,13 @@ export default function AccountEdit() {
         icon={<svg className="w-4 h-4 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
       >
         <Field label="Implementation Status">
-          <select className={sel} value={form.implementation_status || ''} onChange={e => set('implementation_status', e.target.value)}>
-            <option value="">— Select —</option>
-            {opts('implementation_status', ['Not Started','In Progress','Completed','On Hold']).map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
+          <SelectDropdown options={opts('implementation_status', ['Not Started','In Progress','Completed','On Hold'])} value={form.implementation_status || ''} onChange={v => set('implementation_status', v)} />
         </Field>
         <Field label="Implementation Type">
           <input className={inp} value={form.implementation_type || ''} onChange={e => set('implementation_type', e.target.value)} placeholder="e.g. Self-serve" />
         </Field>
         <Field label="PS Engagement">
-          <select className={sel} value={form.ps_engagement || ''} onChange={e => set('ps_engagement', e.target.value)}>
-            <option value="">— Select —</option>
-            <option value="Yes">Yes</option>
-            <option value="No">No</option>
-          </select>
+          <SelectDropdown options={['Yes','No']} value={form.ps_engagement || ''} onChange={v => set('ps_engagement', v)} />
         </Field>
         <Field label="PS Solutioning">
           <input className={inp} value={form.ps_solutioning || ''} onChange={e => set('ps_solutioning', e.target.value)} placeholder="Notes" />
