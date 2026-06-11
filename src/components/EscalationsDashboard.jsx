@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Pagination from './Pagination';
+import MultiSelectDropdown from './MultiSelectDropdown';
 
 const STATUS_STYLES = {
   'Resolved':        'bg-green-100 text-green-800',
@@ -72,7 +73,7 @@ export default function EscalationsDashboard() {
   const navigate = useNavigate();
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [filters,     setFilters]     = useState({ status: '', csm: '', ownership: '', issue_type: '', month: '' });
+  const [filters,     setFilters]     = useState({ status: [], csm: '', ownership: '', issue_type: '', month: '' });
   const [search,      setSearch]      = useState('');
   const [advancedOpen,setAdvancedOpen]= useState(false);
   const [conditions,  setConditions]  = useState([]);
@@ -268,11 +269,11 @@ export default function EscalationsDashboard() {
 
   const clearAll = () => {
     setSearch('');
-    setFilters({ status: '', csm: '', ownership: '', issue_type: '', month: '' });
+    setFilters({ status: [], csm: '', ownership: '', issue_type: '', month: '' });
     setConditions([]);
     setPage(1);
   };
-  const hasFilters = !!(search || Object.values(filters).some(Boolean) || conditions.length > 0);
+  const hasFilters = !!(search || filters.status.length || filters.csm || filters.ownership || filters.issue_type || filters.month || conditions.length > 0);
   const activeConditions = conditions.filter(c => c.field && c.operator);
   // paginated is derived after displayed is computed below
 
@@ -282,7 +283,7 @@ export default function EscalationsDashboard() {
       const blob = [e.account_name, e.description, e.csm, e.ownership, e.escalated_by, e.issue_type].filter(Boolean).join(' ').toLowerCase();
       if (!blob.includes(q)) return false;
     }
-    if (filters.status     && e.status     !== filters.status)     return false;
+    if (filters.status.length > 0 && !filters.status.includes(e.status)) return false;
     if (filters.csm        && e.csm        !== filters.csm)        return false;
     if (filters.ownership  && e.ownership  !== filters.ownership)  return false;
     if (filters.issue_type && e.issue_type !== filters.issue_type) return false;
@@ -511,10 +512,12 @@ export default function EscalationsDashboard() {
           )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Statuses</option>
-            {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
-          </select>
+          <MultiSelectDropdown
+            placeholder="All Statuses"
+            options={[...new Set(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved'])]}
+            value={filters.status}
+            onChange={v => setFilter('status', v)}
+          />
           {user?.role === 'admin' && (
             <select value={filters.csm} onChange={e => setFilter('csm', e.target.value)} className="!w-auto text-sm !py-1.5">
               <option value="">All CSMs</option>

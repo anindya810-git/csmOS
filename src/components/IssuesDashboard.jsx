@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Pagination from './Pagination';
+import MultiSelectDropdown from './MultiSelectDropdown';
 
 const PRIORITY_BADGE = {
   P0: 'bg-red-100 text-red-800 border border-red-200',
@@ -94,7 +95,7 @@ export default function IssuesDashboard() {
   const [editForm,     setEditForm]     = useState({});
   const [editSaving,   setEditSaving]   = useState(false);
 
-  const [filters,      setFilters]      = useState({ status: '', priority: '', issue_type: '', owner_team: '', csm: '', month: '', account_name: '' });
+  const [filters,      setFilters]      = useState({ status: [], priority: '', issue_type: '', owner_team: '', csm: '', month: '', account_name: '' });
   const [search,       setSearch]       = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [conditions,   setConditions]   = useState([]);
@@ -260,11 +261,11 @@ export default function IssuesDashboard() {
 
   const clearAll = () => {
     setSearch('');
-    setFilters({ status: '', priority: '', issue_type: '', owner_team: '', csm: '', month: '', account_name: '' });
+    setFilters({ status: [], priority: '', issue_type: '', owner_team: '', csm: '', month: '', account_name: '' });
     setConditions([]);
     setPage(1);
   };
-  const hasFilters = !!(search || Object.values(filters).some(Boolean) || conditions.length > 0);
+  const hasFilters = !!(search || filters.status.length || filters.priority || filters.issue_type || filters.owner_team || filters.csm || filters.month || filters.account_name || conditions.length > 0);
   const activeConditions = conditions.filter(c => c.field && c.operator);
 
   const displayed = issues.filter(issue => {
@@ -275,7 +276,7 @@ export default function IssuesDashboard() {
       if (!blob.includes(q)) return false;
     }
     if (filters.account_name && issue.account_name !== filters.account_name) return false;
-    if (filters.status     && issue.status     !== filters.status)     return false;
+    if (filters.status.length > 0 && !filters.status.includes(issue.status)) return false;
     if (filters.priority   && issue.priority   !== filters.priority)   return false;
     if (filters.issue_type && issue.issue_type !== filters.issue_type) return false;
     if (filters.owner_team && issue.owner_team !== filters.owner_team) return false;
@@ -481,10 +482,12 @@ export default function IssuesDashboard() {
             <option value="">All Accounts</option>
             {[...new Set(issues.map(i => i.account_name).filter(Boolean))].sort().map(a => <option key={a}>{a}</option>)}
           </select>
-          <select value={filters.status} onChange={e => setFilter('status', e.target.value)} className="!w-auto text-sm !py-1.5">
-            <option value="">All Statuses</option>
-            {['Open','In Progress','Deferred','Resolved','Closed'].map(s => <option key={s}>{s}</option>)}
-          </select>
+          <MultiSelectDropdown
+            placeholder="All Statuses"
+            options={['Open','In Progress','Deferred','Resolved','Closed']}
+            value={filters.status}
+            onChange={v => setFilter('status', v)}
+          />
           <select value={filters.priority} onChange={e => setFilter('priority', e.target.value)} className="!w-auto text-sm !py-1.5">
             <option value="">All Priorities</option>
             {['P0','P1','P2','P3'].map(p => <option key={p}>{p}</option>)}

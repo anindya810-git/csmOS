@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
+import MultiSelectDropdown from './MultiSelectDropdown';
 
 const STATUS_STYLE = {
   Resolved:      'bg-green-100 text-green-700',
@@ -25,7 +26,7 @@ export default function IssuesPivotReport() {
   const [csms,    setCsms]    = useState([]);
 
   const [filterCsm,      setFilterCsm]      = useState('');
-  const [filterStatus,   setFilterStatus]   = useState('');
+  const [filterStatus,   setFilterStatus]   = useState([]);
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo,   setFilterDateTo]   = useState('');
 
@@ -44,8 +45,8 @@ export default function IssuesPivotReport() {
   }, []);
 
   const filtered = useMemo(() => issues.filter(i => {
-    if (filterCsm      && i.csm    !== filterCsm)    return false;
-    if (filterStatus   && i.status !== filterStatus) return false;
+    if (filterCsm                && i.csm    !== filterCsm)              return false;
+    if (filterStatus.length > 0  && !filterStatus.includes(i.status))   return false;
     if (filterDateFrom && i.reported_date && i.reported_date < filterDateFrom) return false;
     if (filterDateTo   && i.reported_date && i.reported_date > filterDateTo)   return false;
     return true;
@@ -85,8 +86,8 @@ export default function IssuesPivotReport() {
     else             { setExpandedTypes(new Set(pivot.map(r => r.type))); }
   };
 
-  const clearFilters = () => { setFilterCsm(''); setFilterStatus(''); setFilterDateFrom(''); setFilterDateTo(''); };
-  const hasFilters   = filterCsm || filterStatus || filterDateFrom || filterDateTo;
+  const clearFilters = () => { setFilterCsm(''); setFilterStatus([]); setFilterDateFrom(''); setFilterDateTo(''); };
+  const hasFilters   = !!(filterCsm || filterStatus.length || filterDateFrom || filterDateTo);
 
   return (
     <div className="space-y-4">
@@ -102,10 +103,12 @@ export default function IssuesPivotReport() {
           </div>
           <div className="flex-1 min-w-[150px]">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="!py-1.5 text-sm">
-              <option value="">All Statuses</option>
-              {['Open', 'In Progress', 'Resolved'].map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            <MultiSelectDropdown
+              placeholder="All Statuses"
+              options={['Open','In Progress','Deferred','Resolved','Closed']}
+              value={filterStatus}
+              onChange={setFilterStatus}
+            />
           </div>
           <div className="flex-1 min-w-[140px]">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Reported From</p>
