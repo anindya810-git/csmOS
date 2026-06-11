@@ -4,6 +4,19 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import ColumnToggle from './ColumnToggle';
+import { useColumnPrefs } from '../hooks/useColumnPrefs';
+
+const ISSUES_COLS = [
+  { key: 'account_name',  label: 'Account',    alwaysVisible: true },
+  { key: 'priority',      label: 'Priority' },
+  { key: 'description',   label: 'Description' },
+  { key: 'issue_type',    label: 'Issue Type' },
+  { key: 'owner_team',    label: 'Owner' },
+  { key: 'status',        label: 'Status' },
+  { key: 'reported_date', label: 'Reported' },
+  { key: 'csm',           label: 'CSM' },
+];
 
 const PRIORITY_BADGE = {
   P0: 'bg-red-100 text-red-800 border border-red-200',
@@ -86,6 +99,10 @@ function StatusBadge({ status }) {
 
 export default function IssuesDashboard() {
   const { user } = useAuth();
+  const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
+    user?.email, 'issues', Object.fromEntries(ISSUES_COLS.map(c => [c.key, true]))
+  );
+  const colCount = ISSUES_COLS.filter(c => showCol(c.key)).length + 1;
   const [issues,       setIssues]       = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [accounts,     setAccounts]     = useState([]);
@@ -493,6 +510,7 @@ export default function IssuesDashboard() {
             <MultiSelectDropdown placeholder="All CSMs" options={allCsms} value={filters.csm} onChange={v => setFilter('csm', v)} />
           )}
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
+          <ColumnToggle columns={ISSUES_COLS} prefs={colPrefs} onToggle={toggleCol} />
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
@@ -643,13 +661,13 @@ export default function IssuesDashboard() {
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Account</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Priority</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Issue Type</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Owner</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reported</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM</th>
+                    {showCol('priority')      && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Priority</th>}
+                    {showCol('description')   && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>}
+                    {showCol('issue_type')    && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Issue Type</th>}
+                    {showCol('owner_team')    && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Owner</th>}
+                    {showCol('status')        && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>}
+                    {showCol('reported_date') && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reported</th>}
+                    {showCol('csm')           && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM</th>}
                     <th className="px-3 py-3 w-10"></th>
                   </tr>
                 </thead>
@@ -672,20 +690,26 @@ export default function IssuesDashboard() {
                             )}
                             {issue.tenant_id && <div className="text-xs text-gray-400 font-mono truncate max-w-[140px]">{issue.tenant_id}</div>}
                           </td>
-                          <td className="px-4 py-3"><PriorityBadge priority={issue.priority} /></td>
-                          <td className="px-4 py-3 max-w-xs">
-                            <p className="text-gray-700 line-clamp-2 text-xs">{issue.description}</p>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="text-xs text-gray-700">{issue.issue_type || '—'}</div>
-                            {issue.issue_sub_type && <div className="text-xs text-gray-400">{issue.issue_sub_type}</div>}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{issue.owner_team || '—'}</td>
-                          <td className="px-4 py-3"><StatusBadge status={issue.status} /></td>
-                          <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
-                            {issue.reported_date ? new Date(issue.reported_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{issue.csm || '—'}</td>
+                          {showCol('priority') && <td className="px-4 py-3"><PriorityBadge priority={issue.priority} /></td>}
+                          {showCol('description') && (
+                            <td className="px-4 py-3 max-w-xs">
+                              <p className="text-gray-700 line-clamp-2 text-xs">{issue.description}</p>
+                            </td>
+                          )}
+                          {showCol('issue_type') && (
+                            <td className="px-4 py-3">
+                              <div className="text-xs text-gray-700">{issue.issue_type || '—'}</div>
+                              {issue.issue_sub_type && <div className="text-xs text-gray-400">{issue.issue_sub_type}</div>}
+                            </td>
+                          )}
+                          {showCol('owner_team')    && <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{issue.owner_team || '—'}</td>}
+                          {showCol('status')        && <td className="px-4 py-3"><StatusBadge status={issue.status} /></td>}
+                          {showCol('reported_date') && (
+                            <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
+                              {issue.reported_date ? new Date(issue.reported_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                            </td>
+                          )}
+                          {showCol('csm') && <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{issue.csm || '—'}</td>}
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-1">
                               <button
@@ -709,7 +733,7 @@ export default function IssuesDashboard() {
 
                         {expanded === issue.id && !isEditing && (
                           <tr className="bg-blue-50">
-                            <td colSpan={9} className="px-4 py-4">
+                            <td colSpan={colCount} className="px-4 py-4">
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div>
                                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
@@ -739,7 +763,7 @@ export default function IssuesDashboard() {
 
                         {isEditing && (
                           <tr className="bg-amber-50">
-                            <td colSpan={9} className="px-4 py-4">
+                            <td colSpan={colCount} className="px-4 py-4">
                               <div className="space-y-4">
                                 <p className="text-sm font-semibold text-gray-800">Edit Issue</p>
                                 <IssueFormFields f={editForm} set={setEditForm} isEdit={true} />

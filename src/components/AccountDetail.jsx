@@ -24,8 +24,15 @@ function fmt(n) {
 
 function fmtDate(s) {
   if (!s) return '—';
-  try { return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
-  catch { return s; }
+  try {
+    let d = new Date(s);
+    // Fallback: try DD/MM/YYYY
+    if (isNaN(d.getTime()) && /^\d{2}\/\d{2}\/\d{4}$/.test(s)) {
+      const [dd, mm, yyyy] = s.split('/');
+      d = new Date(`${yyyy}-${mm}-${dd}`);
+    }
+    return isNaN(d.getTime()) ? s : d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+  } catch { return s; }
 }
 
 function MetricCard({ label, value, sub, colorClass }) {

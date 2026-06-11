@@ -4,6 +4,19 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import ColumnToggle from './ColumnToggle';
+import { useColumnPrefs } from '../hooks/useColumnPrefs';
+
+const ACCOUNTS_COLS = [
+  { key: 'account_name', label: 'Account',      alwaysVisible: true },
+  { key: 'industry',     label: 'Industry' },
+  { key: 'mrr',          label: 'MRR' },
+  { key: 'csm',          label: 'CSM' },
+  { key: 'rag_status',   label: 'RAG' },
+  { key: 'renewal_date', label: 'Renewal Date' },
+  { key: 'churn_status', label: 'Churn Status' },
+  { key: 'region',       label: 'Region' },
+];
 
 function fmt(n) {
   if (!n) return '—';
@@ -129,6 +142,10 @@ function matchesCondition(account, cond, escalationMap, fieldDefs) {
 export default function AccountsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
+    user?.email, 'accounts', Object.fromEntries(ACCOUNTS_COLS.map(c => [c.key, true]))
+  );
+  const colCount = ACCOUNTS_COLS.filter(c => showCol(c.key)).length + 1;
   const [accounts,         setAccounts]         = useState([]);
   const [filters,          setFilters]          = useState({});
   const [loading,          setLoading]          = useState(true);
@@ -382,6 +399,7 @@ export default function AccountsPage() {
           <MultiSelectDropdown options={filters.industries || []} value={query.industry} onChange={v => setQuery(q => ({...q, industry: v}))} placeholder="All Industries" />
           <MultiSelectDropdown options={['North','South','East','West']} value={query.region} onChange={v => setQuery(q => ({...q, region: v}))} placeholder="All Regions" />
           <MultiSelectDropdown options={filters.tiers || []} value={query.mrr_tier} onChange={v => setQuery(q => ({...q, mrr_tier: v}))} placeholder="All Tiers" />
+          <ColumnToggle columns={ACCOUNTS_COLS} prefs={colPrefs} onToggle={toggleCol} />
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
@@ -600,40 +618,44 @@ export default function AccountsPage() {
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
                 <Th label="Account Name" field="account_name" />
-                <Th label="Industry"     field="industry" />
-                <Th label="MRR"          field="mrr" />
-                <Th label="CSM"          field="csm" />
-                <Th label="RAG"          field="rag_status" />
-                <Th label="Renewal Date" field="renewal_date" />
-                <Th label="Churn Status" field="churn_status" />
-                <Th label="Region"       field="region" />
+                {showCol('industry')     && <Th label="Industry"     field="industry" />}
+                {showCol('mrr')          && <Th label="MRR"          field="mrr" />}
+                {showCol('csm')          && <Th label="CSM"          field="csm" />}
+                {showCol('rag_status')   && <Th label="RAG"          field="rag_status" />}
+                {showCol('renewal_date') && <Th label="Renewal Date" field="renewal_date" />}
+                {showCol('churn_status') && <Th label="Churn Status" field="churn_status" />}
+                {showCol('region')       && <Th label="Region"       field="region" />}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {loading ? (
-                <tr><td colSpan={9} className="py-12 text-center text-gray-400">Loading…</td></tr>
+                <tr><td colSpan={colCount} className="py-12 text-center text-gray-400">Loading…</td></tr>
               ) : displayed.length === 0 ? (
-                <tr><td colSpan={9} className="py-12 text-center text-gray-400">No accounts found.</td></tr>
+                <tr><td colSpan={colCount} className="py-12 text-center text-gray-400">No accounts found.</td></tr>
               ) : paginated.map(a => (
                 <tr key={a.id} onClick={() => navigate(`/accounts/${a.id}`)} className="hover:bg-gray-50 cursor-pointer transition">
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900 max-w-xs truncate">{a.account_name}</div>
                     <div className="text-xs text-gray-400">{a.tenant_id}</div>
                   </td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.industry || '—'}</td>
-                  <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">{fmt(a.mrr)}</td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.csm || '—'}</td>
-                  <td className="px-4 py-3">
-                    {a.rag_status ? <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${RAG_BADGE[a.rag_status] || ''}`}>{a.rag_status}</span> : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.renewal_date || '—'}</td>
-                  <td className="px-4 py-3">
-                    {a.churn_status
-                      ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CHURN_BADGE[a.churn_status] || 'bg-gray-100 text-gray-600'}`}>{a.churn_status}</span>
-                      : <span className="text-gray-300">—</span>}
-                  </td>
-                  <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.region || '—'}</td>
+                  {showCol('industry')     && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.industry || '—'}</td>}
+                  {showCol('mrr')          && <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">{fmt(a.mrr)}</td>}
+                  {showCol('csm')          && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.csm || '—'}</td>}
+                  {showCol('rag_status')   && (
+                    <td className="px-4 py-3">
+                      {a.rag_status ? <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${RAG_BADGE[a.rag_status] || ''}`}>{a.rag_status}</span> : '—'}
+                    </td>
+                  )}
+                  {showCol('renewal_date') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.renewal_date || '—'}</td>}
+                  {showCol('churn_status') && (
+                    <td className="px-4 py-3">
+                      {a.churn_status
+                        ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CHURN_BADGE[a.churn_status] || 'bg-gray-100 text-gray-600'}`}>{a.churn_status}</span>
+                        : <span className="text-gray-300">—</span>}
+                    </td>
+                  )}
+                  {showCol('region')       && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.region || '—'}</td>}
                   <td className="px-4 py-3">
                     <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                   </td>

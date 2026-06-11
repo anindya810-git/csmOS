@@ -4,6 +4,20 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import ColumnToggle from './ColumnToggle';
+import { useColumnPrefs } from '../hooks/useColumnPrefs';
+
+const ESC_COLS = [
+  { key: 'account_name',       label: 'Account',      alwaysVisible: true },
+  { key: 'rag_status',         label: 'RAG' },
+  { key: 'date_of_escalation', label: 'Date' },
+  { key: 'description',        label: 'Description' },
+  { key: 'status',             label: 'Status' },
+  { key: 'csm',                label: 'CSM' },
+  { key: 'ownership',          label: 'Ownership' },
+  { key: 'eta',                label: 'ETA' },
+  { key: 'escalated_by',       label: 'Escalated By' },
+];
 
 const STATUS_STYLES = {
   'Resolved':        'bg-green-100 text-green-800',
@@ -76,6 +90,10 @@ function StatusBadge({ status }) {
 export default function EscalationsDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
+    user?.email, 'escalations', Object.fromEntries(ESC_COLS.map(c => [c.key, true]))
+  );
+  const colCount = ESC_COLS.filter(c => showCol(c.key)).length + 1;
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [filters,     setFilters]     = useState({ status: [], csm: [], ownership: [], issue_type: [], month: [] });
@@ -534,6 +552,7 @@ export default function EscalationsDashboard() {
           <MultiSelectDropdown placeholder="All Ownerships" options={allOwnerships} value={filters.ownership} onChange={v => setFilter('ownership', v)} />
           <MultiSelectDropdown placeholder="All Issue Types" options={allIssueTypes} value={filters.issue_type} onChange={v => setFilter('issue_type', v)} />
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
+          <ColumnToggle columns={ESC_COLS} prefs={colPrefs} onToggle={toggleCol} />
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
@@ -702,14 +721,14 @@ export default function EscalationsDashboard() {
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Account</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">RAG</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ownership</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">ETA</th>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Escalated By</th>
+                  {showCol('rag_status')         && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">RAG</th>}
+                  {showCol('date_of_escalation') && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>}
+                  {showCol('description')        && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>}
+                  {showCol('status')             && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>}
+                  {showCol('csm')                && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM</th>}
+                  {showCol('ownership')          && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ownership</th>}
+                  {showCol('eta')                && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">ETA</th>}
+                  {showCol('escalated_by')       && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Escalated By</th>}
                   <th className="px-3 py-3 w-10"></th>
                 </tr>
               </thead>
@@ -737,22 +756,28 @@ export default function EscalationsDashboard() {
                           )}
                           {e.tenant_id && <div className="text-xs text-gray-400 font-mono">{e.tenant_id}</div>}
                         </td>
-                        <td className="px-4 py-3">
-                          {rag ? (
-                            <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${RAG_BADGE[rag] || 'bg-gray-100 text-gray-700'}`}>{rag}</span>
-                          ) : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                          {e.date_of_escalation ? new Date(e.date_of_escalation).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—'}
-                        </td>
-                        <td className="px-4 py-3 max-w-xs">
-                          <p className="text-gray-700 line-clamp-2">{e.description}</p>
-                        </td>
-                        <td className="px-4 py-3"><StatusBadge status={e.status} /></td>
-                        <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{e.csm || '—'}</td>
-                        <td className="px-4 py-3 text-gray-600 text-xs">{e.ownership || '—'}</td>
-                        <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{e.eta || '—'}</td>
-                        <td className="px-4 py-3 text-gray-600 text-xs">{e.escalated_by || '—'}</td>
+                        {showCol('rag_status') && (
+                          <td className="px-4 py-3">
+                            {rag ? (
+                              <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${RAG_BADGE[rag] || 'bg-gray-100 text-gray-700'}`}>{rag}</span>
+                            ) : <span className="text-gray-300">—</span>}
+                          </td>
+                        )}
+                        {showCol('date_of_escalation') && (
+                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
+                            {e.date_of_escalation ? new Date(e.date_of_escalation).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—'}
+                          </td>
+                        )}
+                        {showCol('description') && (
+                          <td className="px-4 py-3 max-w-xs">
+                            <p className="text-gray-700 line-clamp-2">{e.description}</p>
+                          </td>
+                        )}
+                        {showCol('status')       && <td className="px-4 py-3"><StatusBadge status={e.status} /></td>}
+                        {showCol('csm')          && <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{e.csm || '—'}</td>}
+                        {showCol('ownership')    && <td className="px-4 py-3 text-gray-600 text-xs">{e.ownership || '—'}</td>}
+                        {showCol('eta')          && <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{e.eta || '—'}</td>}
+                        {showCol('escalated_by') && <td className="px-4 py-3 text-gray-600 text-xs">{e.escalated_by || '—'}</td>}
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-1">
                             <button
@@ -780,7 +805,7 @@ export default function EscalationsDashboard() {
                       </tr>
                       {expanded === e.id && !isEditing && (
                         <tr className="bg-blue-50">
-                          <td colSpan={10} className="px-4 py-4">
+                          <td colSpan={colCount} className="px-4 py-4">
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                               <div>
                                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
@@ -815,7 +840,7 @@ export default function EscalationsDashboard() {
                       )}
                       {isEditing && (
                         <tr className="bg-amber-50">
-                          <td colSpan={10} className="px-4 py-4">
+                          <td colSpan={colCount} className="px-4 py-4">
                             <div className="space-y-4">
                               <p className="text-sm font-semibold text-gray-800">Edit Escalation</p>
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
