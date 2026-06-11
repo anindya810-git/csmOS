@@ -9,13 +9,22 @@ export default async function handler(req, res) {
   let user;
   try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
+  // Always resolve csm_name fresh from DB so stale JWTs don't cause empty results
+  let csmName = null;
+  if (user.role === 'csm') {
+    const { data: u } = await supabase.from('users').select('csm_name').eq('id', user.id).single();
+    csmName = u?.csm_name ?? null;
+  }
+
   if (req.method === 'GET') {
     const { csm, industry, region, rag_status, churn_status, mrr_tier, search } = req.query;
 
     let query = supabase.from('accounts').select('*').order('account_name');
 
-    if (user.role === 'csm') query = query.eq('csm', user.csm_name);
-    else if (csm) query = query.eq('csm', csm);
+    if (user.role === 'csm') {
+      if (!csmName) return res.json([]);
+      query = query.eq('csm', csmName);
+    } else if (csm) query = query.eq('csm', csm);
     if (industry) query = query.eq('industry', industry);
     if (region) query = query.eq('region', region);
     if (rag_status) query = query.eq('rag_status', rag_status);

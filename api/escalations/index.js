@@ -9,6 +9,12 @@ export default async function handler(req, res) {
   let user;
   try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
+  let csmName = null;
+  if (user.role === 'csm') {
+    const { data: u } = await supabase.from('users').select('csm_name').eq('id', user.id).single();
+    csmName = u?.csm_name ?? null;
+  }
+
   if (req.method === 'GET') {
     const { account_id, status, csm, month } = req.query;
 
@@ -18,7 +24,8 @@ export default async function handler(req, res) {
       .order('date_of_escalation', { ascending: false });
 
     if (user.role === 'csm') {
-      query = query.eq('csm', user.csm_name);
+      if (!csmName) return res.json([]);
+      query = query.eq('csm', csmName);
     } else if (csm) {
       query = query.eq('csm', csm);
     }
@@ -44,7 +51,7 @@ export default async function handler(req, res) {
 
     if (user.role === 'csm' && account_id) {
       const { data: acct } = await supabase.from('accounts').select('csm').eq('id', account_id).single();
-      if (acct && acct.csm !== user.csm_name) return res.status(403).json({ error: 'Access denied' });
+      if (acct && acct.csm !== csmName) return res.status(403).json({ error: 'Access denied' });
     }
 
     const { data, error } = await supabase.from('escalations').insert({

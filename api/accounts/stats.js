@@ -10,8 +10,17 @@ export default async function handler(req, res) {
   let user;
   try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
+  let csmName = null;
+  if (user.role === 'csm') {
+    const { data: u } = await supabase.from('users').select('csm_name').eq('id', user.id).single();
+    csmName = u?.csm_name ?? null;
+  }
+
   let statsQuery = supabase.from('accounts').select('id, rag_status, industry, csm, mrr, churn_status, churn_risk, renewal_status');
-  if (user.role === 'csm') statsQuery = statsQuery.eq('csm', user.csm_name);
+  if (user.role === 'csm') {
+    if (!csmName) return res.json({ total: { count: 0, total_mrr: 0 }, byRag: [], byIndustry: [], byChurn: [], byCsm: [], renewalPending: { count: 0 }, churnRisk: { count: 0 } });
+    statsQuery = statsQuery.eq('csm', csmName);
+  }
   const { data: accounts, error } = await statsQuery;
 
   if (error) return res.status(500).json({ error: error.message });

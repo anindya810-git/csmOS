@@ -11,6 +11,12 @@ export default async function handler(req, res) {
 
   const { id } = req.query;
 
+  let csmName = null;
+  if (user.role === 'csm') {
+    const { data: u } = await supabase.from('users').select('csm_name').eq('id', user.id).single();
+    csmName = u?.csm_name ?? null;
+  }
+
   // GET — list issues
   if (req.method === 'GET') {
     const { account_id, status, csm, issue_type, priority } = req.query;
@@ -20,8 +26,10 @@ export default async function handler(req, res) {
       .order('reported_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
-    if (user.role === 'csm') query = query.eq('csm', user.csm_name);
-    else if (csm) query = query.eq('csm', csm);
+    if (user.role === 'csm') {
+      if (!csmName) return res.json([]);
+      query = query.eq('csm', csmName);
+    } else if (csm) query = query.eq('csm', csm);
     if (account_id) query = query.eq('account_id', account_id);
     if (status)     query = query.eq('status', status);
     if (issue_type) query = query.eq('issue_type', issue_type);

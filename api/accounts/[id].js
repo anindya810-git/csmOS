@@ -25,12 +25,19 @@ export default async function handler(req, res) {
 
   const { id } = req.query;
 
+  // Resolve fresh csm_name so stale JWTs don't block access
+  let csmName = null;
+  if (user.role === 'csm') {
+    const { data: u } = await supabase.from('users').select('csm_name').eq('id', user.id).single();
+    csmName = u?.csm_name ?? null;
+  }
+
   if (req.method === 'GET') {
     const { data: account, error } = await supabase
       .from('accounts').select('*').eq('id', id).single();
 
     if (error || !account) return res.status(404).json({ error: 'Not found' });
-    if (user.role === 'csm' && account.csm !== user.csm_name) return res.status(403).json({ error: 'Access denied' });
+    if (user.role === 'csm' && account.csm !== csmName) return res.status(403).json({ error: 'Access denied' });
 
     const { data: logs } = await supabase
       .from('activity_log')
@@ -50,7 +57,7 @@ export default async function handler(req, res) {
       .from('accounts').select('*').eq('id', id).single();
 
     if (fetchErr || !current) return res.status(404).json({ error: 'Not found' });
-    if (user.role === 'csm' && current.csm !== user.csm_name) return res.status(403).json({ error: 'Access denied' });
+    if (user.role === 'csm' && current.csm !== csmName) return res.status(403).json({ error: 'Access denied' });
 
     const updates = {};
     const changes = {};
