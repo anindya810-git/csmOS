@@ -13,11 +13,12 @@ export default function ReportsPage() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold text-gray-900">Reports</h1>
-        <p className="text-sm text-gray-500 mt-0.5">Renewals and escalation summaries</p>
+        <p className="text-sm text-gray-500 mt-0.5">Renewals, escalation summaries, and issue analysis</p>
       </div>
-      <div className="flex gap-1 border-b border-gray-200">
-        <NavLink to="renewals" className={tabClass}>Renewals</NavLink>
-        <NavLink to="weekly"   className={tabClass}>Weekly Escalations</NavLink>
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
+        <NavLink to="renewals"      className={tabClass}>Renewals</NavLink>
+        <NavLink to="weekly"        className={tabClass}>Weekly Escalations</NavLink>
+        <NavLink to="issues-pivot"  className={tabClass}>Issue Breakdown</NavLink>
       </div>
       <Outlet />
     </div>

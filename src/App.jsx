@@ -12,6 +12,7 @@ import EscalationsDashboard from './components/EscalationsDashboard';
 import WeeklyEscalationsDashboard from './components/WeeklyEscalationsDashboard';
 import IssuesDashboard from './components/IssuesDashboard';
 import ReportsPage from './components/ReportsPage';
+import IssuesPivotReport from './components/IssuesPivotReport';
 import SettingsPage from './components/SettingsPage';
 import AccountEdit from './components/AccountEdit';
 
@@ -43,8 +44,9 @@ function AppRoutes() {
         <Route path="accounts/:id/edit" element={<AccountEdit />} />
         <Route path="reports" element={<ReportsPage />}>
           <Route index element={<Navigate to="renewals" replace />} />
-          <Route path="renewals" element={<RenewalDashboard />} />
-          <Route path="weekly" element={<WeeklyEscalationsDashboard />} />
+          <Route path="renewals"     element={<RenewalDashboard />} />
+          <Route path="weekly"       element={<WeeklyEscalationsDashboard />} />
+          <Route path="issues-pivot" element={<IssuesPivotReport />} />
         </Route>
         <Route path="renewal" element={<Navigate to="/reports/renewals" replace />} />
         <Route path="rag" element={<RAGDashboard />} />
