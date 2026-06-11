@@ -98,7 +98,7 @@ export default async function handler(req, res) {
       'implementation_status','implementation_type','ps_engagement','ps_solutioning',
       'account_understanding_session','new_csm_intro_done','csm_escalation_matrix_shared',
       'ring_fence_meeting_initiated','meeting_planned_date','meeting_done',
-      'issue_mapping_sheet_updated','review_cadence_alignment',
+      'issue_mapping_sheet_updated','review_cadence_alignment','golive_date',
     ];
     const NUMERIC = ['mrr','grr','nps','adoption_score','stickiness_score','adoption_rate'];
     if (!Array.isArray(ids) || ids.length === 0) return res.status(400).json({ error: 'ids required' });

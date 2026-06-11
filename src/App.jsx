@@ -49,7 +49,8 @@ function AppRoutes() {
         <Route path="accounts/:id/timeline" element={<AccountTimeline />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="reports" element={<ReportsPage />}>
-          <Route index element={<Navigate to="renewals" replace />} />
+          <Route index element={<Navigate to="rag" replace />} />
+          <Route path="rag"            element={<RAGDashboard />} />
           <Route path="renewals"       element={<RenewalDashboard />} />
           <Route path="weekly"         element={<WeeklyEscalationsDashboard />} />
           <Route path="issues-pivot"   element={<IssuesPivotReport />} />
@@ -57,7 +58,7 @@ function AppRoutes() {
           <Route path="task-pivot"     element={<TaskPivotReport />} />
         </Route>
         <Route path="renewal" element={<Navigate to="/reports/renewals" replace />} />
-        <Route path="rag" element={<RAGDashboard />} />
+        <Route path="rag" element={<Navigate to="/reports/rag" replace />} />
         <Route path="escalations" element={<EscalationsDashboard />} />
         <Route path="escalations/weekly" element={<Navigate to="/reports/weekly" replace />} />
         <Route path="issues" element={<IssuesDashboard />} />

@@ -150,7 +150,7 @@ export default function AccountMappingReport() {
                   {r.count > 0 ? (
                     <button
                       type="button"
-                      onClick={() => setCsmModal(r.csm)}
+                      onClick={() => setCsmModal({ csm: r.csm, rag: null })}
                       className="text-brand-600 font-medium hover:underline tabular-nums"
                     >{r.count}</button>
                   ) : (
@@ -177,13 +177,13 @@ export default function AccountMappingReport() {
                   </div>
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
-                  {r.green > 0 ? <span className="text-green-700 font-medium">{r.green}</span> : <span className="text-gray-300">—</span>}
+                  {r.green > 0 ? <button type="button" onClick={() => setCsmModal({ csm: r.csm, rag: 'Green' })} className="text-green-700 font-medium hover:underline tabular-nums">{r.green}</button> : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
-                  {r.amber > 0 ? <span className="text-amber-600 font-medium">{r.amber}</span> : <span className="text-gray-300">—</span>}
+                  {r.amber > 0 ? <button type="button" onClick={() => setCsmModal({ csm: r.csm, rag: 'Amber' })} className="text-amber-600 font-medium hover:underline tabular-nums">{r.amber}</button> : <span className="text-gray-300">—</span>}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
-                  {r.red > 0 ? <span className="text-red-600 font-medium">{r.red}</span> : <span className="text-gray-300">—</span>}
+                  {r.red > 0 ? <button type="button" onClick={() => setCsmModal({ csm: r.csm, rag: 'Red' })} className="text-red-600 font-medium hover:underline tabular-nums">{r.red}</button> : <span className="text-gray-300">—</span>}
                 </td>
               </tr>
             ))}
@@ -205,7 +205,12 @@ export default function AccountMappingReport() {
         </table>
       </div>
       {csmModal && (() => {
-        const csmAccounts = accounts.filter(a => (a.csm || '(Unassigned)') === csmModal);
+        const csmAccounts = accounts.filter(a => {
+          if ((a.csm || '(Unassigned)') !== csmModal.csm) return false;
+          if (csmModal.rag && a.rag_status !== csmModal.rag) return false;
+          return true;
+        });
+        const modalTitle = csmModal.rag ? `${csmModal.csm} — ${csmModal.rag}` : csmModal.csm;
         return (
           <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4" onClick={() => setCsmModal(null)}>
             <div className="absolute inset-0 bg-black/30" />
@@ -213,7 +218,7 @@ export default function AccountMappingReport() {
               onClick={e => e.stopPropagation()}>
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <div>
-                  <h3 className="text-base font-semibold text-gray-900">{csmModal}</h3>
+                  <h3 className="text-base font-semibold text-gray-900">{modalTitle}</h3>
                   <p className="text-xs text-gray-400 mt-0.5">{csmAccounts.length} account{csmAccounts.length !== 1 ? 's' : ''}</p>
                 </div>
                 <button onClick={() => setCsmModal(null)}
@@ -230,7 +235,7 @@ export default function AccountMappingReport() {
                     className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition text-left">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800 truncate">{a.account_name}</p>
-                      <p className="text-xs text-gray-400 truncate">{a.industry || '—'} · {fmt(a.mrr)}</p>
+                      <p className="text-xs text-gray-400 truncate">{a.industry || '—'} · {a.region || '—'} · {fmt(a.mrr)}</p>
                     </div>
                     {a.rag_status && (
                       <span className={`shrink-0 w-2.5 h-2.5 rounded-full ${RAG_DOT[a.rag_status] || 'bg-gray-300'}`} />

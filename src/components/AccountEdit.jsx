@@ -115,7 +115,7 @@ export default function AccountEdit() {
       .then(r => {
         const d = r.data;
         const fields = [
-          'account_name','tenant_id','industry','mrr_tier','mrr','region',
+          'account_name','tenant_id','industry','mrr_tier','mrr','region','golive_date',
           'csm_lead','csm','cp','tam_assigned','billing_frequency','renewal_date',
           'renewal_status','closure_eta','sa_status',
           'churn_status','churn_reason','grr','nps','renewal_comments',
@@ -229,7 +229,13 @@ export default function AccountEdit() {
           <input className={inp} value={form.tenant_id || ''} onChange={e => set('tenant_id', e.target.value)} placeholder="e.g. 5528" />
         </Field>
         <Field label="Region">
-          <input className={inp} value={form.region || ''} onChange={e => set('region', e.target.value)} placeholder="e.g. South" />
+          <select className={sel} value={form.region || ''} onChange={e => set('region', e.target.value)}>
+            <option value="">— Select Region —</option>
+            {['North','South','East','West'].map(r => <option key={r} value={r}>{r}</option>)}
+          </select>
+        </Field>
+        <Field label="Go-live Date">
+          <input type="date" className={inp} value={form.golive_date ? form.golive_date.substring(0,10) : ''} onChange={e => set('golive_date', e.target.value)} />
         </Field>
         <Field label="Industry">
           <input className={inp} value={form.industry || ''} onChange={e => set('industry', e.target.value)} placeholder="e.g. Real Estate" />

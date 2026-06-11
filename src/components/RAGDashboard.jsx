@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import MultiSelectDropdown from './MultiSelectDropdown';
 
 const RAG_ORDER  = ['Red', 'Amber', 'Green'];
 const RAG_CONFIG = {
@@ -14,8 +15,8 @@ export default function RAGDashboard() {
   const [loading,      setLoading]      = useState(true);
   const [error,        setError]        = useState(null);
   const [activeRag,    setActiveRag]    = useState('');   // '' = all
-  const [filterCsm,    setFilterCsm]    = useState('');
-  const [filterRegion, setFilterRegion] = useState('');
+  const [filterCsm,    setFilterCsm]    = useState([]);
+  const [filterRegion, setFilterRegion] = useState([]);
   const [search,       setSearch]       = useState('');
 
   useEffect(() => {
@@ -30,9 +31,9 @@ export default function RAGDashboard() {
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
     return accounts.filter(a => {
-      if (activeRag    && a.rag_status !== activeRag)    return false;
-      if (filterCsm    && a.csm        !== filterCsm)    return false;
-      if (filterRegion && a.region     !== filterRegion) return false;
+      if (activeRag              && a.rag_status !== activeRag)           return false;
+      if (filterCsm.length > 0    && !filterCsm.includes(a.csm))          return false;
+      if (filterRegion.length > 0 && !filterRegion.includes(a.region))    return false;
       if (q && !a.account_name.toLowerCase().includes(q) &&
                !(a.rag_reason   || '').toLowerCase().includes(q) &&
                !(a.actions_taken || '').toLowerCase().includes(q)) return false;
@@ -52,8 +53,8 @@ export default function RAGDashboard() {
   // Summary counts (unfiltered by rag tab so the KPI cards always show totals)
   const summary = useMemo(() => {
     const base = accounts.filter(a => {
-      if (filterCsm    && a.csm    !== filterCsm)    return false;
-      if (filterRegion && a.region !== filterRegion) return false;
+      if (filterCsm.length > 0    && !filterCsm.includes(a.csm))       return false;
+      if (filterRegion.length > 0 && !filterRegion.includes(a.region)) return false;
       return true;
     });
     return RAG_ORDER.map(r => ({
@@ -72,9 +73,6 @@ export default function RAGDashboard() {
 
   return (
     <div className="space-y-6">
-      {/* ── Header ── */}
-      <h1 className="text-2xl font-bold text-gray-800">RAG Dashboard</h1>
-
       {/* ── KPI cards ── */}
       <div className="grid grid-cols-3 gap-4">
         {summary.map(({ rag, count, mrr }) => {
@@ -103,18 +101,20 @@ export default function RAGDashboard() {
           value={search} onChange={e => setSearch(e.target.value)}
           className="!w-full sm:!w-64 text-sm"
         />
-        <select value={filterCsm} onChange={e => setFilterCsm(e.target.value)}
-          className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5">
-          <option value="">All CSMs</option>
-          {csms.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={filterRegion} onChange={e => setFilterRegion(e.target.value)}
-          className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5">
-          <option value="">All Regions</option>
-          {regions.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
-        {(filterCsm || filterRegion || activeRag || search) && (
-          <button onClick={() => { setFilterCsm(''); setFilterRegion(''); setActiveRag(''); setSearch(''); }}
+        <MultiSelectDropdown
+          options={csms}
+          value={filterCsm}
+          onChange={setFilterCsm}
+          placeholder="All CSMs"
+        />
+        <MultiSelectDropdown
+          options={regions}
+          value={filterRegion}
+          onChange={setFilterRegion}
+          placeholder="All Regions"
+        />
+        {(filterCsm.length > 0 || filterRegion.length > 0 || activeRag || search) && (
+          <button onClick={() => { setFilterCsm([]); setFilterRegion([]); setActiveRag(''); setSearch(''); }}
             className="text-xs text-red-500 hover:text-red-700 hover:underline">
             Clear all
           </button>

@@ -132,7 +132,7 @@ export default function AccountsPage() {
   const [accounts,         setAccounts]         = useState([]);
   const [filters,          setFilters]          = useState({});
   const [loading,          setLoading]          = useState(true);
-  const [query,            setQuery]            = useState({ csm: '', industry: '', region: '', rag_status: '', mrr_tier: '' });
+  const [query,            setQuery]            = useState({ csm: [], industry: [], region: [], rag_status: [], mrr_tier: [] });
   const [search,           setSearch]           = useState('');
   const [showAdd,          setShowAdd]          = useState(false);
   const [sortField,        setSortField]        = useState('account_name');
@@ -230,9 +230,8 @@ export default function AccountsPage() {
 
   const fetchAccounts = useCallback(() => {
     setLoading(true);
-    const params = Object.fromEntries(Object.entries(query).filter(([, v]) => v));
-    axios.get('/api/accounts', { params }).then(r => setAccounts(r.data)).finally(() => setLoading(false));
-  }, [query]);
+    axios.get('/api/accounts').then(r => setAccounts(r.data)).finally(() => setLoading(false));
+  }, []);
 
   useEffect(() => { fetchAccounts(); }, [fetchAccounts]);
 
@@ -261,6 +260,11 @@ export default function AccountsPage() {
   const activeConditions = conditions.filter(c => c.field && c.operator);
 
   const displayed = sorted.filter(a => {
+    if (query.rag_status.length > 0 && !query.rag_status.includes(a.rag_status)) return false;
+    if (query.csm.length > 0        && !query.csm.includes(a.csm))               return false;
+    if (query.industry.length > 0   && !query.industry.includes(a.industry))     return false;
+    if (query.region.length > 0     && !query.region.includes(a.region))         return false;
+    if (query.mrr_tier.length > 0   && !query.mrr_tier.includes(a.mrr_tier))     return false;
     if (search) {
       const q = search.toLowerCase();
       const blob = [a.account_name, a.tenant_id, a.csm, a.industry, a.region,
@@ -286,12 +290,12 @@ export default function AccountsPage() {
 
   const clearAll = () => {
     setSearch('');
-    setQuery({ csm: '', industry: '', region: '', rag_status: '', mrr_tier: '' });
+    setQuery({ csm: [], industry: [], region: [], rag_status: [], mrr_tier: [] });
     setConditions([]);
     setPage(1);
   };
 
-  const hasFilters = search || Object.values(query).some(Boolean) || conditions.length > 0;
+  const hasFilters = search || Object.values(query).some(arr => arr.length > 0) || conditions.length > 0;
 
   const paginated = displayed.slice((page - 1) * perPage, page * perPage);
 
@@ -373,26 +377,11 @@ export default function AccountsPage() {
 
         {/* Quick filters */}
         <div className="flex flex-wrap items-center gap-2">
-          <select value={query.rag_status} onChange={e => setQuery(q => ({...q, rag_status: e.target.value}))} className="!w-auto text-sm !py-1.5">
-            <option value="">All RAG</option>
-            <option>Green</option><option>Amber</option><option>Red</option>
-          </select>
-          <select value={query.csm} onChange={e => setQuery(q => ({...q, csm: e.target.value}))} className="!w-auto text-sm !py-1.5">
-            <option value="">All CSMs</option>
-            {filters.csms?.map(c => <option key={c}>{c}</option>)}
-          </select>
-          <select value={query.industry} onChange={e => setQuery(q => ({...q, industry: e.target.value}))} className="!w-auto text-sm !py-1.5">
-            <option value="">All Industries</option>
-            {filters.industries?.map(i => <option key={i}>{i}</option>)}
-          </select>
-          <select value={query.region} onChange={e => setQuery(q => ({...q, region: e.target.value}))} className="!w-auto text-sm !py-1.5">
-            <option value="">All Regions</option>
-            {filters.regions?.map(r => <option key={r}>{r}</option>)}
-          </select>
-          <select value={query.mrr_tier} onChange={e => setQuery(q => ({...q, mrr_tier: e.target.value}))} className="!w-auto text-sm !py-1.5">
-            <option value="">All Tiers</option>
-            {filters.tiers?.map(t => <option key={t}>{t}</option>)}
-          </select>
+          <MultiSelectDropdown options={['Green','Amber','Red']} value={query.rag_status} onChange={v => setQuery(q => ({...q, rag_status: v}))} placeholder="All RAG" />
+          <MultiSelectDropdown options={filters.csms || []} value={query.csm} onChange={v => setQuery(q => ({...q, csm: v}))} placeholder="All CSMs" />
+          <MultiSelectDropdown options={filters.industries || []} value={query.industry} onChange={v => setQuery(q => ({...q, industry: v}))} placeholder="All Industries" />
+          <MultiSelectDropdown options={['North','South','East','West']} value={query.region} onChange={v => setQuery(q => ({...q, region: v}))} placeholder="All Regions" />
+          <MultiSelectDropdown options={filters.tiers || []} value={query.mrr_tier} onChange={v => setQuery(q => ({...q, mrr_tier: v}))} placeholder="All Tiers" />
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition

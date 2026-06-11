@@ -594,6 +594,7 @@ export default function AccountDetail() {
                 ['TAM Assigned',       a.tam_assigned],
                 ['Implementation',     a.implementation_status],
                 ['PS Engagement',      a.ps_engagement],
+                ['Go-live Date',       fmtDate(a.golive_date)],
                 ['Closure ETA',        fmtDate(a.closure_eta)],
                 ['GRR (%)',            a.grr != null ? `${a.grr}%` : null],
                 ['Stickiness Score',   a.stickiness_score != null ? `${a.stickiness_score}` : null],
