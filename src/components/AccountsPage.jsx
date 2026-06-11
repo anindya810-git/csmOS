@@ -282,7 +282,7 @@ export default function AccountsPage() {
   const removeCondition = (id) =>
     setConditions(c => c.filter(cond => cond.id !== id));
 
-  useEffect(() => { setPage(1); }, [search]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPage(1); }, [search, query, conditions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearAll = () => {
     setSearch('');

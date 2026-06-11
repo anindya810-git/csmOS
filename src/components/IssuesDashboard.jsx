@@ -132,7 +132,7 @@ export default function IssuesDashboard() {
   useEffect(() => { load(); }, [load]);
 
   const setFilter = (key, val) => { setFilters(f => ({ ...f, [key]: val })); setPage(1); };
-  useEffect(() => { setPage(1); }, [search]);
+  useEffect(() => { setPage(1); }, [search, conditions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleAccountSelect = (accountId, setter) => {
     const acct = accounts.find(a => String(a.id) === String(accountId));

@@ -172,7 +172,7 @@ export default function Dashboard() {
         <div className="card lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold text-gray-700">6-Month Trend</h2>
-            <span className="text-xs text-gray-400">Issues reported · escalations raised · issue resolution %</span>
+            <span className="hidden sm:inline text-xs text-gray-400">Issues · escalations · resolution %</span>
           </div>
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart data={trend} margin={{ top: 5, right: 10, left: -15, bottom: 0 }}>

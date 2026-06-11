@@ -32,7 +32,7 @@ export default function Pagination({ page, perPage, total, onPage, onPerPage }) 
             key={label}
             onClick={action}
             disabled={disabled}
-            className="w-8 h-8 flex items-center justify-center rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
+            className="w-10 h-10 sm:w-8 sm:h-8 flex items-center justify-center rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed transition"
           >
             {label}
           </button>

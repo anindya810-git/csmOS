@@ -266,10 +266,27 @@ export default function SettingsPage() {
   );
 
   return (
-    <div className="flex gap-0 -mx-4 sm:-mx-6 -mt-5 sm:-mt-6 min-h-[calc(100vh-3.5rem)]">
+    <div className="flex flex-col sm:flex-row gap-0 -mx-4 sm:-mx-6 -mt-5 sm:-mt-6 min-h-[calc(100vh-3.5rem)]">
 
-      {/* ── Left Navigation ───────────────────────────────────────────── */}
-      <div className="w-56 shrink-0 bg-white border-r border-gray-100 flex flex-col">
+      {/* ── Mobile tab bar ───────────────────────────────────────────── */}
+      <div className="sm:hidden bg-white border-b border-gray-200 flex overflow-x-auto shrink-0">
+        {NAV_ITEMS.map(item => (
+          <button
+            key={item.key}
+            onClick={() => setSettingsPage(item.key)}
+            className={`flex items-center gap-2 px-5 py-3.5 text-sm font-medium whitespace-nowrap border-b-2 transition
+              ${settingsPage === item.key
+                ? 'border-brand-600 text-brand-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+          >
+            {item.icon}
+            {item.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Desktop sidebar ───────────────────────────────────────────── */}
+      <div className="hidden sm:flex w-56 shrink-0 bg-white border-r border-gray-100 flex-col">
         <div className="px-5 py-5 border-b border-gray-100">
           <h1 className="text-base font-bold text-gray-900">Settings</h1>
           <p className="text-xs text-gray-400 mt-0.5">Admin controls</p>
@@ -292,7 +309,7 @@ export default function SettingsPage() {
       </div>
 
       {/* ── Main Content ──────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 p-6 space-y-6">
+      <div className="flex-1 min-w-0 p-4 sm:p-6 space-y-6">
 
         {/* ── Manage Users page ─────────────────────────────────────── */}
         {settingsPage === 'users' && (
@@ -328,7 +345,8 @@ export default function SettingsPage() {
               ) : users.length === 0 ? (
                 <div className="py-12 text-center text-gray-400">No users found.</div>
               ) : viewMode === 'list' ? (
-                <table className="w-full text-sm">
+                <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[580px]">
                   <thead className="bg-gray-50 border-b border-gray-100">
                     <tr>
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
@@ -365,6 +383,7 @@ export default function SettingsPage() {
                     ))}
                   </tbody>
                 </table>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <div className="flex gap-16 justify-center py-8 px-6 min-w-max">
@@ -387,9 +406,25 @@ export default function SettingsPage() {
             </div>
 
             <div className="card p-0 overflow-hidden">
-              <div className="flex" style={{ minHeight: 420 }}>
-                {/* Left: field selector */}
-                <div className="w-52 shrink-0 border-r border-gray-100 bg-gray-50 overflow-y-auto">
+              {/* Mobile: horizontal scrollable tab bar */}
+              <div className="sm:hidden border-b border-gray-100 bg-gray-50 overflow-x-auto">
+                <div className="flex min-w-max">
+                  {ddSections.flatMap(([, fields]) => fields).map(f => (
+                    <button
+                      key={f.key}
+                      onClick={() => { setDdField(f.key); setDdEditId(null); setDdAddValue(''); setDdAddParent(''); }}
+                      className={`px-4 py-2.5 text-sm whitespace-nowrap border-b-2 transition
+                        ${ddField === f.key ? 'border-brand-600 text-brand-700 font-semibold bg-white' : 'border-transparent text-gray-600 hover:text-gray-800'}`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row" style={{ minHeight: 420 }}>
+                {/* Desktop: left field selector sidebar */}
+                <div className="hidden sm:block w-52 shrink-0 border-r border-gray-100 bg-gray-50 overflow-y-auto">
                   {ddSections.map(([section, fields]) => (
                     <div key={section}>
                       <p className="px-4 pt-3 pb-1 text-xs font-bold text-gray-400 uppercase tracking-widest">{section}</p>

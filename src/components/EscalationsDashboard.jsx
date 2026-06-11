@@ -270,7 +270,7 @@ export default function EscalationsDashboard() {
   ];
 
   const setFilter = (key, val) => { setFilters(f => ({ ...f, [key]: val })); setPage(1); };
-  useEffect(() => { setPage(1); }, [search]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { setPage(1); }, [search, conditions]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearAll = () => {
     setSearch('');
