@@ -1,7 +1,16 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+const STATUS_STYLE = {
+  Resolved:          'bg-green-100 text-green-700',
+  Closed:            'bg-green-100 text-green-700',
+  'In Progress':     'bg-amber-100 text-amber-700',
+  'Partly Resolved': 'bg-blue-100 text-blue-700',
+  Open:              'bg-red-100 text-red-700',
+};
 
 function weekOfMonth(d) {
   return Math.ceil(d.getDate() / 7);
@@ -58,6 +67,22 @@ function pctColor(n, d) {
   return 'text-red-600';
 }
 
+function fmtDate(s) {
+  if (!s) return null;
+  try { return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  catch { return s; }
+}
+
+// Shared column template so both tables align perfectly
+function WeekColgroup() {
+  return (
+    <colgroup>
+      <col className="w-[220px]" />
+      {Array.from({ length: WINDOW_SIZE }).map((_, i) => <col key={i} />)}
+    </colgroup>
+  );
+}
+
 function SectionHeader({ label, colSpan, bg }) {
   return (
     <tr>
@@ -69,18 +94,84 @@ function SectionHeader({ label, colSpan, bg }) {
   );
 }
 
-function Row({ label, values, cls = '', valueCls = 'text-gray-800', bold = false, perCellCls }) {
+function Row({ label, values, cls = '', valueCls = 'text-gray-800', bold = false, perCellCls, onCellClick }) {
   return (
     <tr className={`border-b border-gray-100 last:border-b-0 ${cls}`}>
       <td className={`px-5 py-3 border-r border-gray-200 text-sm ${bold ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
         {label}
       </td>
-      {values.map((v, i) => (
-        <td key={i} className={`text-center px-4 py-3 tabular-nums text-sm border-r border-gray-200 last:border-r-0 ${bold ? 'font-bold' : ''} ${perCellCls ? perCellCls[i] : valueCls}`}>
-          {v}
-        </td>
-      ))}
+      {values.map((v, i) => {
+        const clickable = onCellClick && v !== 0 && v !== '—';
+        return (
+          <td key={i} className={`text-center px-4 py-3 tabular-nums text-sm border-r border-gray-200 last:border-r-0 ${bold ? 'font-bold' : ''} ${perCellCls ? perCellCls[i] : valueCls}`}>
+            {clickable ? (
+              <button
+                onClick={() => onCellClick(i)}
+                className="underline decoration-dotted decoration-gray-400 underline-offset-4 hover:text-brand-600 hover:decoration-brand-400 transition cursor-pointer"
+              >
+                {v}
+              </button>
+            ) : v}
+          </td>
+        );
+      })}
     </tr>
+  );
+}
+
+function DrillModal({ drill, onClose }) {
+  if (!drill) return null;
+  const { title, kind, items } = drill;
+  return (
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={onClose}>
+      <div
+        className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h3 className="text-base font-semibold text-gray-900">{title}</h3>
+            <p className="text-xs text-gray-400 mt-0.5">{items.length} {kind}{items.length !== 1 ? 's' : ''}</p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="overflow-y-auto divide-y divide-gray-50">
+          {items.map(item => (
+            <div key={item.id} className="px-5 py-3.5 hover:bg-gray-50/60 transition">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  {item.account_id ? (
+                    <Link to={`/accounts/${item.account_id}`} className="text-sm font-semibold text-brand-700 hover:underline">
+                      {item.account_name || '(No account)'}
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-semibold text-gray-800">{item.account_name || '(No account)'}</span>
+                  )}
+                  <p className="text-sm text-gray-600 mt-0.5 line-clamp-2">{item.description}</p>
+                </div>
+                <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLE[item.status] || 'bg-gray-100 text-gray-600'}`}>
+                  {item.status}
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 text-xs text-gray-400">
+                {kind === 'issue' && item.issue_type && <span>{item.issue_type}{item.issue_sub_type ? ` · ${item.issue_sub_type}` : ''}</span>}
+                {item.csm && <span>CSM: {item.csm}</span>}
+                {kind === 'issue' ? (
+                  item.reported_date && <span>Reported {fmtDate(item.reported_date)}</span>
+                ) : (
+                  item.date_of_escalation && <span>{fmtDate(item.date_of_escalation)}</span>
+                )}
+                {kind === 'issue' && item.support_ticket && <span className="font-mono">Support #{item.support_ticket}</span>}
+                {kind === 'issue' && item.dev_ticket && <span className="font-mono">Dev #{item.dev_ticket}</span>}
+                {kind === 'escalation' && item.ownership && <span>{item.ownership}</span>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -90,6 +181,7 @@ export default function WeeklyEscalationsDashboard() {
   const [issues,      setIssues]      = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [pageOffset,  setPageOffset]  = useState(0);
+  const [drill,       setDrill]       = useState(null);
 
   useEffect(() => {
     Promise.all([
@@ -109,15 +201,15 @@ export default function WeeklyEscalationsDashboard() {
   const ringFenceCovered = accounts.filter(a => a.meeting_done === 'Yes').length;
 
   const weekEscalations = useMemo(() => weeks.map(w => {
-    const count = escalations.filter(e => {
+    const items = escalations.filter(e => {
       if (!e.date_of_escalation) return false;
       const d = new Date(e.date_of_escalation);
       return d >= w.start && d <= w.end;
-    }).length;
-    return { ...w, count };
+    });
+    return { ...w, items, count: items.length };
   }), [weeks, escalations]);
 
-  // Issues pivot: for each week, group by issue_type → {total, resolved}
+  // Issues pivot: per week, items grouped by issue_type with totals & resolved
   const issueTypes = useMemo(() => {
     const inWindow = issues.filter(i => {
       if (!i.reported_date) return false;
@@ -135,12 +227,11 @@ export default function WeeklyEscalationsDashboard() {
     });
     const byType = {};
     for (const t of issueTypes) {
-      const ti = weekIssues.filter(i => i.issue_type === t);
-      byType[t] = { total: ti.length, resolved: ti.filter(i => i.status === 'Resolved').length };
+      const items = weekIssues.filter(i => i.issue_type === t);
+      byType[t] = { items, total: items.length, resolved: items.filter(i => i.status === 'Resolved').length };
     }
-    const total    = weekIssues.length;
-    const resolved = weekIssues.filter(i => i.status === 'Resolved').length;
-    return { ...w, byType, total, resolved };
+    const resolvedItems = weekIssues.filter(i => i.status === 'Resolved');
+    return { ...w, byType, items: weekIssues, total: weekIssues.length, resolved: resolvedItems.length, resolvedItems };
   }), [weeks, issues, issueTypes]);
 
   if (loading) return (
@@ -151,13 +242,24 @@ export default function WeeklyEscalationsDashboard() {
 
   const cols = weeks.length + 1;
 
+  const headerRow = (firstLabel) => (
+    <tr className="border-b-2 border-gray-200">
+      <th className="text-left px-5 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200">{firstLabel}</th>
+      {weeks.map(w => (
+        <th key={w.key} className="text-center px-4 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 last:border-r-0 whitespace-nowrap">
+          {w.label}
+        </th>
+      ))}
+    </tr>
+  );
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Weekly View</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Coverage, escalations and issue themes by week</p>
+          <p className="text-sm text-gray-500 mt-0.5">Coverage, escalations and issue themes by week — click a number to see the records</p>
         </div>
 
         {/* Week navigator */}
@@ -167,7 +269,7 @@ export default function WeeklyEscalationsDashboard() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
           <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">
-            {weekEscalations[0]?.label} – {weekEscalations[weekEscalations.length - 1]?.label}
+            {weeks[0]?.label} – {weeks[weeks.length - 1]?.label}
           </span>
           <button onClick={() => setPageOffset(p => p + 1)}
             disabled={pageOffset >= 0}
@@ -202,17 +304,9 @@ export default function WeeklyEscalationsDashboard() {
 
       {/* Coverage + Escalation table */}
       <div className="card overflow-x-auto p-0">
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="border-b-2 border-gray-200">
-              <th className="text-left px-5 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 min-w-[200px]">Description</th>
-              {weeks.map(w => (
-                <th key={w.key} className="text-center px-4 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 last:border-r-0 min-w-[120px] whitespace-nowrap">
-                  {w.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
+        <table className="w-full min-w-[860px] table-fixed text-sm border-collapse">
+          <WeekColgroup />
+          <thead>{headerRow('Description')}</thead>
           <tbody>
             <SectionHeader label="Coverage Metrics" colSpan={cols} bg="bg-sky-100" />
             <Row label="Total customers"    values={weeks.map(() => totalCustomers)} />
@@ -222,7 +316,13 @@ export default function WeeklyEscalationsDashboard() {
 
             <SectionHeader label="Impact Metrics" colSpan={cols} bg="bg-orange-100" />
             <Row label="Escalation during RF"
-              values={weekEscalations.map(w => w.count)} />
+              values={weekEscalations.map(w => w.count)}
+              onCellClick={i => setDrill({
+                title: `Escalations — ${weekEscalations[i].label}`,
+                kind: 'escalation',
+                items: weekEscalations[i].items,
+              })}
+            />
             <Row label="Post RF Escalation %"
               values={weekEscalations.map(w => pct(w.count, totalCustomers))}
               cls="bg-orange-50" valueCls="text-orange-700" bold />
@@ -232,19 +332,9 @@ export default function WeeklyEscalationsDashboard() {
 
       {/* Thematic Issues table */}
       <div className="card overflow-x-auto p-0">
-        <table className="w-full text-sm border-collapse">
-          <thead>
-            <tr className="border-b-2 border-gray-200">
-              <th className="text-left px-5 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 min-w-[200px]">
-                Thematic Customer Issues
-              </th>
-              {weeks.map(w => (
-                <th key={w.key} className="text-center px-4 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 last:border-r-0 min-w-[120px] whitespace-nowrap">
-                  {w.label}
-                </th>
-              ))}
-            </tr>
-          </thead>
+        <table className="w-full min-w-[860px] table-fixed text-sm border-collapse">
+          <WeekColgroup />
+          <thead>{headerRow('Thematic Customer Issues')}</thead>
           <tbody>
             {issueTypes.length === 0 ? (
               <tr>
@@ -259,25 +349,37 @@ export default function WeeklyEscalationsDashboard() {
                     key={type}
                     label={type}
                     values={issuePivot.map(w => w.byType[type]?.total || 0)}
+                    onCellClick={i => setDrill({
+                      title: `${type} — ${issuePivot[i].label}`,
+                      kind: 'issue',
+                      items: issuePivot[i].byType[type].items,
+                    })}
                   />
                 ))}
 
-                {/* Total issues */}
                 <Row
                   label="Total Issues"
                   values={issuePivot.map(w => w.total)}
                   bold
                   cls="border-t-2 border-gray-300"
+                  onCellClick={i => setDrill({
+                    title: `All issues — ${issuePivot[i].label}`,
+                    kind: 'issue',
+                    items: issuePivot[i].items,
+                  })}
                 />
 
-                {/* Resolved count */}
                 <Row
                   label="Resolved"
                   values={issuePivot.map(w => w.resolved)}
                   bold
+                  onCellClick={i => setDrill({
+                    title: `Resolved issues — ${issuePivot[i].label}`,
+                    kind: 'issue',
+                    items: issuePivot[i].resolvedItems,
+                  })}
                 />
 
-                {/* Resolved % */}
                 <Row
                   label="Resolved %"
                   values={issuePivot.map(w => pct(w.resolved, w.total))}
@@ -290,6 +392,8 @@ export default function WeeklyEscalationsDashboard() {
           </tbody>
         </table>
       </div>
+
+      <DrillModal drill={drill} onClose={() => setDrill(null)} />
     </div>
   );
 }
