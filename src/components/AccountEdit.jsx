@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import SelectDropdown from './SelectDropdown';
+import DatePicker from './DatePicker';
 
 /* ── Toggle switch ─────────────────────────────────────────── */
 function Toggle({ value, onChange }) {
@@ -233,7 +234,7 @@ export default function AccountEdit() {
           <SelectDropdown options={['North','South','East','West']} value={form.region || ''} onChange={v => set('region', v)} placeholder="— Select Region —" />
         </Field>
         <Field label="Go-live Date">
-          <input type="date" className={inp} value={form.golive_date ? form.golive_date.substring(0,10) : ''} onChange={e => set('golive_date', e.target.value)} />
+          <DatePicker value={form.golive_date ? form.golive_date.substring(0,10) : ''} onChange={v => set('golive_date', v)} placeholder="Pick a date" />
         </Field>
         <Field label="Industry">
           <input className={inp} value={form.industry || ''} onChange={e => set('industry', e.target.value)} placeholder="e.g. Real Estate" />
@@ -269,13 +270,13 @@ export default function AccountEdit() {
           <SelectDropdown options={opts('billing_frequency', ['Monthly','Quarterly','Half-Yearly','Annually'])} value={form.billing_frequency || ''} onChange={v => set('billing_frequency', v)} />
         </Field>
         <Field label="Renewal Date">
-          <input type="date" className={inp} value={form.renewal_date ? form.renewal_date.substring(0,10) : ''} onChange={e => set('renewal_date', e.target.value)} />
+          <DatePicker value={form.renewal_date ? form.renewal_date.substring(0,10) : ''} onChange={v => set('renewal_date', v)} placeholder="Pick a date" />
         </Field>
         <Field label="Renewal Status">
           <SelectDropdown options={opts('renewal_status', ['Renewed','At Risk','Lost','Pending'])} value={form.renewal_status || ''} onChange={v => set('renewal_status', v)} />
         </Field>
         <Field label="Closure ETA">
-          <input type="date" className={inp} value={form.closure_eta ? form.closure_eta.substring(0,10) : ''} onChange={e => set('closure_eta', e.target.value)} />
+          <DatePicker value={form.closure_eta ? form.closure_eta.substring(0,10) : ''} onChange={v => set('closure_eta', v)} placeholder="Pick a date" />
         </Field>
       </SectionCard>
 
@@ -427,9 +428,7 @@ export default function AccountEdit() {
           ))}
           <div className="flex items-center justify-between px-5 py-3.5">
             <span className="text-sm text-gray-500">Meeting Planned Date</span>
-            <input type="date" className={`${inp} w-auto text-right`}
-              value={form.meeting_planned_date ? form.meeting_planned_date.substring(0,10) : ''}
-              onChange={e => set('meeting_planned_date', e.target.value)} />
+            <DatePicker value={form.meeting_planned_date ? form.meeting_planned_date.substring(0,10) : ''} onChange={v => set('meeting_planned_date', v)} placeholder="Pick a date" className="w-48" />
           </div>
         </div>
       </div>
