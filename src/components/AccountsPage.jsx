@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Pagination from './Pagination';
+import MultiSelectDropdown from './MultiSelectDropdown';
 
 function fmt(n) {
   if (!n) return '—';
@@ -25,7 +26,7 @@ const CHURN_BADGE = {
 };
 
 const OPS_TEXT   = ['contains','does not contain','is','is not','is empty','is not empty'];
-const OPS_SELECT = ['is','is not','is empty','is not empty'];
+const OPS_SELECT = ['is','is not','is one of','is empty','is not empty'];
 const OPS_NUM    = ['=','>','<','>=','<=','is empty','is not empty'];
 const OPS_DATE   = ['is','before','after','is empty','is not empty'];
 const OPS_BOOL   = ['is yes','is no'];
@@ -71,6 +72,10 @@ function matchesCondition(account, cond, escalationMap, fieldDefs) {
     const escs = escalationMap[account.id] || [];
     if (operator === 'is empty')     return escs.length === 0;
     if (operator === 'is not empty') return escs.length > 0;
+    if (operator === 'is one of') {
+      const vals = Array.isArray(value) ? value : [];
+      return vals.length === 0 || vals.some(v => escs.some(e => e.status === v));
+    }
     if (operator === 'is')           return escs.some(e => e.status === value);
     if (operator === 'is not')       return !escs.some(e => e.status === value);
     return true;
@@ -90,6 +95,11 @@ function matchesCondition(account, cond, escalationMap, fieldDefs) {
   const raw = account[field];
   if (operator === 'is empty')     return raw === null || raw === undefined || raw === '';
   if (operator === 'is not empty') return raw !== null && raw !== undefined && raw !== '';
+  if (operator === 'is one of') {
+    const vals = Array.isArray(value) ? value : [];
+    if (vals.length === 0) return true;
+    return vals.some(v => String(raw ?? '').toLowerCase() === v.toLowerCase());
+  }
 
   if (def.type === 'number') {
     const v = parseFloat(value), r = parseFloat(raw);
@@ -456,7 +466,7 @@ export default function AccountsPage() {
                     {/* Operator selector */}
                     <select
                       value={cond.operator}
-                      onChange={e => updateCondition(cond.id, { operator: e.target.value, value: '' })}
+                      onChange={e => updateCondition(cond.id, { operator: e.target.value, value: e.target.value === 'is one of' ? [] : '' })}
                       className="!w-auto text-sm !py-1.5"
                     >
                       {ops.map(op => <option key={op}>{op}</option>)}
@@ -465,14 +475,23 @@ export default function AccountsPage() {
                     {/* Value input — type-aware */}
                     {needsValue(cond.operator) && (
                       def?.type === 'select' ? (
-                        <select
-                          value={cond.value}
-                          onChange={e => updateCondition(cond.id, { value: e.target.value })}
-                          className="!w-auto text-sm !py-1.5"
-                        >
-                          <option value="">Select…</option>
-                          {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
+                        cond.operator === 'is one of' ? (
+                          <MultiSelectDropdown
+                            placeholder="Select values…"
+                            options={def.opts || []}
+                            value={Array.isArray(cond.value) ? cond.value : []}
+                            onChange={v => updateCondition(cond.id, { value: v })}
+                          />
+                        ) : (
+                          <select
+                            value={cond.value}
+                            onChange={e => updateCondition(cond.id, { value: e.target.value })}
+                            className="!w-auto text-sm !py-1.5"
+                          >
+                            <option value="">Select…</option>
+                            {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        )
                       ) : def?.type === 'number' ? (
                         <input
                           type="number"

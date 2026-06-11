@@ -13,14 +13,15 @@ export default async function handler(req, res) {
   let filtersQuery = supabase.from('accounts').select('csm, csm_lead, industry, region, mrr_tier');
   if (user.role === 'csm') filtersQuery = filtersQuery.eq('csm', user.csm_name);
 
-  const [{ data, error }, { data: tierData }] = await Promise.all([
+  const [{ data, error }, { data: tierData }, { data: adminUsers }] = await Promise.all([
     filtersQuery,
     supabase.from('dropdown_config').select('value').eq('field_name', 'mrr_tier').order('sort_order').order('value'),
+    supabase.from('users').select('name').eq('role', 'admin').order('name'),
   ]);
   if (error) return res.status(500).json({ error: error.message });
 
-  const csms       = [...new Set(data.map(a => a.csm).filter(Boolean))].sort();
-  const csmLeads   = [...new Set(data.map(a => a.csm_lead).filter(Boolean))].sort();
+  const csms     = [...new Set(data.map(a => a.csm).filter(Boolean))].sort();
+  const csmLeads = (adminUsers || []).map(u => u.name).filter(Boolean).sort();
   const industries = [...new Set(data.map(a => a.industry).filter(Boolean))].sort();
   const regions    = [...new Set(data.map(a => a.region).filter(Boolean))].sort();
   const tiers      = tierData?.length

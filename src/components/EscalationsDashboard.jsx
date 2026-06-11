@@ -21,7 +21,7 @@ const RAG_BADGE = {
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 const OPS_TEXT   = ['contains','does not contain','is','is not','is empty','is not empty'];
-const OPS_SELECT = ['is','is not','is empty','is not empty'];
+const OPS_SELECT = ['is','is not','is one of','is empty','is not empty'];
 const OPS_DATE   = ['is','before','after','is empty','is not empty'];
 function getOps(type) {
   if (type === 'select') return OPS_SELECT;
@@ -36,6 +36,11 @@ function matchesEscalationCondition(esc, cond, fieldDefs) {
   const raw = esc[field];
   if (operator === 'is empty')     return raw === null || raw === undefined || raw === '';
   if (operator === 'is not empty') return raw !== null && raw !== undefined && raw !== '';
+  if (operator === 'is one of') {
+    const vals = Array.isArray(value) ? value : [];
+    if (vals.length === 0) return true;
+    return vals.some(v => String(raw ?? '').toLowerCase() === v.toLowerCase());
+  }
   if (def.type === 'date') {
     if (!raw || !value) return false;
     const rD = new Date(raw), vD = new Date(value);
@@ -591,18 +596,27 @@ export default function EscalationsDashboard() {
                       {fieldDefs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
                     </select>
                     <select value={cond.operator}
-                      onChange={ev => updateCondition(cond.id, { operator: ev.target.value, value: '' })}
+                      onChange={ev => updateCondition(cond.id, { operator: ev.target.value, value: ev.target.value === 'is one of' ? [] : '' })}
                       className="!w-auto text-sm !py-1.5">
                       {ops.map(op => <option key={op}>{op}</option>)}
                     </select>
                     {needsValue(cond.operator) && (
                       def?.type === 'select' ? (
-                        <select value={cond.value}
-                          onChange={ev => updateCondition(cond.id, { value: ev.target.value })}
-                          className="!w-auto text-sm !py-1.5">
-                          <option value="">Select…</option>
-                          {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
+                        cond.operator === 'is one of' ? (
+                          <MultiSelectDropdown
+                            placeholder="Select values…"
+                            options={def.opts || []}
+                            value={Array.isArray(cond.value) ? cond.value : []}
+                            onChange={v => updateCondition(cond.id, { value: v })}
+                          />
+                        ) : (
+                          <select value={cond.value}
+                            onChange={ev => updateCondition(cond.id, { value: ev.target.value })}
+                            className="!w-auto text-sm !py-1.5">
+                            <option value="">Select…</option>
+                            {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
+                          </select>
+                        )
                       ) : def?.type === 'date' ? (
                         <input type="date" value={cond.value}
                           onChange={ev => updateCondition(cond.id, { value: ev.target.value })}
