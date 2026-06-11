@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 
 function fmt(n) {
   if (!n) return '—';
@@ -15,10 +16,12 @@ const RAG_DOT = {
 };
 
 export default function AccountMappingReport() {
+  const navigate = useNavigate();
   const [accounts, setAccounts] = useState([]);
   const [loading,  setLoading]  = useState(true);
   const [sortField, setSortField] = useState('total_mrr');
   const [sortDir,   setSortDir]   = useState('desc');
+  const [csmModal,  setCsmModal]  = useState(null);
 
   useEffect(() => {
     axios.get('/api/accounts')
@@ -106,8 +109,8 @@ export default function AccountMappingReport() {
         </div>
         <div className="rounded-xl border border-gray-200 bg-white px-4 py-3">
           <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">RAG at Risk</p>
-          <p className="text-2xl font-bold text-red-600 mt-0.5">{totals.amber + totals.red}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{totals.amber} amber · {totals.red} red</p>
+          <p className="text-2xl font-bold text-red-600 mt-0.5">{totals.red}</p>
+          <p className="text-xs text-gray-400 mt-0.5">Red accounts</p>
         </div>
       </div>
 
@@ -132,7 +135,13 @@ export default function AccountMappingReport() {
                 <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">
                   {r.csm}
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums text-gray-700">{r.count}</td>
+                <td className="px-4 py-3 text-right tabular-nums">
+                  <button
+                    type="button"
+                    onClick={() => setCsmModal(r.csm)}
+                    className="text-brand-600 font-medium hover:underline tabular-nums"
+                  >{r.count}</button>
+                </td>
                 <td className="px-4 py-3 text-right tabular-nums font-medium text-gray-800 whitespace-nowrap">
                   {fmt(r.total_mrr)}
                 </td>
@@ -180,6 +189,44 @@ export default function AccountMappingReport() {
           </tfoot>
         </table>
       </div>
+      {csmModal && (() => {
+        const csmAccounts = accounts.filter(a => (a.csm || '(Unassigned)') === csmModal);
+        return (
+          <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4" onClick={() => setCsmModal(null)}>
+            <div className="absolute inset-0 bg-black/30" />
+            <div className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[70vh] flex flex-col overflow-hidden"
+              onClick={e => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900">{csmModal}</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">{csmAccounts.length} account{csmAccounts.length !== 1 ? 's' : ''}</p>
+                </div>
+                <button onClick={() => setCsmModal(null)}
+                  className="p-1.5 rounded-lg hover:bg-gray-100 transition text-gray-400">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+              <div className="overflow-y-auto divide-y divide-gray-50">
+                {csmAccounts.map(a => (
+                  <button key={a.id} type="button"
+                    onClick={() => { setCsmModal(null); navigate(`/accounts/${a.id}`); }}
+                    className="w-full flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition text-left">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium text-gray-800 truncate">{a.account_name}</p>
+                      <p className="text-xs text-gray-400 truncate">{a.industry || '—'} · {fmt(a.mrr)}</p>
+                    </div>
+                    {a.rag_status && (
+                      <span className={`shrink-0 w-2.5 h-2.5 rounded-full ${RAG_DOT[a.rag_status] || 'bg-gray-300'}`} />
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

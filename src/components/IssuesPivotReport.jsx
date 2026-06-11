@@ -25,7 +25,7 @@ export default function IssuesPivotReport() {
   const [loading, setLoading] = useState(true);
   const [csms,    setCsms]    = useState([]);
 
-  const [filterCsm,      setFilterCsm]      = useState('');
+  const [filterCsm,      setFilterCsm]      = useState([]);
   const [filterStatus,   setFilterStatus]   = useState([]);
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo,   setFilterDateTo]   = useState('');
@@ -45,7 +45,7 @@ export default function IssuesPivotReport() {
   }, []);
 
   const filtered = useMemo(() => issues.filter(i => {
-    if (filterCsm                && i.csm    !== filterCsm)              return false;
+    if (filterCsm.length > 0     && !filterCsm.includes(i.csm))          return false;
     if (filterStatus.length > 0  && !filterStatus.includes(i.status))   return false;
     if (filterDateFrom && i.reported_date && i.reported_date < filterDateFrom) return false;
     if (filterDateTo   && i.reported_date && i.reported_date > filterDateTo)   return false;
@@ -86,8 +86,8 @@ export default function IssuesPivotReport() {
     else             { setExpandedTypes(new Set(pivot.map(r => r.type))); }
   };
 
-  const clearFilters = () => { setFilterCsm(''); setFilterStatus([]); setFilterDateFrom(''); setFilterDateTo(''); };
-  const hasFilters   = !!(filterCsm || filterStatus.length || filterDateFrom || filterDateTo);
+  const clearFilters = () => { setFilterCsm([]); setFilterStatus([]); setFilterDateFrom(''); setFilterDateTo(''); };
+  const hasFilters   = !!(filterCsm.length || filterStatus.length || filterDateFrom || filterDateTo);
 
   return (
     <div className="space-y-4">
@@ -96,10 +96,12 @@ export default function IssuesPivotReport() {
         <div className="flex flex-wrap gap-3 items-end">
           <div className="flex-1 min-w-[150px]">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
-            <select value={filterCsm} onChange={e => setFilterCsm(e.target.value)} className="!py-1.5 text-sm">
-              <option value="">All CSMs</option>
-              {csms.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <MultiSelectDropdown
+              placeholder="All CSMs"
+              options={csms}
+              value={filterCsm}
+              onChange={setFilterCsm}
+            />
           </div>
           <div className="flex-1 min-w-[150px]">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>

@@ -95,7 +95,7 @@ export default function IssuesDashboard() {
   const [editForm,     setEditForm]     = useState({});
   const [editSaving,   setEditSaving]   = useState(false);
 
-  const [filters,      setFilters]      = useState({ status: [], priority: '', issue_type: '', owner_team: '', csm: '', month: '', account_name: '' });
+  const [filters,      setFilters]      = useState({ status: [], priority: '', issue_type: '', owner_team: '', csm: [], month: '', account_name: '' });
   const [search,       setSearch]       = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [conditions,   setConditions]   = useState([]);
@@ -261,11 +261,11 @@ export default function IssuesDashboard() {
 
   const clearAll = () => {
     setSearch('');
-    setFilters({ status: [], priority: '', issue_type: '', owner_team: '', csm: '', month: '', account_name: '' });
+    setFilters({ status: [], priority: '', issue_type: '', owner_team: '', csm: [], month: '', account_name: '' });
     setConditions([]);
     setPage(1);
   };
-  const hasFilters = !!(search || filters.status.length || filters.priority || filters.issue_type || filters.owner_team || filters.csm || filters.month || filters.account_name || conditions.length > 0);
+  const hasFilters = !!(search || filters.status.length || filters.priority || filters.issue_type || filters.owner_team || filters.csm.length || filters.month || filters.account_name || conditions.length > 0);
   const activeConditions = conditions.filter(c => c.field && c.operator);
 
   const displayed = issues.filter(issue => {
@@ -280,7 +280,7 @@ export default function IssuesDashboard() {
     if (filters.priority   && issue.priority   !== filters.priority)   return false;
     if (filters.issue_type && issue.issue_type !== filters.issue_type) return false;
     if (filters.owner_team && issue.owner_team !== filters.owner_team) return false;
-    if (filters.csm        && issue.csm        !== filters.csm)        return false;
+    if (filters.csm.length > 0 && !filters.csm.includes(issue.csm))   return false;
     if (filters.month && issue.reported_date) {
       const m = MONTHS[new Date(issue.reported_date + 'T00:00:00').getMonth()];
       if (m !== filters.month) return false;
@@ -501,10 +501,12 @@ export default function IssuesDashboard() {
             {allOwnerTeams.map(o => <option key={o}>{o}</option>)}
           </select>
           {user?.role === 'admin' && (
-            <select value={filters.csm} onChange={e => setFilter('csm', e.target.value)} className="!w-auto text-sm !py-1.5">
-              <option value="">All CSMs</option>
-              {allCsms.map(c => <option key={c}>{c}</option>)}
-            </select>
+            <MultiSelectDropdown
+              placeholder="All CSMs"
+              options={allCsms}
+              value={filters.csm}
+              onChange={v => setFilter('csm', v)}
+            />
           )}
           <select value={filters.month} onChange={e => setFilter('month', e.target.value)} className="!w-auto text-sm !py-1.5">
             <option value="">All Months</option>

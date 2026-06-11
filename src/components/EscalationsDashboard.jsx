@@ -73,7 +73,7 @@ export default function EscalationsDashboard() {
   const navigate = useNavigate();
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [filters,     setFilters]     = useState({ status: [], csm: '', ownership: '', issue_type: '', month: '' });
+  const [filters,     setFilters]     = useState({ status: [], csm: [], ownership: '', issue_type: '', month: '' });
   const [search,      setSearch]      = useState('');
   const [advancedOpen,setAdvancedOpen]= useState(false);
   const [conditions,  setConditions]  = useState([]);
@@ -269,11 +269,11 @@ export default function EscalationsDashboard() {
 
   const clearAll = () => {
     setSearch('');
-    setFilters({ status: [], csm: '', ownership: '', issue_type: '', month: '' });
+    setFilters({ status: [], csm: [], ownership: '', issue_type: '', month: '' });
     setConditions([]);
     setPage(1);
   };
-  const hasFilters = !!(search || filters.status.length || filters.csm || filters.ownership || filters.issue_type || filters.month || conditions.length > 0);
+  const hasFilters = !!(search || filters.status.length || filters.csm.length || filters.ownership || filters.issue_type || filters.month || conditions.length > 0);
   const activeConditions = conditions.filter(c => c.field && c.operator);
   // paginated is derived after displayed is computed below
 
@@ -284,7 +284,7 @@ export default function EscalationsDashboard() {
       if (!blob.includes(q)) return false;
     }
     if (filters.status.length > 0 && !filters.status.includes(e.status)) return false;
-    if (filters.csm        && e.csm        !== filters.csm)        return false;
+    if (filters.csm.length > 0 && !filters.csm.includes(e.csm))   return false;
     if (filters.ownership  && e.ownership  !== filters.ownership)  return false;
     if (filters.issue_type && e.issue_type !== filters.issue_type) return false;
     if (filters.month      && e.month      !== filters.month)      return false;
@@ -519,10 +519,12 @@ export default function EscalationsDashboard() {
             onChange={v => setFilter('status', v)}
           />
           {user?.role === 'admin' && (
-            <select value={filters.csm} onChange={e => setFilter('csm', e.target.value)} className="!w-auto text-sm !py-1.5">
-              <option value="">All CSMs</option>
-              {allCsms.map(c => <option key={c}>{c}</option>)}
-            </select>
+            <MultiSelectDropdown
+              placeholder="All CSMs"
+              options={allCsms}
+              value={filters.csm}
+              onChange={v => setFilter('csm', v)}
+            />
           )}
           <select value={filters.ownership} onChange={e => setFilter('ownership', e.target.value)} className="!w-auto text-sm !py-1.5">
             <option value="">All Ownerships</option>
