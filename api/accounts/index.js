@@ -16,6 +16,41 @@ export default async function handler(req, res) {
     csmName = u?.csm_name ?? null;
   }
 
+  if (req.method === 'GET' && req.query.stats) {
+    let statsQuery = supabase.from('accounts').select('id, rag_status, industry, csm, mrr, churn_status, churn_risk, renewal_status');
+    if (user.role === 'csm') {
+      if (!csmName) return res.json({ total: { count: 0, total_mrr: 0 }, byRag: [], byIndustry: [], byChurn: [], byCsm: [], renewalPending: { count: 0 }, churnRisk: { count: 0 } });
+      statsQuery = statsQuery.eq('csm', csmName);
+    }
+    const { data: accts, error: sErr } = await statsQuery;
+    if (sErr) return res.status(500).json({ error: sErr.message });
+
+    const total = { count: accts.length, total_mrr: accts.reduce((s, a) => s + (a.mrr || 0), 0) };
+    const ragCounts = {};
+    accts.forEach(a => { if (a.rag_status) ragCounts[a.rag_status] = (ragCounts[a.rag_status] || 0) + 1; });
+    const byRag = Object.entries(ragCounts).map(([rag_status, count]) => ({ rag_status, count }));
+    const industryMap = {};
+    accts.forEach(a => {
+      if (!a.industry) return;
+      if (!industryMap[a.industry]) industryMap[a.industry] = { count: 0, mrr: 0 };
+      industryMap[a.industry].count++; industryMap[a.industry].mrr += (a.mrr || 0);
+    });
+    const byIndustry = Object.entries(industryMap).map(([industry, v]) => ({ industry, ...v })).sort((a, b) => b.mrr - a.mrr);
+    const csmMap = {};
+    accts.forEach(a => {
+      if (!a.csm) return;
+      if (!csmMap[a.csm]) csmMap[a.csm] = { count: 0, mrr: 0 };
+      csmMap[a.csm].count++; csmMap[a.csm].mrr += (a.mrr || 0);
+    });
+    const byCsm = Object.entries(csmMap).map(([csm, v]) => ({ csm, ...v })).sort((a, b) => b.mrr - a.mrr);
+    const churnMap = {};
+    accts.forEach(a => { if (a.churn_status) churnMap[a.churn_status] = (churnMap[a.churn_status] || 0) + 1; });
+    const byChurn = Object.entries(churnMap).map(([churn_status, count]) => ({ churn_status, count }));
+    const renewalPending = { count: accts.filter(a => a.renewal_status === 'Renewal Pending').length };
+    const churnRisk = { count: accts.filter(a => a.churn_risk === 'Yes' || ['Churn Activated', 'Churn Predicted'].includes(a.churn_status)).length };
+    return res.json({ total, byRag, byIndustry, byChurn, byCsm, renewalPending, churnRisk });
+  }
+
   if (req.method === 'GET') {
     const { csm, industry, region, rag_status, churn_status, mrr_tier, search } = req.query;
 

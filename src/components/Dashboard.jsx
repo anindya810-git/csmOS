@@ -48,7 +48,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      axios.get('/api/accounts/stats'),
+      axios.get('/api/accounts?stats=1'),
       axios.get('/api/accounts'),
       axios.get('/api/escalations'),
       axios.get('/api/issues'),
