@@ -23,6 +23,15 @@ export default async function handler(req, res) {
     if (csm_lead !== undefined) updates.csm_lead = csm_lead || null;
     if (password) updates.password_hash = bcrypt.hashSync(password, 10);
 
+    // Accounts/escalations/issues store the CSM as plain text — when the
+    // display name changes, rename it everywhere or the user loses access
+    // to their data and reports keep showing the old name.
+    let oldCsmName = null;
+    if (csm_name !== undefined) {
+      const { data: existing } = await supabase.from('users').select('csm_name').eq('id', id).single();
+      oldCsmName = existing?.csm_name || null;
+    }
+
     const { data, error } = await supabase
       .from('users')
       .update(updates)
@@ -30,6 +39,18 @@ export default async function handler(req, res) {
       .select('id, name, email, role, csm_name, csm_lead')
       .single();
     if (error) return res.status(500).json({ error: error.message });
+
+    const newCsmName = csm_name || null;
+    if (oldCsmName && newCsmName && oldCsmName !== newCsmName) {
+      await Promise.all([
+        supabase.from('accounts').update({ csm: newCsmName }).eq('csm', oldCsmName),
+        supabase.from('accounts').update({ csm_lead: newCsmName }).eq('csm_lead', oldCsmName),
+        supabase.from('escalations').update({ csm: newCsmName }).eq('csm', oldCsmName),
+        supabase.from('issues').update({ csm: newCsmName }).eq('csm', oldCsmName),
+        supabase.from('issues').update({ csm_lead: newCsmName }).eq('csm_lead', oldCsmName),
+      ]);
+    }
+
     return res.json(data);
   }
 

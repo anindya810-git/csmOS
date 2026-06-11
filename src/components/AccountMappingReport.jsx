@@ -22,15 +22,26 @@ export default function AccountMappingReport() {
   const [sortField, setSortField] = useState('total_mrr');
   const [sortDir,   setSortDir]   = useState('desc');
   const [csmModal,  setCsmModal]  = useState(null);
+  const [csmUsers,  setCsmUsers]  = useState([]);
 
   useEffect(() => {
     axios.get('/api/accounts')
       .then(r => setAccounts(r.data || []))
       .finally(() => setLoading(false));
+    // Canonical CSM list so users with zero mapped accounts still appear.
+    // Admin-only endpoint — CSM-role viewers fall back to account-derived rows.
+    axios.get('/api/admin/users')
+      .then(r => setCsmUsers((r.data || []).filter(u => u.role === 'csm')))
+      .catch(() => setCsmUsers([]));
   }, []);
 
   const rows = useMemo(() => {
     const map = {};
+    for (const u of csmUsers) {
+      const csm = u.csm_name || u.name;
+      if (!csm) continue;
+      map[csm] = { csm, count: 0, total_mrr: 0, green: 0, amber: 0, red: 0, unset: 0 };
+    }
     for (const a of accounts) {
       const csm = a.csm || '(Unassigned)';
       if (!map[csm]) map[csm] = { csm, count: 0, total_mrr: 0, green: 0, amber: 0, red: 0, unset: 0 };
@@ -49,7 +60,7 @@ export default function AccountMappingReport() {
       return va < vb ? 1 : va > vb ? -1 : 0;
     });
     return list;
-  }, [accounts, sortField, sortDir]);
+  }, [accounts, csmUsers, sortField, sortDir]);
 
   const totals = useMemo(() => ({
     count:     accounts.length,
@@ -60,7 +71,7 @@ export default function AccountMappingReport() {
     unset:     accounts.filter(a => !a.rag_status).length,
   }), [accounts]);
 
-  const maxMrr = rows.length ? rows[0].total_mrr || 1 : 1;
+  const maxMrr = Math.max(...rows.map(r => r.total_mrr), 1);
 
   const handleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
@@ -136,11 +147,15 @@ export default function AccountMappingReport() {
                   {r.csm}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums">
-                  <button
-                    type="button"
-                    onClick={() => setCsmModal(r.csm)}
-                    className="text-brand-600 font-medium hover:underline tabular-nums"
-                  >{r.count}</button>
+                  {r.count > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setCsmModal(r.csm)}
+                      className="text-brand-600 font-medium hover:underline tabular-nums"
+                    >{r.count}</button>
+                  ) : (
+                    <span className="text-gray-300">0</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-right tabular-nums font-medium text-gray-800 whitespace-nowrap">
                   {fmt(r.total_mrr)}
