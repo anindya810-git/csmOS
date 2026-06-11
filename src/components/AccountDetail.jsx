@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
@@ -83,6 +84,7 @@ function PocCard({ n, account }) {
 export default function AccountDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [account,     setAccount]     = useState(null);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
@@ -104,6 +106,15 @@ export default function AccountDetail() {
   const [issueForm,     setIssueForm]     = useState({});
   const [issueSaving,   setIssueSaving]   = useState(false);
   const [issueError,    setIssueError]    = useState(null);
+
+  // Tasks
+  const [tasks,         setTasks]         = useState([]);
+  const [taskExpanded,  setTaskExpanded]  = useState(null);
+  const [showAllTasks,  setShowAllTasks]  = useState(false);
+  const [showAddTask,   setShowAddTask]   = useState(false);
+  const [taskForm,      setTaskForm]      = useState({});
+  const [taskSaving,    setTaskSaving]    = useState(false);
+  const [taskError,     setTaskError]     = useState(null);
 
   // Dropdown options
   const [ddConfig,      setDdConfig]      = useState({});
@@ -128,6 +139,9 @@ export default function AccountDetail() {
       .catch(() => {});
     axios.get('/api/dropdown-config').then(r => setDdConfig(r.data || {})).catch(() => {});
     axios.get('/api/accounts/filters').then(r => setCsms(r.data.csms || [])).catch(() => {});
+    axios.get(`/api/tasks?account_id=${id}`)
+      .then(r => setTasks(r.data || []))
+      .catch(() => {});
   }, [id]);
 
   function openAddEscal() {
@@ -185,6 +199,39 @@ export default function AccountDetail() {
     }
   }
 
+  function openAddTask() {
+    const now = new Date();
+    const pad = n => String(n).padStart(2, '0');
+    const dt = `${now.getFullYear()}-${pad(now.getMonth()+1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+    setTaskForm({ task_subject: '', nature_of_task: '', task_description: '', due_date: dt, assigned_to: account?.csm || '' });
+    setTaskError(null);
+    setShowAddTask(true);
+  }
+
+  async function handleAddTask(e) {
+    e.preventDefault();
+    if (!taskForm.task_subject?.trim()) { setTaskError('Task subject is required'); return; }
+    if (!taskForm.due_date) { setTaskError('Due date is required'); return; }
+    setTaskSaving(true); setTaskError(null);
+    try {
+      const { data } = await axios.post('/api/tasks', {
+        task_subject: taskForm.task_subject.trim(),
+        task_description: taskForm.task_description || null,
+        nature_of_task: taskForm.nature_of_task || null,
+        due_date: new Date(taskForm.due_date).toISOString(),
+        account_id: Number(id),
+        account_name: account?.account_name,
+        assigned_to: taskForm.assigned_to || null,
+      });
+      setTasks(prev => [data, ...prev]);
+      setShowAddTask(false);
+    } catch (err) {
+      setTaskError(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setTaskSaving(false);
+    }
+  }
+
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>;
   if (error)   return <div className="max-w-lg mx-auto mt-16 p-6 bg-red-50 rounded-xl border border-red-200 text-center space-y-3"><p className="text-red-700">{error}</p><button onClick={() => navigate('/accounts')} className="text-sm text-brand-600 hover:underline">← Back</button></div>;
   if (!account) return null;
@@ -211,6 +258,7 @@ export default function AccountDetail() {
   const openIssues   = issues.filter(i => i.status === 'Open').length;
   const activeIssues = issues.filter(i => i.status !== 'Resolved').length;
   const viewIssues   = showAllIssues ? issues : issues.slice(0, 3);
+  const viewTasks    = showAllTasks ? tasks : tasks.slice(0, 3);
   const topThemes    = Object.entries(
     issues.reduce((acc, i) => { if (i.issue_type) { acc[i.issue_type] = (acc[i.issue_type] || 0) + 1; } return acc; }, {})
   ).sort((a, b) => b[1] - a[1]).slice(0, 5);
@@ -446,6 +494,79 @@ export default function AccountDetail() {
               </>
             ) : (
               <p className="text-sm text-gray-400 italic">No issues recorded.</p>
+            )}
+          </div>
+
+          {/* Tasks */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
+              <h3 className="text-sm font-semibold text-gray-700">
+                Tasks
+                {tasks.length > 0 && <span className="ml-2 text-xs font-normal text-gray-400">{tasks.length} total</span>}
+              </h3>
+              <div className="flex items-center gap-2">
+                {tasks.length === 0 && <span className="text-xs text-gray-400">None recorded</span>}
+                <button onClick={openAddTask} className="text-xs text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-0.5 transition">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add
+                </button>
+                <Link to="/tasks" className="text-xs text-gray-400 hover:underline font-medium">All →</Link>
+              </div>
+            </div>
+            {tasks.length > 0 ? (
+              <>
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {(['Open','Overdue','Completed']).map(s => {
+                    const cnt = tasks.filter(t => t.derived_status === s).length;
+                    if (!cnt) return null;
+                    const color = s === 'Open' ? 'bg-blue-100 text-blue-700' : s === 'Overdue' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700';
+                    return <span key={s} className={`text-xs font-medium px-2 py-0.5 rounded-full ${color}`}>{cnt} {s}</span>;
+                  })}
+                </div>
+                <div className="space-y-2">
+                  {viewTasks.map(task => (
+                    <div key={task.id} className={`rounded-lg border overflow-hidden ${task.derived_status === 'Overdue' ? 'border-red-100' : 'border-gray-100'}`}>
+                      <button
+                        type="button"
+                        className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-gray-50 transition text-left"
+                        onClick={() => setTaskExpanded(taskExpanded === task.id ? null : task.id)}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className={`shrink-0 inline-flex text-xs font-medium px-2 py-0.5 rounded-full ${
+                            task.derived_status === 'Open' ? 'bg-blue-100 text-blue-700'
+                            : task.derived_status === 'Overdue' ? 'bg-red-100 text-red-700'
+                            : 'bg-green-100 text-green-700'
+                          }`}>{task.derived_status}</span>
+                          {task.nature_of_task && <span className="shrink-0 text-xs text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded">{task.nature_of_task}</span>}
+                          <span className="text-sm text-gray-700 truncate">{task.task_subject}</span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <span className="text-xs text-gray-400 whitespace-nowrap">{fmtDate(task.due_date)}</span>
+                          <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${taskExpanded === task.id ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                        </div>
+                      </button>
+                      {taskExpanded === task.id && (
+                        <div className="px-3 pb-3 pt-1 bg-gray-50 border-t border-gray-100 space-y-2 text-sm">
+                          {task.task_description && <p className="text-gray-700 whitespace-pre-wrap">{task.task_description}</p>}
+                          <div className="flex flex-wrap gap-3 text-xs text-gray-500 pt-1">
+                            {task.assigned_to && <span><span className="font-medium">Assigned to:</span> {task.assigned_to}</span>}
+                            {task.assigned_by && <span><span className="font-medium">Assigned by:</span> {task.assigned_by}</span>}
+                            {task.due_date && <span><span className="font-medium">Due:</span> {fmtDate(task.due_date)}</span>}
+                            {task.completed_at && <span><span className="font-medium">Completed:</span> {fmtDate(task.completed_at)}</span>}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                {tasks.length > 3 && (
+                  <button onClick={() => setShowAllTasks(s => !s)} className="mt-3 text-xs text-brand-600 hover:underline font-medium">
+                    {showAllTasks ? 'Show less' : `Show all ${tasks.length} tasks`}
+                  </button>
+                )}
+              </>
+            ) : (
+              <p className="text-sm text-gray-400 italic">No tasks recorded.</p>
             )}
           </div>
 
@@ -729,6 +850,71 @@ export default function AccountDetail() {
                 <button type="submit" disabled={issueSaving}
                   className="px-4 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition disabled:opacity-50">
                   {issueSaving ? 'Saving…' : 'Add Issue'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Task Modal ───────────────────────────────────────────── */}
+      {showAddTask && (
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 pt-12 overflow-y-auto" onClick={() => setShowAddTask(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Add Task</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{a.account_name}</p>
+              </div>
+              <button onClick={() => setShowAddTask(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <form onSubmit={handleAddTask} className="p-5 space-y-3">
+              {taskError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{taskError}</p>}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Task Subject *</label>
+                <input value={taskForm.task_subject}
+                  onChange={e => setTaskForm(f => ({ ...f, task_subject: e.target.value }))}
+                  placeholder="What needs to be done?" required />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {[...new Set((ddConfig.nature_of_task || []).map(o => o.value))].length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Nature of Task</label>
+                    <select value={taskForm.nature_of_task} onChange={e => setTaskForm(f => ({ ...f, nature_of_task: e.target.value }))}>
+                      <option value="">—</option>
+                      {[...new Set((ddConfig.nature_of_task || []).map(o => o.value))].map(v => <option key={v}>{v}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Due Date &amp; Time *</label>
+                  <input type="datetime-local" value={taskForm.due_date}
+                    onChange={e => setTaskForm(f => ({ ...f, due_date: e.target.value }))} required />
+                </div>
+                {user?.role === 'admin' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Assign To</label>
+                    <select value={taskForm.assigned_to} onChange={e => setTaskForm(f => ({ ...f, assigned_to: e.target.value }))}>
+                      <option value="">—</option>
+                      {csms.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Description</label>
+                <textarea rows={2} value={taskForm.task_description}
+                  onChange={e => setTaskForm(f => ({ ...f, task_description: e.target.value }))}
+                  placeholder="Optional details…" className="resize-none" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowAddTask(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+                <button type="submit" disabled={taskSaving}
+                  className="px-4 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition disabled:opacity-50">
+                  {taskSaving ? 'Saving…' : 'Add Task'}
                 </button>
               </div>
             </form>

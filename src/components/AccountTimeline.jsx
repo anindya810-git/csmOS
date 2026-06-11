@@ -32,19 +32,22 @@ export default function AccountTimeline() {
   const [account,     setAccount]     = useState(null);
   const [escalations, setEscalations] = useState([]);
   const [issues,      setIssues]      = useState([]);
+  const [tasks,       setTasks]       = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [expanded,    setExpanded]    = useState(null);
-  const [filter,      setFilter]      = useState('all'); // all | escalation | issue
+  const [filter,      setFilter]      = useState('all'); // all | escalation | issue | task
 
   useEffect(() => {
     Promise.all([
       axios.get(`/api/accounts/${id}`),
       axios.get(`/api/escalations?account_id=${id}`),
       axios.get(`/api/issues?account_id=${id}`),
-    ]).then(([acc, esc, iss]) => {
+      axios.get(`/api/tasks?account_id=${id}`),
+    ]).then(([acc, esc, iss, tsk]) => {
       setAccount(acc.data);
       setEscalations(esc.data || []);
       setIssues(iss.data || []);
+      setTasks(tsk.data || []);
     }).catch(() => {}).finally(() => setLoading(false));
   }, [id]);
 
@@ -62,6 +65,10 @@ export default function AccountTimeline() {
         _sortDate: new Date(i.reported_date || i.created_at || 0),
         _dateStr:  i.reported_date,
       })),
+      ...tasks.map(t => {
+        const dateStr = t.derived_status === 'Completed' ? (t.completed_at || t.due_date) : t.due_date;
+        return { ...t, _type: 'task', _sortDate: new Date(dateStr || 0), _dateStr: dateStr };
+      }),
     ]
       .filter(ev => filter === 'all' || ev._type === filter)
       .sort((a, b) => b._sortDate - a._sortDate);
@@ -74,9 +81,9 @@ export default function AccountTimeline() {
       result.push({ kind: 'event', data: item });
     }
     return result;
-  }, [escalations, issues, filter]);
+  }, [escalations, issues, tasks, filter]);
 
-  const total = escalations.length + issues.length;
+  const total = escalations.length + issues.length + tasks.length;
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -108,6 +115,7 @@ export default function AccountTimeline() {
           { key: 'all',        label: `All (${total})` },
           { key: 'escalation', label: `Escalations (${escalations.length})` },
           { key: 'issue',      label: `Issues (${issues.length})` },
+          { key: 'task',       label: `Tasks (${tasks.length})` },
         ].map(f => (
           <button
             key={f.key}
@@ -146,15 +154,23 @@ export default function AccountTimeline() {
                 );
               }
 
-              const ev   = row.data;
-              const isEsc = ev._type === 'escalation';
-              const key   = `${ev._type}-${ev.id}`;
-              const open  = expanded === key;
+              const ev     = row.data;
+              const isEsc  = ev._type === 'escalation';
+              const isTask = ev._type === 'task';
+              const key    = `${ev._type}-${ev.id}`;
+              const open   = expanded === key;
+
+              const dotColor = isEsc ? 'bg-red-500'
+                : isTask
+                  ? ev.derived_status === 'Completed' ? 'bg-green-500'
+                  : ev.derived_status === 'Overdue'   ? 'bg-amber-500'
+                  : 'bg-teal-500'
+                : 'bg-purple-500';
 
               return (
                 <div key={key} className="relative pl-14 pb-2">
                   {/* Timeline dot */}
-                  <div className={`absolute left-[11px] top-4 w-[9px] h-[9px] rounded-full border-2 border-white z-10 shadow-sm ${isEsc ? 'bg-red-500' : 'bg-purple-500'}`} />
+                  <div className={`absolute left-[11px] top-4 w-[9px] h-[9px] rounded-full border-2 border-white z-10 shadow-sm ${dotColor}`} />
 
                   <div className="card !p-0 overflow-hidden">
                     <button
@@ -164,13 +180,27 @@ export default function AccountTimeline() {
                     >
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-1.5 mb-1">
-                          <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${isEsc ? 'bg-red-100 text-red-700' : 'bg-purple-100 text-purple-700'}`}>
-                            {isEsc ? 'Escalation' : 'Issue'}
+                          <span className={`text-[10px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded ${
+                            isEsc  ? 'bg-red-100 text-red-700'
+                            : isTask ? 'bg-teal-100 text-teal-700'
+                            : 'bg-purple-100 text-purple-700'
+                          }`}>
+                            {isEsc ? 'Escalation' : isTask ? 'Task' : 'Issue'}
                           </span>
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[ev.status] || 'bg-gray-100 text-gray-700'}`}>
-                            {ev.status || 'Open'}
-                          </span>
-                          {!isEsc && ev.priority && (
+                          {isTask ? (
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
+                              ev.derived_status === 'Completed' ? 'bg-green-100 text-green-800'
+                              : ev.derived_status === 'Overdue' ? 'bg-red-100 text-red-800'
+                              : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {ev.derived_status}
+                            </span>
+                          ) : (
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[ev.status] || 'bg-gray-100 text-gray-700'}`}>
+                              {ev.status || 'Open'}
+                            </span>
+                          )}
+                          {!isEsc && !isTask && ev.priority && (
                             <span className={`text-xs px-1.5 py-0.5 rounded border font-medium ${
                               ev.priority === 'High' || ev.priority === 'P0' || ev.priority === 'P1'
                                 ? 'bg-red-50 text-red-600 border-red-200'
@@ -181,15 +211,19 @@ export default function AccountTimeline() {
                               {ev.priority}
                             </span>
                           )}
+                          {isTask && ev.nature_of_task && (
+                            <span className="text-xs px-1.5 py-0.5 rounded bg-gray-100 text-gray-600">{ev.nature_of_task}</span>
+                          )}
                         </div>
-                        <p className="text-sm text-gray-800 line-clamp-2">{ev.description}</p>
+                        <p className="text-sm text-gray-800 line-clamp-2">{isTask ? ev.task_subject : ev.description}</p>
                         <div className="flex flex-wrap gap-3 mt-1 text-xs text-gray-400">
                           <span>{fmtDate(ev._dateStr)}</span>
-                          {ev.csm && <span>CSM: {ev.csm}</span>}
+                          {!isTask && ev.csm && <span>CSM: {ev.csm}</span>}
                           {isEsc && ev.ownership && <span>Owner: {ev.ownership}</span>}
-                          {!isEsc && ev.issue_type && (
+                          {!isEsc && !isTask && ev.issue_type && (
                             <span>{ev.issue_type}{ev.issue_sub_type ? ` › ${ev.issue_sub_type}` : ''}</span>
                           )}
+                          {isTask && ev.assigned_to && <span>Assigned: {ev.assigned_to}</span>}
                         </div>
                       </div>
                       <svg className={`w-4 h-4 text-gray-300 shrink-0 mt-1 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -199,36 +233,48 @@ export default function AccountTimeline() {
 
                     {open && (
                       <div className="px-4 pb-4 pt-2 bg-gray-50 border-t border-gray-100 text-sm space-y-2.5">
-                        <p className="text-gray-700 whitespace-pre-wrap">{ev.description}</p>
-
-                        {isEsc && ev.action_taken && (
-                          <div>
-                            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Action Taken</p>
-                            <p className="text-gray-700 whitespace-pre-wrap">{ev.action_taken}</p>
-                          </div>
+                        {isTask ? (
+                          <>
+                            {ev.task_description && <p className="text-gray-700 whitespace-pre-wrap">{ev.task_description}</p>}
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 pt-0.5">
+                              {ev.assigned_to && <span><span className="font-medium text-gray-600">Assigned to:</span> {ev.assigned_to}</span>}
+                              {ev.assigned_by && <span><span className="font-medium text-gray-600">Assigned by:</span> {ev.assigned_by}</span>}
+                              {ev.due_date && <span><span className="font-medium text-gray-600">Due:</span> {fmtDate(ev.due_date)}</span>}
+                              {ev.completed_at && <span><span className="font-medium text-gray-600">Completed:</span> {fmtDate(ev.completed_at)}</span>}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <p className="text-gray-700 whitespace-pre-wrap">{ev.description}</p>
+                            {isEsc && ev.action_taken && (
+                              <div>
+                                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Action Taken</p>
+                                <p className="text-gray-700 whitespace-pre-wrap">{ev.action_taken}</p>
+                              </div>
+                            )}
+                            {!isEsc && ev.next_steps && (
+                              <div>
+                                <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Next Steps</p>
+                                <p className="text-gray-700 whitespace-pre-wrap">{ev.next_steps}</p>
+                              </div>
+                            )}
+                            <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 pt-0.5">
+                              {isEsc && ev.escalated_by && <span><span className="font-medium text-gray-600">Escalated by:</span> {ev.escalated_by}</span>}
+                              {isEsc && ev.eta && <span><span className="font-medium text-gray-600">ETA:</span> {fmtDate(ev.eta)}</span>}
+                              {isEsc && ev.ps_leader && <span><span className="font-medium text-gray-600">PS Leader:</span> {ev.ps_leader}</span>}
+                              {isEsc && ev.trigger_reason && <span><span className="font-medium text-gray-600">Trigger:</span> {ev.trigger_reason}</span>}
+                              {isEsc && ev.source_of_escalation && <span><span className="font-medium text-gray-600">Source:</span> {ev.source_of_escalation}</span>}
+                              {!isEsc && ev.owner_team && <span><span className="font-medium text-gray-600">Owner Team:</span> {ev.owner_team}</span>}
+                              {!isEsc && ev.closure_date && <span><span className="font-medium text-gray-600">Closed:</span> {fmtDate(ev.closure_date)}</span>}
+                              {!isEsc && (ev.support_ticket || ev.dev_ticket) && (
+                                <span className="flex gap-2">
+                                  {ev.support_ticket && <span className="font-mono text-blue-600">Support #{ev.support_ticket}</span>}
+                                  {ev.dev_ticket && <span className="font-mono text-purple-600">Dev #{ev.dev_ticket}</span>}
+                                </span>
+                              )}
+                            </div>
+                          </>
                         )}
-                        {!isEsc && ev.next_steps && (
-                          <div>
-                            <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-0.5">Next Steps</p>
-                            <p className="text-gray-700 whitespace-pre-wrap">{ev.next_steps}</p>
-                          </div>
-                        )}
-
-                        <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500 pt-0.5">
-                          {isEsc && ev.escalated_by && <span><span className="font-medium text-gray-600">Escalated by:</span> {ev.escalated_by}</span>}
-                          {isEsc && ev.eta && <span><span className="font-medium text-gray-600">ETA:</span> {fmtDate(ev.eta)}</span>}
-                          {isEsc && ev.ps_leader && <span><span className="font-medium text-gray-600">PS Leader:</span> {ev.ps_leader}</span>}
-                          {isEsc && ev.trigger_reason && <span><span className="font-medium text-gray-600">Trigger:</span> {ev.trigger_reason}</span>}
-                          {isEsc && ev.source_of_escalation && <span><span className="font-medium text-gray-600">Source:</span> {ev.source_of_escalation}</span>}
-                          {!isEsc && ev.owner_team && <span><span className="font-medium text-gray-600">Owner Team:</span> {ev.owner_team}</span>}
-                          {!isEsc && ev.closure_date && <span><span className="font-medium text-gray-600">Closed:</span> {fmtDate(ev.closure_date)}</span>}
-                          {!isEsc && (ev.support_ticket || ev.dev_ticket) && (
-                            <span className="flex gap-2">
-                              {ev.support_ticket && <span className="font-mono text-blue-600">Support #{ev.support_ticket}</span>}
-                              {ev.dev_ticket && <span className="font-mono text-purple-600">Dev #{ev.dev_ticket}</span>}
-                            </span>
-                          )}
-                        </div>
                       </div>
                     )}
                   </div>

@@ -43,6 +43,7 @@ export default function Dashboard() {
   const [accounts,    setAccounts]    = useState([]);
   const [escalations, setEscalations] = useState([]);
   const [issues,      setIssues]      = useState([]);
+  const [tasks,       setTasks]       = useState([]);
   const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
@@ -51,17 +52,31 @@ export default function Dashboard() {
       axios.get('/api/accounts'),
       axios.get('/api/escalations'),
       axios.get('/api/issues'),
-    ]).then(([st, acc, esc, iss]) => {
+      axios.get('/api/tasks'),
+    ]).then(([st, acc, esc, iss, tsk]) => {
       setStats(st.data);
       setAccounts(acc.data || []);
       setEscalations(esc.data || []);
       setIssues(iss.data || []);
+      setTasks(tsk.data || []);
     }).finally(() => setLoading(false));
   }, []);
 
   // ---- Derived metrics ----
   const activeEscalations = useMemo(() => escalations.filter(e => isActive(e.status)), [escalations]);
   const activeIssues      = useMemo(() => issues.filter(i => isActive(i.status)), [issues]);
+
+  const openTasks    = useMemo(() => tasks.filter(t => t.derived_status === 'Open').length, [tasks]);
+  const overdueTasks = useMemo(() => tasks.filter(t => t.derived_status === 'Overdue').length, [tasks]);
+  const dueTodayTasks = useMemo(() => {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    return tasks.filter(t => {
+      if (t.derived_status === 'Completed') return false;
+      const d = new Date(t.due_date);
+      return !isNaN(d) && d >= today && d < tomorrow;
+    }).length;
+  }, [tasks]);
 
   const atRiskMrr = useMemo(() =>
     accounts.filter(a => a.rag_status === 'Red' || a.rag_status === 'Amber')
@@ -108,21 +123,28 @@ export default function Dashboard() {
     });
   }, [issues, escalations]);
 
-  // CSM workload: accounts, MRR, active escalations, active issues
+  // CSM workload: accounts, MRR, active escalations, active issues, open tasks
   const csmWorkload = useMemo(() => {
     const map = {};
     const get = (csm) => {
       const k = csm || '(Unassigned)';
-      if (!map[k]) map[k] = { csm: k, accounts: 0, mrr: 0, esc: 0, iss: 0 };
+      if (!map[k]) map[k] = { csm: k, accounts: 0, mrr: 0, esc: 0, iss: 0, tasks: 0 };
       return map[k];
     };
     for (const a of accounts) { const r = get(a.csm); r.accounts++; r.mrr += a.mrr || 0; }
     for (const e of activeEscalations) get(e.csm).esc++;
     for (const i of activeIssues)      get(i.csm).iss++;
+    for (const t of tasks) {
+      if (t.derived_status !== 'Completed') {
+        const k = t.assigned_to || '(Unassigned)';
+        if (!map[k]) map[k] = { csm: k, accounts: 0, mrr: 0, esc: 0, iss: 0, tasks: 0 };
+        map[k].tasks++;
+      }
+    }
     return Object.values(map)
-      .filter(r => r.accounts > 0 || r.esc > 0 || r.iss > 0)
+      .filter(r => r.accounts > 0 || r.esc > 0 || r.iss > 0 || r.tasks > 0)
       .sort((a, b) => (b.esc + b.iss) - (a.esc + a.iss));
-  }, [accounts, activeEscalations, activeIssues]);
+  }, [accounts, activeEscalations, activeIssues, tasks]);
 
   // Hotspot accounts: most open escalations + issues
   const hotspots = useMemo(() => {
@@ -158,11 +180,13 @@ export default function Dashboard() {
       </div>
 
       {/* KPI row */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
         <KpiCard label="Total MRR" value={fmt(total.total_mrr)} sub={`${total.count} accounts`} onClick={() => navigate('/accounts')} />
         <KpiCard label="At-Risk MRR" value={fmt(atRiskMrr)} sub="Red + Amber accounts" color="text-red-600" onClick={() => navigate('/rag')} />
         <KpiCard label="Active Escalations" value={activeEscalations.length} sub={openEsc ? `${openEsc} open` : 'none open'} color={activeEscalations.length ? 'text-orange-600' : 'text-gray-400'} onClick={() => navigate('/escalations')} />
         <KpiCard label="Active Issues" value={activeIssues.length} sub={`of ${issues.length} total`} color={activeIssues.length ? 'text-amber-600' : 'text-gray-400'} onClick={() => navigate('/issues')} />
+        <KpiCard label="Open Tasks" value={openTasks + overdueTasks} sub={overdueTasks ? `${overdueTasks} overdue` : 'none overdue'} color={overdueTasks ? 'text-red-600' : (openTasks + overdueTasks) ? 'text-blue-700' : 'text-gray-400'} onClick={() => navigate('/tasks')} />
+        <KpiCard label="Due Today" value={dueTodayTasks} sub="tasks due" color={dueTodayTasks ? 'text-amber-600' : 'text-gray-400'} onClick={() => navigate('/tasks')} />
         <KpiCard label="Renewals (90d)" value={upcomingRenewals.length} sub={fmt(upcomingRenewals.reduce((s,a) => s + (a.mrr||0), 0))} color="text-sky-700" onClick={() => navigate('/reports/renewals')} />
         <KpiCard label="Issue Resolution" value={issues.length ? `${Math.round(issues.filter(i => !isActive(i.status)).length / issues.length * 100)}%` : '—'} sub="all-time resolved" color="text-green-700" onClick={() => navigate('/reports/issues-pivot')} />
       </div>
@@ -225,7 +249,8 @@ export default function Dashboard() {
                   <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Accounts</th>
                   <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">MRR</th>
                   <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Active Esc</th>
-                  <th className="text-right px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Active Issues</th>
+                  <th className="text-right px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Active Issues</th>
+                  <th className="text-right px-5 py-2.5 text-xs font-semibold text-gray-500 uppercase tracking-wide">Open Tasks</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -237,8 +262,11 @@ export default function Dashboard() {
                     <td className="px-4 py-2.5 text-right tabular-nums">
                       {r.esc > 0 ? <span className="font-semibold text-orange-600">{r.esc}</span> : <span className="text-gray-300">—</span>}
                     </td>
-                    <td className="px-5 py-2.5 text-right tabular-nums">
+                    <td className="px-4 py-2.5 text-right tabular-nums">
                       {r.iss > 0 ? <span className="font-semibold text-amber-600">{r.iss}</span> : <span className="text-gray-300">—</span>}
+                    </td>
+                    <td className="px-5 py-2.5 text-right tabular-nums">
+                      {r.tasks > 0 ? <span className="font-semibold text-blue-600">{r.tasks}</span> : <span className="text-gray-300">—</span>}
                     </td>
                   </tr>
                 ))}

@@ -27,6 +27,7 @@ const DD_FIELDS = [
   { key: 'contraction_risk',     label: 'Contraction Risk',     section: 'Accounts' },
   { key: 'churn_risk',           label: 'Churn Risk',           section: 'Accounts' },
   { key: 'implementation_status',label: 'Implementation Status',section: 'Accounts' },
+  { key: 'nature_of_task',        label: 'Nature of Task',        section: 'Tasks' },
 ];
 
 function getInitials(name) {

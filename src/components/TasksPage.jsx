@@ -1,0 +1,533 @@
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import axios from 'axios';
+import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
+import Pagination from './Pagination';
+
+const STATUS_STYLES = {
+  Open:      'bg-blue-100 text-blue-800',
+  Overdue:   'bg-red-100 text-red-800',
+  Completed: 'bg-green-100 text-green-800',
+};
+
+function deriveStatus(task) {
+  if (task.derived_status) return task.derived_status;
+  if (task.status === 'Completed') return 'Completed';
+  if (task.due_date && new Date(task.due_date) < new Date()) return 'Overdue';
+  return 'Open';
+}
+
+function fmtDT(s) {
+  if (!s) return '—';
+  try {
+    return new Date(s).toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: true,
+    });
+  } catch { return s; }
+}
+
+function fmtDate(s) {
+  if (!s) return '—';
+  try { return new Date(s).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }); }
+  catch { return s; }
+}
+
+function toLocalDT(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return '';
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+const EMPTY_FORM = {
+  task_subject: '', task_description: '', nature_of_task: '',
+  due_date: '', account_id: '', account_name: '', assigned_to_id: '', assigned_to: '',
+};
+
+export default function TasksPage() {
+  const { user } = useAuth();
+  const navigate  = useNavigate();
+  const isAdmin   = user?.role === 'admin';
+
+  const [tasks,     setTasks]     = useState([]);
+  const [loading,   setLoading]   = useState(true);
+  const [reload,    setReload]    = useState(0);
+  const [expanded,  setExpanded]  = useState(null);
+
+  // Filters
+  const [statusFilter,  setStatusFilter]  = useState('all');   // all | Open | Overdue | Completed
+  const [natureFilter,  setNatureFilter]  = useState('');
+  const [assigneeFilter,setAssigneeFilter]= useState('');
+  const [search,        setSearch]        = useState('');
+  const [page,          setPage]          = useState(1);
+  const [perPage,       setPerPage]       = useState(25);
+
+  // Bulk
+  const [selected, setSelected] = useState(new Set());
+  const [bulkSaving, setBulkSaving] = useState(false);
+
+  // Add/Edit form
+  const [showForm,  setShowForm]  = useState(false);
+  const [form,      setForm]      = useState(EMPTY_FORM);
+  const [saving,    setSaving]    = useState(false);
+  const [formError, setFormError] = useState(null);
+  const [editingId, setEditingId] = useState(null);
+
+  // Reference data
+  const [accounts,   setAccounts]   = useState([]);
+  const [csms,       setCsms]       = useState([]);
+  const [ddConfig,   setDdConfig]   = useState({});
+
+  useEffect(() => {
+    axios.get('/api/accounts').then(r => setAccounts((r.data || []).sort((a,b) => a.account_name.localeCompare(b.account_name)))).catch(() => {});
+    axios.get('/api/dropdown-config').then(r => setDdConfig(r.data || {})).catch(() => {});
+    if (isAdmin) {
+      axios.get('/api/admin/users').then(r => setCsms((r.data || []).filter(u => u.role === 'csm'))).catch(() => {});
+    }
+  }, [isAdmin]);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    axios.get('/api/tasks')
+      .then(r => setTasks(r.data || []))
+      .catch(() => setTasks([]))
+      .finally(() => setLoading(false));
+  }, [reload]);
+
+  useEffect(() => { load(); }, [load]);
+
+  useEffect(() => { setPage(1); }, [statusFilter, natureFilter, assigneeFilter, search]);
+
+  const natureOptions = useMemo(() =>
+    [...new Set((ddConfig.nature_of_task || []).map(o => o.value))], [ddConfig]);
+
+  const assigneeOptions = useMemo(() =>
+    [...new Set(tasks.map(t => t.assigned_to).filter(Boolean))].sort(), [tasks]);
+
+  const filtered = useMemo(() => {
+    return tasks.filter(t => {
+      const ds = deriveStatus(t);
+      if (statusFilter !== 'all' && ds !== statusFilter) return false;
+      if (natureFilter && t.nature_of_task !== natureFilter) return false;
+      if (assigneeFilter && t.assigned_to !== assigneeFilter) return false;
+      if (search) {
+        const q = search.toLowerCase();
+        if (!(t.task_subject?.toLowerCase().includes(q) ||
+              t.task_description?.toLowerCase().includes(q) ||
+              t.account_name?.toLowerCase().includes(q) ||
+              t.assigned_to?.toLowerCase().includes(q))) return false;
+      }
+      return true;
+    });
+  }, [tasks, statusFilter, natureFilter, assigneeFilter, search]);
+
+  const counts = useMemo(() => ({
+    all:       tasks.length,
+    Open:      tasks.filter(t => deriveStatus(t) === 'Open').length,
+    Overdue:   tasks.filter(t => deriveStatus(t) === 'Overdue').length,
+    Completed: tasks.filter(t => deriveStatus(t) === 'Completed').length,
+  }), [tasks]);
+
+  const paginated = useMemo(() => {
+    const start = (page - 1) * perPage;
+    return filtered.slice(start, start + perPage);
+  }, [filtered, page, perPage]);
+
+  // ── Add / Edit helpers ───────────────────────────────────────
+  function openAdd() {
+    const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(9, 0, 0, 0);
+    const defaultDue = toLocalDT(d.toISOString());
+    const self = csms.find(c => c.csm_name === user?.name || c.name === user?.name);
+    setForm({
+      ...EMPTY_FORM,
+      due_date: defaultDue,
+      assigned_to: isAdmin ? '' : (user?.csm_name || user?.name || ''),
+      assigned_to_id: isAdmin ? '' : (user?.id || ''),
+    });
+    setEditingId(null); setFormError(null); setShowForm(true);
+  }
+
+  function openEdit(t) {
+    setForm({
+      task_subject: t.task_subject || '',
+      task_description: t.task_description || '',
+      nature_of_task: t.nature_of_task || '',
+      due_date: toLocalDT(t.due_date),
+      account_id: t.account_id || '',
+      account_name: t.account_name || '',
+      assigned_to_id: t.assigned_to_id || '',
+      assigned_to: t.assigned_to || '',
+    });
+    setEditingId(t.id); setFormError(null); setShowForm(true);
+  }
+
+  async function handleSave(e) {
+    e.preventDefault();
+    if (!form.task_subject.trim()) { setFormError('Task subject is required'); return; }
+    if (!form.due_date) { setFormError('Due date is required'); return; }
+    setSaving(true); setFormError(null);
+    try {
+      const payload = { ...form };
+      if (!payload.account_id) delete payload.account_id;
+      if (!payload.assigned_to_id) delete payload.assigned_to_id;
+
+      let data;
+      if (editingId) {
+        ({ data } = await axios.put(`/api/tasks?id=${editingId}`, payload));
+        setTasks(prev => prev.map(t => t.id === editingId ? data : t));
+      } else {
+        ({ data } = await axios.post('/api/tasks', payload));
+        setTasks(prev => [data, ...prev]);
+      }
+      setShowForm(false);
+    } catch (err) {
+      setFormError(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function markComplete(taskId) {
+    try {
+      const { data } = await axios.put(`/api/tasks?id=${taskId}`, { status: 'Completed' });
+      setTasks(prev => prev.map(t => t.id === taskId ? data : t));
+    } catch {}
+  }
+
+  async function markOpen(taskId) {
+    try {
+      const { data } = await axios.put(`/api/tasks?id=${taskId}`, { status: 'Open' });
+      setTasks(prev => prev.map(t => t.id === taskId ? data : t));
+    } catch {}
+  }
+
+  async function bulkMarkComplete() {
+    if (!selected.size) return;
+    setBulkSaving(true);
+    try {
+      await axios.patch('/api/tasks', { ids: [...selected], field: 'status', value: 'Completed' });
+      setReload(r => r + 1); setSelected(new Set());
+    } catch {} finally { setBulkSaving(false); }
+  }
+
+  async function deleteTask(taskId) {
+    if (!window.confirm('Delete this task?')) return;
+    try {
+      await axios.delete(`/api/tasks?id=${taskId}`);
+      setTasks(prev => prev.filter(t => t.id !== taskId));
+    } catch {}
+  }
+
+  function toggleSelect(id) {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }
+
+  function selectAll() {
+    if (selected.size === paginated.length) { setSelected(new Set()); return; }
+    setSelected(new Set(paginated.map(t => t.id)));
+  }
+
+  const allChecked = paginated.length > 0 && paginated.every(t => selected.has(t.id));
+
+  // Account change → auto-fill account_name
+  function onAccountChange(e) {
+    const aid = e.target.value;
+    const acct = accounts.find(a => String(a.id) === String(aid));
+    setForm(f => ({ ...f, account_id: aid, account_name: acct?.account_name || '' }));
+  }
+
+  // Assignee change → fill name from csm list
+  function onAssigneeChange(e) {
+    const csmId = e.target.value;
+    const csm = csms.find(c => String(c.id) === String(csmId));
+    setForm(f => ({ ...f, assigned_to_id: csmId, assigned_to: csm?.csm_name || csm?.name || '' }));
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Tasks</h1>
+          <p className="text-sm text-gray-500 mt-0.5">{counts.Open} open · {counts.Overdue} overdue · {counts.Completed} completed</p>
+        </div>
+        <button
+          onClick={openAdd}
+          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          Add Task
+        </button>
+      </div>
+
+      {/* Status tabs */}
+      <div className="flex gap-1 border-b border-gray-200 overflow-x-auto pb-px">
+        {[
+          { key: 'all',      label: `All (${counts.all})` },
+          { key: 'Open',     label: `Open (${counts.Open})` },
+          { key: 'Overdue',  label: `Overdue (${counts.Overdue})` },
+          { key: 'Completed',label: `Completed (${counts.Completed})` },
+        ].map(({ key, label }) => (
+          <button key={key} onClick={() => setStatusFilter(key)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition -mb-px whitespace-nowrap ${
+              statusFilter === key
+                ? 'border-brand-600 text-brand-700'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex flex-wrap items-center gap-2">
+        <input
+          value={search} onChange={e => setSearch(e.target.value)}
+          placeholder="Search tasks…"
+          className="!w-56 text-sm"
+        />
+        <select value={natureFilter} onChange={e => setNatureFilter(e.target.value)} className="!w-auto text-sm">
+          <option value="">All types</option>
+          {natureOptions.map(v => <option key={v}>{v}</option>)}
+        </select>
+        {isAdmin && (
+          <select value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)} className="!w-auto text-sm">
+            <option value="">All assignees</option>
+            {assigneeOptions.map(v => <option key={v}>{v}</option>)}
+          </select>
+        )}
+        {search || natureFilter || assigneeFilter ? (
+          <button onClick={() => { setSearch(''); setNatureFilter(''); setAssigneeFilter(''); }}
+            className="text-xs text-gray-400 hover:text-gray-600 transition">Clear</button>
+        ) : null}
+        {selected.size > 0 && isAdmin && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-xs text-gray-500">{selected.size} selected</span>
+            <button onClick={bulkMarkComplete} disabled={bulkSaving}
+              className="px-3 py-1.5 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg transition disabled:opacity-50">
+              {bulkSaving ? '…' : 'Mark Complete'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Table */}
+      {loading ? (
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="card text-center py-12 text-gray-400">
+          <p className="font-medium">No tasks found</p>
+          <p className="text-sm mt-1">Try adjusting your filters or add a new task.</p>
+        </div>
+      ) : (
+        <div className="card p-0 overflow-x-auto">
+          <table className="w-full text-sm min-w-[700px]">
+            <thead className="bg-gray-50 border-b border-gray-100">
+              <tr>
+                {isAdmin && (
+                  <th className="w-10 px-3 py-3">
+                    <input type="checkbox" checked={allChecked} onChange={selectAll}
+                      className="!w-4 !h-4 !p-0 !border-0 !ring-0 shrink-0 accent-brand-600" />
+                  </th>
+                )}
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Subject</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Nature</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Account</th>
+                {isAdmin && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Assigned To</th>}
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Due</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {paginated.map(task => {
+                const ds = deriveStatus(task);
+                const isOpen = expanded === task.id;
+                return (
+                  <React.Fragment key={task.id}>
+                    <tr className={`hover:bg-gray-50 transition ${ds === 'Overdue' ? 'bg-red-50/30' : ''}`}>
+                      {isAdmin && (
+                        <td className="w-10 px-3 py-3">
+                          <input type="checkbox" checked={selected.has(task.id)} onChange={() => toggleSelect(task.id)}
+                            className="!w-4 !h-4 !p-0 !border-0 !ring-0 shrink-0 accent-brand-600" />
+                        </td>
+                      )}
+                      <td className="px-4 py-3 max-w-[220px]">
+                        <button type="button" onClick={() => setExpanded(isOpen ? null : task.id)}
+                          className="text-left w-full">
+                          <p className="text-sm font-medium text-gray-800 truncate">{task.task_subject}</p>
+                          {task.task_description && (
+                            <p className="text-xs text-gray-400 truncate mt-0.5">{task.task_description}</p>
+                          )}
+                        </button>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        {task.nature_of_task
+                          ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{task.nature_of_task}</span>
+                          : <span className="text-gray-300">—</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        {task.account_id ? (
+                          <button type="button" onClick={() => navigate(`/accounts/${task.account_id}`)}
+                            className="text-xs text-brand-600 hover:underline font-medium truncate max-w-[140px] block">
+                            {task.account_name || '—'}
+                          </button>
+                        ) : <span className="text-xs text-gray-400">{task.account_name || '—'}</span>}
+                      </td>
+                      {isAdmin && (
+                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{task.assigned_to || '—'}</td>
+                      )}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <p className={`text-xs font-medium ${ds === 'Overdue' ? 'text-red-700' : 'text-gray-700'}`}>
+                          {fmtDT(task.due_date)}
+                        </p>
+                        {ds === 'Completed' && task.completed_at && (
+                          <p className="text-xs text-gray-400 mt-0.5">Done {fmtDate(task.completed_at)}</p>
+                        )}
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[ds] || 'bg-gray-100 text-gray-700'}`}>
+                          {ds}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1">
+                          {ds !== 'Completed' && (
+                            <button onClick={() => markComplete(task.id)}
+                              className="text-xs px-2 py-1 rounded bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition font-medium"
+                              title="Mark complete">
+                              ✓ Done
+                            </button>
+                          )}
+                          {ds === 'Completed' && (
+                            <button onClick={() => markOpen(task.id)}
+                              className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition"
+                              title="Reopen">
+                              Reopen
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <>
+                              <button onClick={() => openEdit(task)}
+                                className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 transition">
+                                Edit
+                              </button>
+                              <button onClick={() => deleteTask(task.id)}
+                                className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition">
+                                Del
+                              </button>
+                            </>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                    {isOpen && task.task_description && (
+                      <tr className="bg-gray-50">
+                        <td colSpan={isAdmin ? 8 : 6} className="px-5 py-3 text-sm text-gray-700 whitespace-pre-wrap border-t border-gray-100">
+                          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Description</p>
+                          {task.task_description}
+                          {task.assigned_by && (
+                            <p className="text-xs text-gray-400 mt-2">Assigned by: {task.assigned_by}</p>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+          <div className="px-4">
+            <Pagination page={page} perPage={perPage} total={filtered.length} onPage={setPage} onPerPage={setPerPage} />
+          </div>
+        </div>
+      )}
+
+      {/* ── Add / Edit Task Modal ────────────────────────────────── */}
+      {showForm && (
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 pt-10 overflow-y-auto" onClick={() => setShowForm(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900">{editingId ? 'Edit Task' : 'Add Task'}</h3>
+              <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <form onSubmit={handleSave} className="p-5 space-y-3">
+              {formError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{formError}</p>}
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Task Subject *</label>
+                <input value={form.task_subject} onChange={e => setForm(f => ({ ...f, task_subject: e.target.value }))}
+                  placeholder="e.g. War room for Acme escalation" required />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Nature of Task</label>
+                  <select value={form.nature_of_task} onChange={e => setForm(f => ({ ...f, nature_of_task: e.target.value }))}>
+                    <option value="">— Select —</option>
+                    {natureOptions.map(v => <option key={v}>{v}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Due Date & Time *</label>
+                  <input type="datetime-local" value={form.due_date}
+                    onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} required />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Account</label>
+                  <select value={form.account_id} onChange={onAccountChange}>
+                    <option value="">— No account —</option>
+                    {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Assigned To</label>
+                  {isAdmin ? (
+                    <select value={form.assigned_to_id} onChange={onAssigneeChange}>
+                      <option value="">— Unassigned —</option>
+                      {csms.map(c => (
+                        <option key={c.id} value={c.id}>{c.csm_name || c.name}</option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input value={form.assigned_to || user?.csm_name || user?.name || ''} readOnly className="bg-gray-50 text-gray-500" />
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Task Description</label>
+                <textarea rows={3} value={form.task_description}
+                  onChange={e => setForm(f => ({ ...f, task_description: e.target.value }))}
+                  placeholder="Details, context, links…" className="resize-none" />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowForm(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+                <button type="submit" disabled={saving}
+                  className="px-4 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition disabled:opacity-50">
+                  {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Task'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

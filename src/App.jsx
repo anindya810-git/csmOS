@@ -17,6 +17,8 @@ import AccountMappingReport from './components/AccountMappingReport';
 import SettingsPage from './components/SettingsPage';
 import AccountEdit from './components/AccountEdit';
 import AccountTimeline from './components/AccountTimeline';
+import TasksPage from './components/TasksPage';
+import TaskPivotReport from './components/TaskPivotReport';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -45,12 +47,14 @@ function AppRoutes() {
         <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="accounts/:id/edit" element={<AccountEdit />} />
         <Route path="accounts/:id/timeline" element={<AccountTimeline />} />
+        <Route path="tasks" element={<TasksPage />} />
         <Route path="reports" element={<ReportsPage />}>
           <Route index element={<Navigate to="renewals" replace />} />
-          <Route path="renewals"     element={<RenewalDashboard />} />
-          <Route path="weekly"       element={<WeeklyEscalationsDashboard />} />
-          <Route path="issues-pivot"    element={<IssuesPivotReport />} />
+          <Route path="renewals"       element={<RenewalDashboard />} />
+          <Route path="weekly"         element={<WeeklyEscalationsDashboard />} />
+          <Route path="issues-pivot"   element={<IssuesPivotReport />} />
           <Route path="account-mapping" element={<AccountMappingReport />} />
+          <Route path="task-pivot"     element={<TaskPivotReport />} />
         </Route>
         <Route path="renewal" element={<Navigate to="/reports/renewals" replace />} />
         <Route path="rag" element={<RAGDashboard />} />
