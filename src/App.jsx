@@ -16,6 +16,7 @@ import IssuesPivotReport from './components/IssuesPivotReport';
 import AccountMappingReport from './components/AccountMappingReport';
 import SettingsPage from './components/SettingsPage';
 import AccountEdit from './components/AccountEdit';
+import AccountTimeline from './components/AccountTimeline';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -43,6 +44,7 @@ function AppRoutes() {
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="accounts/:id/edit" element={<AccountEdit />} />
+        <Route path="accounts/:id/timeline" element={<AccountTimeline />} />
         <Route path="reports" element={<ReportsPage />}>
           <Route index element={<Navigate to="renewals" replace />} />
           <Route path="renewals"     element={<RenewalDashboard />} />

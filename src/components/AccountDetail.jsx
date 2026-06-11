@@ -2,6 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 
+const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+function toMonth(dateStr) {
+  if (!dateStr) return '';
+  try { const d = new Date(dateStr); return isNaN(d) ? '' : `${MONTHS[d.getMonth()]} ${d.getFullYear()}`; }
+  catch { return ''; }
+}
+
 const RAG_COLOR = { Green: 'bg-green-100 text-green-800 border-green-200', Amber: 'bg-amber-100 text-amber-800 border-amber-200', Red: 'bg-red-100 text-red-800 border-red-200' };
 const CHURN_COLOR = { 'Churn Activated': 'bg-red-100 text-red-700 border-red-200', 'Churn Predicted': 'bg-orange-100 text-orange-700 border-orange-200', 'Churn Executed': 'bg-gray-100 text-gray-600 border-gray-200', 'Contraction Predicted': 'bg-yellow-100 text-yellow-700 border-yellow-200' };
 const ESC_COLOR = { Open: 'bg-red-100 text-red-700', 'In Progress': 'bg-amber-100 text-amber-700', 'Partly Resolved': 'bg-blue-100 text-blue-700', Resolved: 'bg-green-100 text-green-700' };
@@ -79,12 +86,28 @@ export default function AccountDetail() {
   const [account,     setAccount]     = useState(null);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState(null);
-  const [escalations, setEscalations] = useState([]);
+  const [escalations,   setEscalations]   = useState([]);
   const [escalExpanded, setEscalExpanded] = useState(null);
-  const [showAllEscal, setShowAllEscal] = useState(false);
+  const [showAllEscal,  setShowAllEscal]  = useState(false);
   const [issues,        setIssues]        = useState([]);
   const [issueExpanded, setIssueExpanded] = useState(null);
   const [showAllIssues, setShowAllIssues] = useState(false);
+
+  // Add escalation modal
+  const [showAddEscal,  setShowAddEscal]  = useState(false);
+  const [escalForm,     setEscalForm]     = useState({});
+  const [escalSaving,   setEscalSaving]   = useState(false);
+  const [escalError,    setEscalError]    = useState(null);
+
+  // Add issue modal
+  const [showAddIssue,  setShowAddIssue]  = useState(false);
+  const [issueForm,     setIssueForm]     = useState({});
+  const [issueSaving,   setIssueSaving]   = useState(false);
+  const [issueError,    setIssueError]    = useState(null);
+
+  // Dropdown options
+  const [ddConfig,      setDdConfig]      = useState({});
+  const [csms,          setCsms]          = useState([]);
 
   useEffect(() => {
     setLoading(true);
@@ -103,7 +126,64 @@ export default function AccountDetail() {
     axios.get(`/api/issues?account_id=${id}`)
       .then(r => setIssues(r.data || []))
       .catch(() => {});
+    axios.get('/api/dropdown-config').then(r => setDdConfig(r.data || {})).catch(() => {});
+    axios.get('/api/accounts/filters').then(r => setCsms(r.data.csms || [])).catch(() => {});
   }, [id]);
+
+  function openAddEscal() {
+    const today = new Date().toISOString().split('T')[0];
+    setEscalForm({ description: '', date_of_escalation: today, status: 'Open', csm: account?.csm || '', ownership: '', eta: '', escalated_by: '', trigger_reason: '', source_of_escalation: '' });
+    setEscalError(null);
+    setShowAddEscal(true);
+  }
+
+  function openAddIssue() {
+    const today = new Date().toISOString().split('T')[0];
+    setIssueForm({ description: '', reported_date: today, priority: '', status: 'Open', csm: account?.csm || '', csm_lead: account?.csm_lead || '', issue_type: '', issue_sub_type: '', owner_team: '', support_ticket: '', dev_ticket: '', next_steps: '' });
+    setIssueError(null);
+    setShowAddIssue(true);
+  }
+
+  async function handleAddEscal(e) {
+    e.preventDefault();
+    if (!escalForm.description?.trim()) { setEscalError('Description is required'); return; }
+    setEscalSaving(true); setEscalError(null);
+    try {
+      const { data } = await axios.post('/api/escalations', {
+        account_id: Number(id),
+        account_name: account?.account_name,
+        tenant_id: account?.tenant_id,
+        month: toMonth(escalForm.date_of_escalation),
+        ...escalForm,
+      });
+      setEscalations(prev => [data, ...prev]);
+      setShowAddEscal(false);
+    } catch (err) {
+      setEscalError(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setEscalSaving(false);
+    }
+  }
+
+  async function handleAddIssue(e) {
+    e.preventDefault();
+    if (!issueForm.description?.trim()) { setIssueError('Description is required'); return; }
+    setIssueSaving(true); setIssueError(null);
+    try {
+      const { data } = await axios.post('/api/issues', {
+        account_id: Number(id),
+        account_name: account?.account_name,
+        tenant_id: account?.tenant_id,
+        ...issueForm,
+      });
+      setIssues(prev => [data, ...prev]);
+      setShowAddIssue(false);
+    } catch (err) {
+      setIssueError(err.response?.data?.error || 'Failed to save');
+    } finally {
+      setIssueSaving(false);
+    }
+  }
 
   if (loading) return <div className="flex items-center justify-center h-64"><div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" /></div>;
   if (error)   return <div className="max-w-lg mx-auto mt-16 p-6 bg-red-50 rounded-xl border border-red-200 text-center space-y-3"><p className="text-red-700">{error}</p><button onClick={() => navigate('/accounts')} className="text-sm text-brand-600 hover:underline">← Back</button></div>;
@@ -154,13 +234,24 @@ export default function AccountDetail() {
             </div>
           </div>
         </div>
-        <Link
-          to={`/accounts/${id}/edit`}
-          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-          Edit Account
-        </Link>
+        <div className="flex flex-wrap gap-2 shrink-0">
+          <Link
+            to={`/accounts/${id}/timeline`}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg border border-gray-200 transition"
+          >
+            <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Timeline
+          </Link>
+          <Link
+            to={`/accounts/${id}/edit`}
+            className="inline-flex items-center gap-1.5 px-3 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+            Edit
+          </Link>
+        </div>
       </div>
 
       {/* Key metrics row */}
@@ -189,7 +280,11 @@ export default function AccountDetail() {
               </h3>
               <div className="flex items-center gap-2">
                 {escalations.length === 0 && <span className="text-xs text-gray-400">None recorded</span>}
-                <Link to="/escalations" className="text-xs text-brand-600 hover:underline font-medium">All escalations →</Link>
+                <button onClick={openAddEscal} className="text-xs text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-0.5 transition">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add
+                </button>
+                <Link to="/escalations" className="text-xs text-gray-400 hover:underline font-medium">All →</Link>
               </div>
             </div>
 
@@ -256,7 +351,11 @@ export default function AccountDetail() {
               </h3>
               <div className="flex items-center gap-2">
                 {issues.length === 0 && <span className="text-xs text-gray-400">None recorded</span>}
-                <Link to="/issues" className="text-xs text-brand-600 hover:underline font-medium">All issues →</Link>
+                <button onClick={openAddIssue} className="text-xs text-brand-600 hover:text-brand-700 font-medium inline-flex items-center gap-0.5 transition">
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add
+                </button>
+                <Link to="/issues" className="text-xs text-gray-400 hover:underline font-medium">All →</Link>
               </div>
             </div>
 
@@ -406,7 +505,7 @@ export default function AccountDetail() {
           </div>
         </div>
 
-        {/* Right — Ring Fence + Team */}
+        {/* Right — Ring Fence + Renewal */}
         <div className="space-y-5">
 
           {/* Ring Fence Status */}
@@ -454,6 +553,188 @@ export default function AccountDetail() {
           )}
         </div>
       </div>
+
+      {/* ── Add Escalation Modal ─────────────────────────────────────── */}
+      {showAddEscal && (
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 pt-12 overflow-y-auto" onClick={() => setShowAddEscal(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Add Escalation</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{a.account_name}</p>
+              </div>
+              <button onClick={() => setShowAddEscal(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <form onSubmit={handleAddEscal} className="p-5 space-y-3">
+              {escalError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{escalError}</p>}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Description *</label>
+                <textarea rows={3} value={escalForm.description}
+                  onChange={e => setEscalForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Describe the escalation…" className="resize-none" required />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Date</label>
+                  <input type="date" value={escalForm.date_of_escalation}
+                    onChange={e => setEscalForm(f => ({ ...f, date_of_escalation: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                  <select value={escalForm.status} onChange={e => setEscalForm(f => ({ ...f, status: e.target.value }))}>
+                    {['Open','In Progress','Partly Resolved','Resolved'].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">CSM</label>
+                  <select value={escalForm.csm} onChange={e => setEscalForm(f => ({ ...f, csm: e.target.value }))}>
+                    <option value="">—</option>
+                    {csms.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Ownership</label>
+                  <input value={escalForm.ownership} onChange={e => setEscalForm(f => ({ ...f, ownership: e.target.value }))} placeholder="e.g. Product" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">ETA</label>
+                  <input type="date" value={escalForm.eta} onChange={e => setEscalForm(f => ({ ...f, eta: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Escalated By</label>
+                  <input value={escalForm.escalated_by} onChange={e => setEscalForm(f => ({ ...f, escalated_by: e.target.value }))} placeholder="Name" />
+                </div>
+                {[...new Set((ddConfig.trigger_reason || []).map(o => o.value))].length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Trigger Reason</label>
+                    <select value={escalForm.trigger_reason} onChange={e => setEscalForm(f => ({ ...f, trigger_reason: e.target.value }))}>
+                      <option value="">—</option>
+                      {[...new Set((ddConfig.trigger_reason || []).map(o => o.value))].map(v => <option key={v}>{v}</option>)}
+                    </select>
+                  </div>
+                )}
+                {[...new Set((ddConfig.source_of_escalation || []).map(o => o.value))].length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Source</label>
+                    <select value={escalForm.source_of_escalation} onChange={e => setEscalForm(f => ({ ...f, source_of_escalation: e.target.value }))}>
+                      <option value="">—</option>
+                      {[...new Set((ddConfig.source_of_escalation || []).map(o => o.value))].map(v => <option key={v}>{v}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowAddEscal(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+                <button type="submit" disabled={escalSaving}
+                  className="px-4 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition disabled:opacity-50">
+                  {escalSaving ? 'Saving…' : 'Add Escalation'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Add Issue Modal ──────────────────────────────────────────── */}
+      {showAddIssue && (
+        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 pt-12 overflow-y-auto" onClick={() => setShowAddIssue(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <div>
+                <h3 className="text-base font-semibold text-gray-900">Add Issue</h3>
+                <p className="text-xs text-gray-400 mt-0.5">{a.account_name}</p>
+              </div>
+              <button onClick={() => setShowAddIssue(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <form onSubmit={handleAddIssue} className="p-5 space-y-3">
+              {issueError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{issueError}</p>}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Description *</label>
+                <textarea rows={3} value={issueForm.description}
+                  onChange={e => setIssueForm(f => ({ ...f, description: e.target.value }))}
+                  placeholder="Describe the issue…" className="resize-none" required />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Reported Date</label>
+                  <input type="date" value={issueForm.reported_date}
+                    onChange={e => setIssueForm(f => ({ ...f, reported_date: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Priority</label>
+                  <select value={issueForm.priority} onChange={e => setIssueForm(f => ({ ...f, priority: e.target.value }))}>
+                    <option value="">—</option>
+                    {['High','Medium','Low'].map(p => <option key={p}>{p}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                  <select value={issueForm.status} onChange={e => setIssueForm(f => ({ ...f, status: e.target.value }))}>
+                    {['Open','In Progress','Deferred','Resolved','Closed'].map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">CSM</label>
+                  <select value={issueForm.csm} onChange={e => setIssueForm(f => ({ ...f, csm: e.target.value }))}>
+                    <option value="">—</option>
+                    {csms.map(c => <option key={c}>{c}</option>)}
+                  </select>
+                </div>
+                {[...new Set((ddConfig.issue_type || []).map(o => o.value))].length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Issue Type</label>
+                    <select value={issueForm.issue_type}
+                      onChange={e => setIssueForm(f => ({ ...f, issue_type: e.target.value, issue_sub_type: '' }))}>
+                      <option value="">—</option>
+                      {[...new Set((ddConfig.issue_type || []).map(o => o.value))].map(v => <option key={v}>{v}</option>)}
+                    </select>
+                  </div>
+                )}
+                {issueForm.issue_type && (ddConfig.issue_sub_type || []).filter(o => o.parent_value === issueForm.issue_type).length > 0 && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Sub-type</label>
+                    <select value={issueForm.issue_sub_type} onChange={e => setIssueForm(f => ({ ...f, issue_sub_type: e.target.value }))}>
+                      <option value="">—</option>
+                      {(ddConfig.issue_sub_type || []).filter(o => o.parent_value === issueForm.issue_type).map(o => <option key={o.value}>{o.value}</option>)}
+                    </select>
+                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Owner Team</label>
+                  <input value={issueForm.owner_team} onChange={e => setIssueForm(f => ({ ...f, owner_team: e.target.value }))} placeholder="e.g. Engineering" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Support Ticket #</label>
+                  <input value={issueForm.support_ticket} onChange={e => setIssueForm(f => ({ ...f, support_ticket: e.target.value }))} placeholder="12345" />
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Dev Ticket #</label>
+                  <input value={issueForm.dev_ticket} onChange={e => setIssueForm(f => ({ ...f, dev_ticket: e.target.value }))} placeholder="JIRA-123" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1">Next Steps</label>
+                <textarea rows={2} value={issueForm.next_steps}
+                  onChange={e => setIssueForm(f => ({ ...f, next_steps: e.target.value }))}
+                  placeholder="Planned next steps…" className="resize-none" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button type="button" onClick={() => setShowAddIssue(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+                <button type="submit" disabled={issueSaving}
+                  className="px-4 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition disabled:opacity-50">
+                  {issueSaving ? 'Saving…' : 'Add Issue'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
