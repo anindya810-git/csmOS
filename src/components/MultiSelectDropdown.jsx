@@ -48,7 +48,7 @@ export default function MultiSelectDropdown({ options, value = [], onChange, pla
             {options.map(opt => (
               <label key={opt} className="flex items-center gap-2.5 px-3 py-2 hover:bg-gray-50 cursor-pointer transition">
                 <input type="checkbox" checked={value.includes(opt)} onChange={() => toggle(opt)}
-                  className="rounded accent-brand-600 shrink-0" />
+                  className="!w-auto !h-4 !p-0 !border-0 !rounded !ring-0 shrink-0 accent-brand-600" />
                 <span className="text-sm text-gray-700">{opt}</span>
               </label>
             ))}
