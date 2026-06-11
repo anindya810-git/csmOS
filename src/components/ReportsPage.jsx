@@ -17,7 +17,7 @@ export default function ReportsPage() {
       </div>
       <div className="flex gap-1 border-b border-gray-200 overflow-x-auto">
         <NavLink to="renewals"      className={tabClass}>Renewals</NavLink>
-        <NavLink to="weekly"        className={tabClass}>Weekly Escalations</NavLink>
+        <NavLink to="weekly"        className={tabClass}>Weekly View</NavLink>
         <NavLink to="issues-pivot"  className={tabClass}>Issue Breakdown</NavLink>
       </div>
       <Outlet />

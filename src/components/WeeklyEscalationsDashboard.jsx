@@ -1,5 +1,4 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -24,7 +23,6 @@ function shiftWeek(year, month, week, delta) {
   return { year: y, month: m, week: w };
 }
 
-// pageOffset 0 → most recent WINDOW_SIZE weeks; -1 → previous page; etc.
 const WINDOW_SIZE = 5;
 
 function makeWeekWindow(pageOffset) {
@@ -52,6 +50,14 @@ function pct(n, d) {
   return Math.round(n / d * 100) + '%';
 }
 
+function pctColor(n, d) {
+  if (!d) return 'text-gray-400';
+  const v = n / d;
+  if (v >= 0.8) return 'text-green-700';
+  if (v >= 0.5) return 'text-amber-600';
+  return 'text-red-600';
+}
+
 function SectionHeader({ label, colSpan, bg }) {
   return (
     <tr>
@@ -63,14 +69,14 @@ function SectionHeader({ label, colSpan, bg }) {
   );
 }
 
-function Row({ label, values, cls = '', valueCls = 'text-gray-800', bold = false }) {
+function Row({ label, values, cls = '', valueCls = 'text-gray-800', bold = false, perCellCls }) {
   return (
     <tr className={`border-b border-gray-100 last:border-b-0 ${cls}`}>
       <td className={`px-5 py-3 border-r border-gray-200 text-sm ${bold ? 'font-bold text-gray-800' : 'text-gray-600'}`}>
         {label}
       </td>
       {values.map((v, i) => (
-        <td key={i} className={`text-center px-4 py-3 tabular-nums text-sm border-r border-gray-200 last:border-r-0 ${bold ? 'font-bold' : ''} ${valueCls}`}>
+        <td key={i} className={`text-center px-4 py-3 tabular-nums text-sm border-r border-gray-200 last:border-r-0 ${bold ? 'font-bold' : ''} ${perCellCls ? perCellCls[i] : valueCls}`}>
           {v}
         </td>
       ))}
@@ -81,6 +87,7 @@ function Row({ label, values, cls = '', valueCls = 'text-gray-800', bold = false
 export default function WeeklyEscalationsDashboard() {
   const [accounts,    setAccounts]    = useState([]);
   const [escalations, setEscalations] = useState([]);
+  const [issues,      setIssues]      = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [pageOffset,  setPageOffset]  = useState(0);
 
@@ -88,9 +95,11 @@ export default function WeeklyEscalationsDashboard() {
     Promise.all([
       axios.get('/api/accounts'),
       axios.get('/api/escalations'),
-    ]).then(([accR, escR]) => {
+      axios.get('/api/issues'),
+    ]).then(([accR, escR, issR]) => {
       setAccounts(accR.data || []);
       setEscalations(escR.data || []);
+      setIssues(issR.data || []);
     }).finally(() => setLoading(false));
   }, []);
 
@@ -99,14 +108,40 @@ export default function WeeklyEscalationsDashboard() {
   const totalCustomers   = accounts.length;
   const ringFenceCovered = accounts.filter(a => a.meeting_done === 'Yes').length;
 
-  const weekData = useMemo(() => weeks.map(w => {
+  const weekEscalations = useMemo(() => weeks.map(w => {
     const count = escalations.filter(e => {
       if (!e.date_of_escalation) return false;
       const d = new Date(e.date_of_escalation);
       return d >= w.start && d <= w.end;
     }).length;
-    return { ...w, escalations: count };
+    return { ...w, count };
   }), [weeks, escalations]);
+
+  // Issues pivot: for each week, group by issue_type → {total, resolved}
+  const issueTypes = useMemo(() => {
+    const inWindow = issues.filter(i => {
+      if (!i.reported_date) return false;
+      const d = new Date(i.reported_date);
+      return d >= weeks[0].start && d <= weeks[weeks.length - 1].end;
+    });
+    return [...new Set(inWindow.map(i => i.issue_type).filter(Boolean))].sort();
+  }, [issues, weeks]);
+
+  const issuePivot = useMemo(() => weeks.map(w => {
+    const weekIssues = issues.filter(i => {
+      if (!i.reported_date) return false;
+      const d = new Date(i.reported_date);
+      return d >= w.start && d <= w.end;
+    });
+    const byType = {};
+    for (const t of issueTypes) {
+      const ti = weekIssues.filter(i => i.issue_type === t);
+      byType[t] = { total: ti.length, resolved: ti.filter(i => i.status === 'Resolved').length };
+    }
+    const total    = weekIssues.length;
+    const resolved = weekIssues.filter(i => i.status === 'Resolved').length;
+    return { ...w, byType, total, resolved };
+  }), [weeks, issues, issueTypes]);
 
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -114,22 +149,15 @@ export default function WeeklyEscalationsDashboard() {
     </div>
   );
 
-  const cols = weekData.length + 1; // label col + week cols
+  const cols = weeks.length + 1;
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link to="/escalations" className="text-gray-400 hover:text-gray-600 transition">
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </Link>
-          <div>
-            <h1 className="text-xl font-bold text-gray-900">Weekly Escalations</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Coverage and impact metrics by week</p>
-          </div>
+        <div>
+          <h1 className="text-xl font-bold text-gray-900">Weekly View</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Coverage, escalations and issue themes by week</p>
         </div>
 
         {/* Week navigator */}
@@ -138,8 +166,8 @@ export default function WeeklyEscalationsDashboard() {
             className="p-1.5 rounded-lg border border-gray-200 hover:bg-gray-100 transition text-gray-600">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           </button>
-          <span className="text-sm font-semibold text-gray-700 min-w-[150px] text-center">
-            {weekData[0]?.label} – {weekData[weekData.length - 1]?.label}
+          <span className="text-sm font-semibold text-gray-700 min-w-[180px] text-center">
+            {weekEscalations[0]?.label} – {weekEscalations[weekEscalations.length - 1]?.label}
           </span>
           <button onClick={() => setPageOffset(p => p + 1)}
             disabled={pageOffset >= 0}
@@ -168,76 +196,99 @@ export default function WeeklyEscalationsDashboard() {
         </div>
         <div className="rounded-xl border border-orange-200 bg-orange-50 p-4">
           <p className="text-xs font-medium text-orange-600">This Week Escalations</p>
-          <p className="text-2xl font-bold text-orange-700 mt-1">{weekData[weekData.length - 1]?.escalations ?? '—'}</p>
+          <p className="text-2xl font-bold text-orange-700 mt-1">{weekEscalations[weekEscalations.length - 1]?.count ?? '—'}</p>
         </div>
       </div>
 
-      {/* Main table */}
+      {/* Coverage + Escalation table */}
       <div className="card overflow-x-auto p-0">
         <table className="w-full text-sm border-collapse">
           <thead>
             <tr className="border-b-2 border-gray-200">
-              <th className="text-left px-5 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 min-w-[200px]">
-                Description
-              </th>
-              {weekData.map(w => (
-                <th key={w.key}
-                  className="text-center px-4 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 last:border-r-0 min-w-[120px] whitespace-nowrap">
+              <th className="text-left px-5 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 min-w-[200px]">Description</th>
+              {weeks.map(w => (
+                <th key={w.key} className="text-center px-4 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 last:border-r-0 min-w-[120px] whitespace-nowrap">
                   {w.label}
                 </th>
               ))}
             </tr>
           </thead>
           <tbody>
-            {/* Coverage section */}
             <SectionHeader label="Coverage Metrics" colSpan={cols} bg="bg-sky-100" />
+            <Row label="Total customers"    values={weeks.map(() => totalCustomers)} />
+            <Row label="Ring Fence covered" values={weeks.map(() => ringFenceCovered)} />
+            <Row label="Overall Coverage %" values={weeks.map(() => pct(ringFenceCovered, totalCustomers))}
+              cls="bg-green-50" valueCls="text-green-700" bold />
 
-            <Row
-              label="Total customers"
-              values={weekData.map(() => totalCustomers)}
-            />
-            <Row
-              label="Ring Fence covered"
-              values={weekData.map(() => ringFenceCovered)}
-            />
-            <Row
-              label="Overall Coverage %"
-              values={weekData.map(() => pct(ringFenceCovered, totalCustomers))}
-              cls="bg-green-50"
-              valueCls="text-green-700"
-              bold
-            />
-
-            {/* Impact section */}
             <SectionHeader label="Impact Metrics" colSpan={cols} bg="bg-orange-100" />
-
-            <Row
-              label="Escalation during RF"
-              values={weekData.map(w => w.escalations)}
-            />
-            <Row
-              label="Post RF Escalation %"
-              values={weekData.map(w => pct(w.escalations, totalCustomers))}
-              cls="bg-orange-50"
-              valueCls="text-orange-700"
-              bold
-            />
+            <Row label="Escalation during RF"
+              values={weekEscalations.map(w => w.count)} />
+            <Row label="Post RF Escalation %"
+              values={weekEscalations.map(w => pct(w.count, totalCustomers))}
+              cls="bg-orange-50" valueCls="text-orange-700" bold />
           </tbody>
         </table>
       </div>
 
-      {/* Weekly escalation breakdown */}
-      <div className="card">
-        <h2 className="text-sm font-semibold text-gray-700 mb-4">Escalations per week</h2>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          {weekData.map(w => (
-            <div key={w.key} className="rounded-lg border border-gray-100 bg-gray-50 p-3 text-center">
-              <p className="text-xs text-gray-500 mb-1 leading-tight">{w.label}</p>
-              <p className={`text-2xl font-bold ${w.escalations > 0 ? 'text-orange-600' : 'text-gray-300'}`}>{w.escalations}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{pct(w.escalations, totalCustomers)}</p>
-            </div>
-          ))}
-        </div>
+      {/* Thematic Issues table */}
+      <div className="card overflow-x-auto p-0">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="border-b-2 border-gray-200">
+              <th className="text-left px-5 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 min-w-[200px]">
+                Thematic Customer Issues
+              </th>
+              {weeks.map(w => (
+                <th key={w.key} className="text-center px-4 py-3 font-bold text-gray-700 bg-gray-50 border-r border-gray-200 last:border-r-0 min-w-[120px] whitespace-nowrap">
+                  {w.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {issueTypes.length === 0 ? (
+              <tr>
+                <td colSpan={cols} className="px-5 py-6 text-sm text-gray-400 text-center italic">
+                  No issues with a reported date in this window.
+                </td>
+              </tr>
+            ) : (
+              <>
+                {issueTypes.map(type => (
+                  <Row
+                    key={type}
+                    label={type}
+                    values={issuePivot.map(w => w.byType[type]?.total || 0)}
+                  />
+                ))}
+
+                {/* Total issues */}
+                <Row
+                  label="Total Issues"
+                  values={issuePivot.map(w => w.total)}
+                  bold
+                  cls="border-t-2 border-gray-300"
+                />
+
+                {/* Resolved count */}
+                <Row
+                  label="Resolved"
+                  values={issuePivot.map(w => w.resolved)}
+                  bold
+                />
+
+                {/* Resolved % */}
+                <Row
+                  label="Resolved %"
+                  values={issuePivot.map(w => pct(w.resolved, w.total))}
+                  perCellCls={issuePivot.map(w => `font-bold ${pctColor(w.resolved, w.total)}`)}
+                  cls="bg-green-50/60"
+                  bold
+                />
+              </>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );
