@@ -6,6 +6,8 @@ import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../context/PermissionsContext';
 import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
+import DrillModal from './DrillModal';
+import AccountListModal from './AccountListModal';
 
 const PRIORITY_COLORS = {
   P0: 'bg-red-100 text-red-700',
@@ -94,13 +96,17 @@ export default function FeatureRequestsPage() {
   const [rejectReason, setRejectReason] = useState('');
   const [reviewing, setReviewing]   = useState(false);
 
-  // Resolved data for linked-item sections in the panels (lazy-loaded once)
+  // Drill-downs opened from the table's Links column (shared with the reports)
+  const [drill, setDrill]         = useState(null);   // escalations / issues
+  const [acctModal, setAcctModal] = useState(null);   // accounts
+
+  // Full escalation / issue / account records so links resolve to rich detail.
   const panelDataLoadedRef = useRef(false);
   const [allEscalations, setAllEscalations] = useState([]);
   const [allIssues,       setAllIssues]       = useState([]);
   const [allAccounts,     setAllAccounts]     = useState([]);
 
-  useEffect(() => { load(); loadRelatedOpts(); }, []);
+  useEffect(() => { load(); loadRelatedOpts(); loadPanelData(); }, []);
 
   const load = async (f = filters) => {
     setLoading(true);
@@ -135,6 +141,36 @@ export default function FeatureRequestsPage() {
       setAllIssues(issR.data || []);
       setAllAccounts(accR.data || []);
     }).catch(() => { panelDataLoadedRef.current = false; });
+  };
+
+  // Resolve a request's links into full records, then open the matching
+  // drill-down (same modals as the Weekly View / Account Mapping reports).
+  const openDrillEscalations = (fr) => {
+    const items = (fr.feature_request_links || [])
+      .filter(l => l.link_type === 'escalation')
+      .map(l => allEscalations.find(e => String(e.id) === String(l.linked_id))
+        || { id: l.linked_id, account_id: l.account_id, account_name: l.account_name, description: '', status: '' });
+    setDrill({ title: `Escalations — ${reqId(fr)}`, kind: 'escalation', items });
+  };
+
+  const openDrillIssues = (fr) => {
+    const items = (fr.feature_request_links || [])
+      .filter(l => l.link_type === 'issue')
+      .map(l => allIssues.find(i => String(i.id) === String(l.linked_id))
+        || { id: l.linked_id, account_id: l.account_id, account_name: l.account_name, description: '', status: '' });
+    setDrill({ title: `Issues — ${reqId(fr)}`, kind: 'issue', items });
+  };
+
+  const openDrillAccounts = (fr) => {
+    const seen = new Set();
+    const items = [];
+    for (const l of (fr.feature_request_links || [])) {
+      if (l.account_id == null || seen.has(l.account_id)) continue;
+      seen.add(l.account_id);
+      items.push(allAccounts.find(a => String(a.id) === String(l.account_id))
+        || { id: l.account_id, account_name: l.account_name, mrr: l.mrr });
+    }
+    setAcctModal({ title: `Accounts — ${reqId(fr)}`, accounts: items });
   };
 
   const openCreate = () => {
@@ -314,6 +350,26 @@ export default function FeatureRequestsPage() {
     </svg>
   );
 
+  // One stacked line in the Links column: "N Escalations / Issues / Accounts".
+  // Clickable (colored) when count > 0, muted when empty.
+  const LinkLine = ({ count, singular, dotBg, textCls, onClick }) => {
+    const label = `${count} ${singular}${count === 1 ? '' : 's'}`;
+    if (count > 0) {
+      return (
+        <button onClick={onClick} className={`flex items-center gap-1.5 font-medium hover:underline transition w-fit ${textCls}`}>
+          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dotBg}`} />
+          {label}
+        </button>
+      );
+    }
+    return (
+      <span className="flex items-center gap-1.5 text-gray-300">
+        <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-gray-200" />
+        {label}
+      </span>
+    );
+  };
+
   return (
     <div className="space-y-5">
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -361,11 +417,17 @@ export default function FeatureRequestsPage() {
                 <span className="text-gray-400">by {fr.created_by || '—'}</span>
                 {fr.approver_name && fr.status === 'pending' && <span className="text-gray-400">· approver {fr.approver_name}</span>}
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
-                {stats.escalations > 0 && <span>{stats.escalations} escalation{stats.escalations > 1 ? 's' : ''}</span>}
-                {stats.issues > 0 && <span>{stats.issues} issue{stats.issues > 1 ? 's' : ''}</span>}
-                {stats.accounts > 0 && <span>{stats.accounts} account{stats.accounts > 1 ? 's' : ''}</span>}
-                {fr.expected_rollout_date && <span>Rollout: {fmtDate(fr.expected_rollout_date)}</span>}
+              <div className="mt-2 flex flex-col gap-1 text-xs">
+                {stats.escalations > 0 && (
+                  <LinkLine count={stats.escalations} singular="Escalation" dotBg="bg-orange-400" textCls="text-orange-600" onClick={() => openDrillEscalations(fr)} />
+                )}
+                {stats.issues > 0 && (
+                  <LinkLine count={stats.issues} singular="Issue" dotBg="bg-blue-400" textCls="text-blue-600" onClick={() => openDrillIssues(fr)} />
+                )}
+                {stats.accounts > 0 && (
+                  <LinkLine count={stats.accounts} singular="Account" dotBg="bg-brand-400" textCls="text-brand-600" onClick={() => openDrillAccounts(fr)} />
+                )}
+                {fr.expected_rollout_date && <span className="text-gray-500">Rollout: {fmtDate(fr.expected_rollout_date)}</span>}
               </div>
               <div className="mt-3 flex items-center gap-2">
                 {canReview(fr) && fr.status === 'pending' && (
@@ -433,23 +495,10 @@ export default function FeatureRequestsPage() {
                         )}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2 text-xs text-gray-500">
-                          {stats.escalations > 0 && (
-                            <span className="flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0"></span>
-                              {stats.escalations}E
-                            </span>
-                          )}
-                          {stats.issues > 0 && (
-                            <span className="flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0"></span>
-                              {stats.issues}I
-                            </span>
-                          )}
-                          {stats.accounts > 0 && (
-                            <span className="text-gray-400">{stats.accounts} acct{stats.accounts > 1 ? 's' : ''}</span>
-                          )}
-                          {stats.escalations === 0 && stats.issues === 0 && <span className="text-gray-300">—</span>}
+                        <div className="flex flex-col gap-1 text-xs">
+                          <LinkLine count={stats.escalations} singular="Escalation" dotBg="bg-orange-400" textCls="text-orange-600 hover:text-orange-800" onClick={() => openDrillEscalations(fr)} />
+                          <LinkLine count={stats.issues} singular="Issue" dotBg="bg-blue-400" textCls="text-blue-600 hover:text-blue-800" onClick={() => openDrillIssues(fr)} />
+                          <LinkLine count={stats.accounts} singular="Account" dotBg="bg-brand-400" textCls="text-brand-600 hover:text-brand-800" onClick={() => openDrillAccounts(fr)} />
                         </div>
                       </td>
                       <td className="px-4 py-3">
@@ -681,6 +730,10 @@ export default function FeatureRequestsPage() {
         </>,
         document.body
       )}
+
+      {/* Link drill-downs (shared with Weekly View / Account Mapping reports) */}
+      <DrillModal drill={drill} onClose={() => setDrill(null)} />
+      {acctModal && <AccountListModal title={acctModal.title} accounts={acctModal.accounts} onClose={() => setAcctModal(null)} />}
     </div>
   );
 }
