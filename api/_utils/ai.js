@@ -1,0 +1,116 @@
+// Provider-agnostic AI helper (BYOK). Supports Anthropic, OpenAI and Google
+// Gemini. Keys live in the ai_config table and never leave the server.
+// NOTE: Vercel Hobby caps function duration at ~10s, so we use fast models,
+// modest token budgets and a hard client-side timeout.
+
+export const PROVIDERS = ['anthropic', 'openai', 'gemini'];
+
+export const DEFAULT_MODELS = {
+  anthropic: 'claude-3-5-haiku-latest',
+  openai:    'gpt-4o-mini',
+  gemini:    'gemini-1.5-flash',
+};
+
+// Per-section default system instructions. The admin's custom instruction
+// (from Settings → AI) is appended to these at request time.
+export const AI_SECTIONS = {
+  account_summary: {
+    label: 'Account Summary',
+    system: 'You are a Customer Success analyst. Write a single executive summary of this account in NO MORE THAN 200 words. Cover: health (RAG status + why), commercials (MRR, renewal), adoption/stickiness, open escalations and issues with their severity, and the top risks and recommended next actions. Be specific, use the data provided, and never invent facts. Prefer short paragraphs or tight bullets.',
+    maxTokens: 700,
+  },
+  account_esc_iss: {
+    label: 'Account Escalations & Issues',
+    system: 'You are a Customer Success analyst. Summarize this account\'s escalations and issues in under 150 words: dominant themes, severity, what is open vs resolved, and the most urgent items needing attention. Use the data provided; do not invent.',
+    maxTokens: 500,
+  },
+  feature_request: {
+    label: 'Feature Request Recommendation',
+    system: 'You are a product prioritization assistant. Using ONLY the linked accounts, escalations and issues provided, recommend whether this feature request should be taken up, assign a priority (P0, P1, P2 or P3), and a suggested ETA (a rough timeframe). Justify briefly using affected MRR, severity and frequency. Respond with these labelled sections: "Recommendation:", "Priority:", "Suggested ETA:", "Rationale:".',
+    maxTokens: 600,
+  },
+  rag: {
+    label: 'RAG Analysis',
+    system: 'You are a Customer Success portfolio analyst. Analyze the accounts in this RAG band. Summarize the common drivers, where risk/MRR is concentrated, notable accounts, and recommended plays. Be concise and data-grounded.',
+    maxTokens: 700,
+  },
+  issues_overview: {
+    label: 'Issues & Escalations Overview',
+    system: 'You are a Customer Success analyst. Summarize the issues and escalations currently in view (already filtered by the user): dominant themes, priority/severity distribution, notable accounts, and the top 3 recommended focus areas. Be concise.',
+    maxTokens: 700,
+  },
+  next_steps: {
+    label: 'Recommended Next Steps',
+    system: 'You are a Customer Success analyst. Given this single issue or escalation, recommend concrete next steps as 3–5 short bullets, suggest who should own it, and flag any risk. Be specific and concise.',
+    maxTokens: 400,
+  },
+};
+
+function withTimeout(ms) {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), ms);
+  return { signal: ctrl.signal, clear: () => clearTimeout(t) };
+}
+
+async function callAnthropic({ key, model, system, user, maxTokens }) {
+  const to = withTimeout(9500);
+  try {
+    const r = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      signal: to.signal,
+      headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+      body: JSON.stringify({ model, max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error?.message || `Anthropic error ${r.status}`);
+    return (j.content || []).map(b => b.text || '').join('').trim();
+  } finally { to.clear(); }
+}
+
+async function callOpenAI({ key, model, system, user, maxTokens }) {
+  const to = withTimeout(9500);
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      signal: to.signal,
+      headers: { Authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        messages: [{ role: 'system', content: system }, { role: 'user', content: user }],
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error?.message || `OpenAI error ${r.status}`);
+    return (j.choices?.[0]?.message?.content || '').trim();
+  } finally { to.clear(); }
+}
+
+async function callGemini({ key, model, system, user, maxTokens }) {
+  const to = withTimeout(9500);
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(key)}`;
+    const r = await fetch(url, {
+      method: 'POST',
+      signal: to.signal,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: 'user', parts: [{ text: user }] }],
+        generationConfig: { maxOutputTokens: maxTokens },
+      }),
+    });
+    const j = await r.json();
+    if (!r.ok) throw new Error(j.error?.message || `Gemini error ${r.status}`);
+    return (j.candidates?.[0]?.content?.parts || []).map(p => p.text || '').join('').trim();
+  } finally { to.clear(); }
+}
+
+export async function callAI({ provider, key, model, system, user, maxTokens = 600 }) {
+  if (!key) throw new Error('No API key configured for the selected provider');
+  const m = model || DEFAULT_MODELS[provider];
+  if (provider === 'anthropic') return callAnthropic({ key, model: m, system, user, maxTokens });
+  if (provider === 'openai')    return callOpenAI({ key, model: m, system, user, maxTokens });
+  if (provider === 'gemini')    return callGemini({ key, model: m, system, user, maxTokens });
+  throw new Error(`Unknown AI provider: ${provider}`);
+}

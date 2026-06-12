@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
 import LastEdited from './LastEdited';
+import AiPanel from './AiPanel';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 function toMonth(dateStr) {
@@ -322,11 +323,33 @@ export default function AccountDetail() {
         <MetricCard label="NPS" value={a.nps != null ? `${a.nps}` : '—'} />
       </div>
 
+      {/* AI account summary (manual refresh, ≤200 words) */}
+      <AiPanel
+        section="account_summary"
+        title="AI Account Summary"
+        getPayload={() => ({ account_id: id })}
+        initialText={a.ai_summary}
+        initialAt={a.ai_summary_at}
+        onGenerated={(t, at) => setAccount(prev => ({ ...prev, ai_summary: t, ai_summary_at: at }))}
+        hint="Summarizes this account across escalations, issues, tasks, health and commercials. Click Generate."
+      />
+
       {/* Main grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* Left — Escalations + POCs */}
         <div className="lg:col-span-2 space-y-5">
+
+          {/* AI summary of this account's escalations & issues */}
+          <AiPanel
+            section="account_esc_iss"
+            title="AI Escalations & Issues Summary"
+            getPayload={() => ({ account_id: id })}
+            initialText={a.ai_esc_iss_summary}
+            initialAt={a.ai_esc_iss_summary_at}
+            onGenerated={(t, at) => setAccount(prev => ({ ...prev, ai_esc_iss_summary: t, ai_esc_iss_summary_at: at }))}
+            hint="Summarizes the escalations and issues on this account. Click Generate."
+          />
 
           {/* Escalations */}
           <div className="card">

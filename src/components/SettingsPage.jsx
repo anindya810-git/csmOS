@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { FIELD_CATALOG } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions, getDefaultPermsForRole, PERM_OBJECTS, PERM_ACTIONS } from '../context/PermissionsContext';
+import { useAiConfig } from '../context/AiConfigContext';
 import { timeAgo, fullTime } from './LastEdited';
 
 // Users seen within this window count as currently active.
@@ -182,6 +183,30 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    key: 'ai',
+    label: 'AI',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
+      </svg>
+    ),
+  },
+];
+
+const AI_PROVIDERS = [
+  ['anthropic', 'Anthropic (Claude)'],
+  ['openai',    'OpenAI (GPT)'],
+  ['gemini',    'Google Gemini'],
+];
+
+const AI_PROMPT_FIELDS = [
+  ['account_summary', 'Account Summary', 'How to summarize an account (≤200 words).'],
+  ['account_esc_iss', 'Account — Escalations & Issues', 'How to summarize an account\'s escalations & issues.'],
+  ['feature_request', 'Feature Request Recommendation', 'How to recommend take-up, priority and ETA from linked data.'],
+  ['rag',             'RAG Report Analysis', 'How to analyze each RAG band (Red/Amber/Green).'],
+  ['issues_overview', 'Issues & Escalations Overview', 'How to summarize the filtered issues & escalations in view.'],
+  ['next_steps',      'Issue / Escalation Next Steps', 'How to recommend next steps for a single issue or escalation.'],
 ];
 
 export default function SettingsPage() {
@@ -224,6 +249,12 @@ export default function SettingsPage() {
   const [permEdits, setPermEdits] = useState({});
   const [permSaving, setPermSaving] = useState(false);
 
+  // AI settings
+  const { ai: aiConfig, reload: reloadAi } = useAiConfig();
+  const [aiForm,   setAiForm]   = useState({ provider: '', keys: {}, models: {}, prompts: {} });
+  const [aiSaving, setAiSaving] = useState(false);
+  const [aiMsg,    setAiMsg]    = useState('');
+
   // Field renaming
   const { rows: labelRows, reload: labelsReload } = useFieldLabels();
   const [fieldsTab,    setFieldsTab]    = useState('dropdowns'); // dropdowns | rename
@@ -248,6 +279,43 @@ export default function SettingsPage() {
     const cfg = ddData.fr_default_approver?.[0];
     if (cfg) setFrApprover(cfg.value);
   }, [ddData]);
+
+  // Prefill the AI form from the (key-free) public config.
+  useEffect(() => {
+    if (!aiConfig) return;
+    setAiForm({
+      provider: aiConfig.provider || '',
+      keys: {},
+      models: { ...(aiConfig.models || {}) },
+      prompts: { ...(aiConfig.prompts || {}) },
+    });
+  }, [aiConfig]);
+
+  const saveAi = async () => {
+    setAiSaving(true); setAiMsg('');
+    try {
+      await axios.post('/api/dropdown-config', {
+        action: 'ai_save',
+        provider: aiForm.provider,
+        keys: aiForm.keys,            // only non-empty values are applied server-side
+        models: aiForm.models,
+        prompts: aiForm.prompts,
+      });
+      await reloadAi();
+      setAiForm(f => ({ ...f, keys: {} }));   // never keep key text around
+      setAiMsg('Saved');
+      setTimeout(() => setAiMsg(''), 2500);
+    } catch (e) { setAiMsg(e.response?.data?.error || 'Failed to save'); }
+    finally { setAiSaving(false); }
+  };
+
+  const clearAiKey = async (p) => {
+    if (!window.confirm(`Remove the ${p} API key?`)) return;
+    try {
+      await axios.post('/api/dropdown-config', { action: 'ai_save', clear: [p] });
+      await reloadAi();
+    } catch (e) { alert(e.response?.data?.error || 'Failed'); }
+  };
 
   useEffect(() => {
     const defaults = getDefaultPermsForRole(permRole);
@@ -691,6 +759,101 @@ export default function SettingsPage() {
                   </p>
                 )}
               </div>
+            </div>
+          </>
+        )}
+
+        {/* ── AI page ────────────────────────────────────────────────── */}
+        {settingsPage === 'ai' && (
+          <>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">AI (Bring Your Own Key)</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Choose a provider, paste your API key, and tune how each AI section analyzes data. AI buttons stay greyed out until the active provider has a key.</p>
+            </div>
+
+            {/* Provider + keys */}
+            <div className="card space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Active Provider</label>
+                <div className="flex flex-wrap gap-2">
+                  {AI_PROVIDERS.map(([key, label]) => {
+                    const active = aiForm.provider === key;
+                    const hasKey = aiConfig?.providers?.[key];
+                    return (
+                      <button key={key} onClick={() => setAiForm(f => ({ ...f, provider: key }))}
+                        className={`px-3 py-2 rounded-lg text-sm font-medium border transition flex items-center gap-2
+                          ${active ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-600 hover:border-gray-300'}`}>
+                        {label}
+                        <span className={`w-1.5 h-1.5 rounded-full ${hasKey ? 'bg-green-500' : 'bg-gray-300'}`} title={hasKey ? 'Key set' : 'No key'} />
+                      </button>
+                    );
+                  })}
+                </div>
+                {aiConfig && !aiConfig.enabled && (
+                  <p className="text-xs text-amber-600 mt-2">The active provider has no key yet — AI features are disabled until you add one.</p>
+                )}
+              </div>
+
+              <div className="space-y-3">
+                {AI_PROVIDERS.map(([key, label]) => (
+                  <div key={key} className="grid grid-cols-1 sm:grid-cols-[160px_1fr_140px] gap-2 items-center">
+                    <div className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                      {label}
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${aiConfig?.providers?.[key] ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                        {aiConfig?.providers?.[key] ? 'Key set' : 'No key'}
+                      </span>
+                    </div>
+                    <input
+                      type="password"
+                      value={aiForm.keys[key] || ''}
+                      onChange={e => setAiForm(f => ({ ...f, keys: { ...f.keys, [key]: e.target.value } }))}
+                      placeholder={aiConfig?.providers?.[key] ? 'Enter new key to replace (leave blank to keep)' : 'Paste API key'}
+                      className="w-full !py-1.5 text-sm font-mono"
+                      autoComplete="off"
+                    />
+                    <div className="flex items-center gap-2">
+                      <input
+                        value={aiForm.models[key] || ''}
+                        onChange={e => setAiForm(f => ({ ...f, models: { ...f.models, [key]: e.target.value } }))}
+                        placeholder="model (optional)"
+                        className="w-full !py-1.5 text-xs"
+                        title="Override the default model for this provider"
+                      />
+                      {aiConfig?.providers?.[key] && (
+                        <button onClick={() => clearAiKey(key)} className="text-xs text-red-500 hover:text-red-700 shrink-0" title="Remove key">✕</button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Per-section instructions */}
+            <div className="card space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">Section instructions</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Optional. Added on top of the built-in prompt for each AI section. Leave blank to use defaults.</p>
+              </div>
+              {AI_PROMPT_FIELDS.map(([key, label, placeholder]) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
+                  <textarea
+                    rows={2}
+                    value={aiForm.prompts[key] || ''}
+                    onChange={e => setAiForm(f => ({ ...f, prompts: { ...f.prompts, [key]: e.target.value } }))}
+                    placeholder={placeholder}
+                    className="w-full resize-none text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-3">
+              <button onClick={saveAi} disabled={aiSaving}
+                className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+                {aiSaving ? 'Saving…' : 'Save AI Settings'}
+              </button>
+              {aiMsg && <span className={`text-sm ${aiMsg === 'Saved' ? 'text-green-600' : 'text-red-600'}`}>{aiMsg}</span>}
             </div>
           </>
         )}

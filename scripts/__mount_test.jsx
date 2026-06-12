@@ -8,6 +8,7 @@ import axios from 'axios';
 import { AuthProvider } from '../src/context/AuthContext';
 import { FieldLabelsProvider } from '../src/context/FieldLabelsContext';
 import { PermissionsProvider } from '../src/context/PermissionsContext';
+import { AiConfigProvider } from '../src/context/AiConfigContext';
 
 import IssuesDashboard from '../src/components/IssuesDashboard';
 import EscalationsDashboard from '../src/components/EscalationsDashboard';
@@ -61,7 +62,14 @@ const FIXTURES = {
         { link_type: 'issue', linked_id: 12, account_id: 2, account_name: 'Beta Inc', mrr: 50000 },
       ] },
   ],
-  '/api/dropdown-config': {},
+  '/api/dropdown-config': {
+    __ai: {
+      provider: 'anthropic', enabled: true,
+      providers: { anthropic: true, openai: false, gemini: false },
+      models: { anthropic: 'claude-3-5-haiku-latest', openai: 'gpt-4o-mini', gemini: 'gemini-1.5-flash' },
+      prompts: { account_summary: '', account_esc_iss: '', feature_request: '', rag: '', issues_overview: '', next_steps: '' },
+    },
+  },
   '/api/users': [{ id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin' }],
   '/api/admin/users': [
     { id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin', team: 'India EV', last_active_at: new Date().toISOString() },
@@ -97,7 +105,9 @@ async function mountOne(name, Comp) {
           <AuthProvider>
             <FieldLabelsProvider>
               <PermissionsProvider>
-                <Comp />
+                <AiConfigProvider>
+                  <Comp />
+                </AiConfigProvider>
               </PermissionsProvider>
             </FieldLabelsProvider>
           </AuthProvider>

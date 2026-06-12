@@ -3,6 +3,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FieldLabelsProvider } from './context/FieldLabelsContext';
 import { PermissionsProvider } from './context/PermissionsContext';
+import { AiConfigProvider } from './context/AiConfigContext';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -82,5 +83,5 @@ function AppRoutes() {
 }
 
 export default function App() {
-  return <AuthProvider><FieldLabelsProvider><PermissionsProvider><AppRoutes /></PermissionsProvider></FieldLabelsProvider></AuthProvider>;
+  return <AuthProvider><FieldLabelsProvider><PermissionsProvider><AiConfigProvider><AppRoutes /></AiConfigProvider></PermissionsProvider></FieldLabelsProvider></AuthProvider>;
 }
