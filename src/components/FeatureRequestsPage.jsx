@@ -235,8 +235,50 @@ export default function FeatureRequestsPage() {
         <input value={filters.search} onChange={e => applyFilter({ search: e.target.value })} placeholder="Search title…" className="flex-1 min-w-[160px] !py-1.5 text-sm" />
       </div>
 
-      {/* List */}
-      <div className="card p-0 overflow-hidden">
+      {/* Mobile card list */}
+      <div className="md:hidden space-y-3">
+        {loading ? (
+          <div className="card text-center py-10 text-gray-400">Loading…</div>
+        ) : frs.length === 0 ? (
+          <div className="card text-center py-10 text-gray-400">No feature requests found.</div>
+        ) : frs.map(fr => {
+          const stats = frStats(fr);
+          const canEdit = isAdmin || (fr.created_by_id === user?.id && fr.status === 'pending');
+          return (
+            <div key={fr.id} className="card">
+              <div className="flex items-start justify-between gap-3">
+                <p className="font-semibold text-gray-900 min-w-0">{fr.title}</p>
+                <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[fr.status] || 'bg-gray-100 text-gray-600'}`}>{fr.status}</span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
+                <span className={`font-bold px-2 py-0.5 rounded-full ${PRIORITY_COLORS[fr.priority] || 'bg-gray-100 text-gray-600'}`}>{fr.priority}</span>
+                {fr.related_to && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{fr.related_to}</span>}
+                <span className="text-gray-400">by {fr.created_by || '—'}</span>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                {stats.escalations > 0 && <span>{stats.escalations} escalation{stats.escalations > 1 ? 's' : ''}</span>}
+                {stats.issues > 0 && <span>{stats.issues} issue{stats.issues > 1 ? 's' : ''}</span>}
+                {stats.accounts > 0 && <span>{stats.accounts} account{stats.accounts > 1 ? 's' : ''}</span>}
+                {fr.expected_rollout_date && <span>Rollout: {fmtDate(fr.expected_rollout_date)}</span>}
+              </div>
+              <div className="mt-3 flex items-center gap-2">
+                {isAdmin && fr.status === 'pending' && (
+                  <button onClick={() => { setReviewFr(fr); setRejectReason(''); }} className="px-3 py-1.5 text-xs font-medium bg-brand-50 text-brand-700 rounded-lg">Review</button>
+                )}
+                {canEdit && (
+                  <button onClick={() => openEdit(fr)} className="px-3 py-1.5 text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200 rounded-lg">Edit</button>
+                )}
+                {isAdmin && (
+                  <button onClick={() => handleDelete(fr)} className="px-3 py-1.5 text-xs font-medium bg-red-50 text-red-600 border border-red-200 rounded-lg">Delete</button>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Desktop table */}
+      <div className="card p-0 overflow-hidden hidden md:block">
         {loading ? (
           <div className="py-12 text-center text-gray-400">Loading…</div>
         ) : frs.length === 0 ? (
