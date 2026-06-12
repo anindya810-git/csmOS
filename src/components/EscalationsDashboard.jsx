@@ -46,6 +46,15 @@ function getOps(type) {
 function needsValue(op) { return !['is empty','is not empty'].includes(op); }
 function matchesEscalationCondition(esc, cond, fieldDefs) {
   const { field, operator, value } = cond;
+  if (field === 'rag_status') {
+    const raw = (esc.accounts?.rag_status ?? esc.rag_status) || '';
+    if (operator === 'is empty')     return !raw;
+    if (operator === 'is not empty') return !!raw;
+    if (operator === 'is one of') { const vals = Array.isArray(value) ? value : []; return vals.length === 0 || vals.some(v => raw.toLowerCase() === v.toLowerCase()); }
+    if (operator === 'is')    return raw.toLowerCase() === String(value ?? '').toLowerCase();
+    if (operator === 'is not') return raw.toLowerCase() !== String(value ?? '').toLowerCase();
+    return true;
+  }
   const def = fieldDefs.find(f => f.key === field);
   if (!def) return true;
   const raw = esc[field];
@@ -118,7 +127,7 @@ export default function EscalationsDashboard() {
     user?.email, 'escalations', Object.fromEntries(ESC_COLS.map(c => [c.key, !c.off]))
   );
   const visibleEscCols = ESC_COLS.filter(c => c.key !== 'account_name' && showCol(c.key));
-  const colCount = visibleEscCols.length + 2;
+  const colCount = visibleEscCols.length + 2 + (user?.role === 'admin' ? 1 : 0);
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [filters,     setFilters]     = useState({ status: [], csm: [], ownership: [], issue_type: [], month: [] });
@@ -144,6 +153,7 @@ export default function EscalationsDashboard() {
   const [editForm,      setEditForm]      = useState({});
   const [editSaving,    setEditSaving]    = useState(false);
   const [dropdownConfig, setDropdownConfig] = useState({});
+  const [selectedIds,   setSelectedIds]   = useState(new Set());
 
   useEffect(() => {
     axios.get('/api/accounts').then(r => {
@@ -260,10 +270,14 @@ export default function EscalationsDashboard() {
   const removeCondition = (id) =>
     setConditions(c => c.filter(cond => cond.id !== id));
 
+  const toggleSelectId = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const allPageSelected = paginated.length > 0 && paginated.every(e => selectedIds.has(e.id));
+  const selectAllPage = () => { allPageSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(paginated.map(e => e.id))); };
+
   const handleBulkApply = async () => {
     setBulkSaving(true);
     try {
-      await axios.patch('/api/escalations', { ids: displayed.map(e => e.id), field: bulkField, value: bulkValue });
+      await axios.patch('/api/escalations', { ids: selectedIds.size > 0 ? [...selectedIds] : displayed.map(e => e.id), field: bulkField, value: bulkValue });
       setBulkConfirm(false);
       setBulkOpen(false);
       setBulkValue('');
@@ -296,6 +310,9 @@ export default function EscalationsDashboard() {
     { key: 'date_of_escalation',   label: 'Date of Escalation',   type: 'date' },
     { key: 'eta',                  label: 'ETA',                  type: 'date' },
     { key: 'month',                label: 'Month',                type: 'select', opts: MONTHS },
+    { key: 'tenant_id',     label: 'Tenant ID',     type: 'text' },
+    { key: 'email_subject', label: 'Email Subject',  type: 'text' },
+    { key: 'rag_status',    label: 'RAG Status',     type: 'select', opts: ['Green','Amber','Red'] },
   ];
 
   const bulkFieldDefs = [
@@ -721,7 +738,7 @@ export default function EscalationsDashboard() {
               );
             })()}
             <span className="text-sm text-amber-700">
-              for <strong className="text-amber-900">{displayed.length}</strong> escalation{displayed.length !== 1 ? 's' : ''}
+              for <strong className="text-amber-900">{selectedIds.size > 0 ? selectedIds.size : displayed.length}</strong> escalation{(selectedIds.size > 0 ? selectedIds.size : displayed.length) !== 1 ? 's' : ''}{selectedIds.size > 0 ? ' (selected)' : ''}
             </span>
             <button onClick={() => setBulkConfirm(true)} disabled={!bulkValue || displayed.length === 0}
               className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-sm font-medium rounded-lg transition ml-1">
@@ -750,6 +767,12 @@ export default function EscalationsDashboard() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  {user?.role === 'admin' && (
+                    <th className="w-10 px-3 py-3">
+                      <input type="checkbox" checked={allPageSelected} onChange={selectAllPage}
+                        className="!w-4 !h-4 !p-0 !border-0 !ring-0 shrink-0 accent-brand-600" />
+                    </th>
+                  )}
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldLabel('escalations', 'account_name', 'Account')}</th>
                   {visibleEscCols.map(c => (
                     <th key={c.key} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{fieldLabel('escalations', c.key, c.label)}</th>
@@ -767,6 +790,12 @@ export default function EscalationsDashboard() {
                         className={`transition ${isEditing ? 'bg-amber-50/40' : 'hover:bg-gray-50 cursor-pointer'}`}
                         onClick={() => { if (!isEditing) setExpanded(expanded === e.id ? null : e.id); }}
                       >
+                        {user?.role === 'admin' && (
+                          <td className="w-10 px-3 py-3" onClick={ev => ev.stopPropagation()}>
+                            <input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleSelectId(e.id)}
+                              className="!w-4 !h-4 !p-0 !border-0 !ring-0 shrink-0 accent-brand-600" />
+                          </td>
+                        )}
                         <td className="px-4 py-3">
                           {e.account_id ? (
                             <Link
@@ -1236,7 +1265,7 @@ export default function EscalationsDashboard() {
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
               Set <strong>{bulkFieldDefs.find(f => f.key === bulkField)?.label}</strong> to{' '}
               <strong>"{bulkValue}"</strong> for{' '}
-              <strong>{displayed.length} escalation{displayed.length !== 1 ? 's' : ''}</strong>
+              <strong>{selectedIds.size > 0 ? selectedIds.size : displayed.length} escalation{(selectedIds.size > 0 ? selectedIds.size : displayed.length) !== 1 ? 's' : ''}</strong>
             </div>
             <div className="flex justify-end gap-3">
               <button onClick={() => setBulkConfirm(false)} disabled={bulkSaving}
@@ -1245,7 +1274,7 @@ export default function EscalationsDashboard() {
               </button>
               <button onClick={handleBulkApply} disabled={bulkSaving}
                 className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
-                {bulkSaving ? 'Updating…' : `Update ${displayed.length} escalation${displayed.length !== 1 ? 's' : ''}`}
+                {bulkSaving ? 'Updating…' : `Update ${selectedIds.size > 0 ? selectedIds.size : displayed.length} escalation${(selectedIds.size > 0 ? selectedIds.size : displayed.length) !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>

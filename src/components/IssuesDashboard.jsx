@@ -131,7 +131,7 @@ export default function IssuesDashboard() {
     user?.email, 'issues', Object.fromEntries(ISSUES_COLS.map(c => [c.key, !c.off]))
   );
   const visibleIssueCols = ISSUES_COLS.filter(c => c.key !== 'account_name' && showCol(c.key));
-  const colCount = visibleIssueCols.length + 2;
+  const colCount = visibleIssueCols.length + 2 + (user?.role === 'admin' ? 1 : 0);
   const [issues,       setIssues]       = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [accounts,     setAccounts]     = useState([]);
@@ -158,6 +158,7 @@ export default function IssuesDashboard() {
   const [bulkValue,    setBulkValue]    = useState('');
   const [bulkConfirm,  setBulkConfirm]  = useState(false);
   const [bulkSaving,   setBulkSaving]   = useState(false);
+  const [selectedIds,   setSelectedIds]   = useState(new Set());
 
   useEffect(() => {
     axios.get('/api/accounts').then(r => {
@@ -258,10 +259,14 @@ export default function IssuesDashboard() {
   const removeCondition = (id) =>
     setConditions(c => c.filter(cond => cond.id !== id));
 
+  const toggleSelectId = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const allPageSelected = paginated.length > 0 && paginated.every(i => selectedIds.has(i.id));
+  const selectAllPage = () => { allPageSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(paginated.map(i => i.id))); };
+
   const handleBulkApply = async () => {
     setBulkSaving(true);
     try {
-      await axios.patch('/api/issues', { ids: displayed.map(i => i.id), field: bulkField, value: bulkValue });
+      await axios.patch('/api/issues', { ids: selectedIds.size > 0 ? [...selectedIds] : displayed.map(i => i.id), field: bulkField, value: bulkValue });
       setBulkConfirm(false);
       setBulkOpen(false);
       setBulkValue('');
@@ -295,6 +300,8 @@ export default function IssuesDashboard() {
     { key: 'closure_date',   label: 'Closure Date',   type: 'text' },
     { key: 'support_ticket', label: 'Support Ticket', type: 'number' },
     { key: 'dev_ticket',     label: 'Dev Ticket',     type: 'number' },
+    { key: 'tenant_id', label: 'Tenant ID', type: 'text' },
+    { key: 'csm_lead',  label: 'CSM Lead',  type: 'text' },
   ];
 
   const bulkFieldDefs = [
@@ -382,6 +389,10 @@ export default function IssuesDashboard() {
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account Name <span className="text-gray-300 font-normal normal-case">(read-only)</span></p>
             <input type="text" value={f.account_name || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM <span className="text-gray-300 font-normal normal-case">(from account)</span></p>
+            <input type="text" value={f.csm || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
           </div>
         </>
       )}
@@ -670,7 +681,7 @@ export default function IssuesDashboard() {
               );
               return <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Enter value…" className="!w-48 text-sm !py-1.5 border-amber-200 bg-white" />;
             })()}
-            <span className="text-sm text-amber-700">for <strong className="text-amber-900">{displayed.length}</strong> issue{displayed.length !== 1 ? 's' : ''}</span>
+            <span className="text-sm text-amber-700">for <strong className="text-amber-900">{selectedIds.size > 0 ? selectedIds.size : displayed.length}</strong> issue{(selectedIds.size > 0 ? selectedIds.size : displayed.length) !== 1 ? 's' : ''}{selectedIds.size > 0 ? ' (selected)' : ''}</span>
             <button onClick={() => setBulkConfirm(true)} disabled={!bulkValue || displayed.length === 0}
               className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 hover:bg-amber-600 disabled:bg-amber-300 text-white text-sm font-medium rounded-lg transition ml-1">
               Apply →
@@ -695,6 +706,12 @@ export default function IssuesDashboard() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
+                    {user?.role === 'admin' && (
+                      <th className="w-10 px-3 py-3">
+                        <input type="checkbox" checked={allPageSelected} onChange={selectAllPage}
+                          className="!w-4 !h-4 !p-0 !border-0 !ring-0 shrink-0 accent-brand-600" />
+                      </th>
+                    )}
                     <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldLabel('issues', 'account_name', 'Account')}</th>
                     {visibleIssueCols.map(c => (
                       <th key={c.key} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{fieldLabel('issues', c.key, c.label)}</th>
@@ -711,6 +728,12 @@ export default function IssuesDashboard() {
                           className={`transition ${isEditing ? 'bg-amber-50/40' : 'hover:bg-gray-50 cursor-pointer'}`}
                           onClick={() => { if (!isEditing) setExpanded(expanded === issue.id ? null : issue.id); }}
                         >
+                          {user?.role === 'admin' && (
+                            <td className="w-10 px-3 py-3" onClick={ev => ev.stopPropagation()}>
+                              <input type="checkbox" checked={selectedIds.has(issue.id)} onChange={() => toggleSelectId(issue.id)}
+                                className="!w-4 !h-4 !p-0 !border-0 !ring-0 shrink-0 accent-brand-600" />
+                            </td>
+                          )}
                           <td className="px-4 py-3">
                             {issue.account_id ? (
                               <Link to={`/accounts/${issue.account_id}`} className="font-medium text-brand-700 hover:underline" onClick={ev => ev.stopPropagation()}>
@@ -895,13 +918,13 @@ export default function IssuesDashboard() {
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
               Set <strong>{bulkFieldDefs.find(f => f.key === bulkField)?.label}</strong> to{' '}
               <strong>"{bulkField === 'account_id' ? (accounts.find(a => String(a.id) === String(bulkValue))?.account_name || bulkValue) : bulkValue}"</strong> for{' '}
-              <strong>{displayed.length} issue{displayed.length !== 1 ? 's' : ''}</strong>
+              <strong>{selectedIds.size > 0 ? selectedIds.size : displayed.length} issue{(selectedIds.size > 0 ? selectedIds.size : displayed.length) !== 1 ? 's' : ''}</strong>
             </div>
             <div className="flex justify-end gap-3">
               <button onClick={() => setBulkConfirm(false)} disabled={bulkSaving} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
               <button onClick={handleBulkApply} disabled={bulkSaving}
                 className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
-                {bulkSaving ? 'Updating…' : `Update ${displayed.length} issue${displayed.length !== 1 ? 's' : ''}`}
+                {bulkSaving ? 'Updating…' : `Update ${selectedIds.size > 0 ? selectedIds.size : displayed.length} issue${(selectedIds.size > 0 ? selectedIds.size : displayed.length) !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>

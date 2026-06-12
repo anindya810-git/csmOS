@@ -167,7 +167,7 @@ export default function AccountsPage() {
     user?.email, 'accounts', Object.fromEntries(ACCOUNTS_COLS.map(c => [c.key, !c.off]))
   );
   const visibleCols = ACCOUNTS_COLS.filter(c => c.key !== 'account_name' && showCol(c.key));
-  const colCount = visibleCols.length + 2; // +account_name +actions
+  const colCount = visibleCols.length + 2 + (user?.role === 'admin' ? 1 : 0); // +account_name +actions
   const [accounts,         setAccounts]         = useState([]);
   const [filters,          setFilters]          = useState({});
   const [loading,          setLoading]          = useState(true);
@@ -187,6 +187,7 @@ export default function AccountsPage() {
   const [bulkValue,        setBulkValue]        = useState('');
   const [bulkConfirm,      setBulkConfirm]      = useState(false);
   const [bulkSaving,       setBulkSaving]       = useState(false);
+  const [selectedIds,   setSelectedIds]   = useState(new Set());
   const [page,             setPage]             = useState(1);
   const [perPage,          setPerPage]          = useState(100);
 
@@ -339,6 +340,10 @@ export default function AccountsPage() {
 
   const paginated = displayed.slice((page - 1) * perPage, page * perPage);
 
+  const toggleSelectId = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const allPageSelected = paginated.length > 0 && paginated.every(a => selectedIds.has(a.id));
+  const selectAllPage = () => { allPageSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(paginated.map(a => a.id))); };
+
   const handleSort = (field) => {
     if (sortField === field) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortDir('asc'); }
@@ -347,7 +352,7 @@ export default function AccountsPage() {
   const handleBulkApply = async () => {
     setBulkSaving(true);
     try {
-      await axios.patch('/api/accounts', { ids: displayed.map(a => a.id), field: bulkField, value: bulkValue });
+      await axios.patch('/api/accounts', { ids: selectedIds.size > 0 ? [...selectedIds] : displayed.map(a => a.id), field: bulkField, value: bulkValue });
       setBulkConfirm(false);
       setBulkOpen(false);
       setBulkValue('');
@@ -611,7 +616,7 @@ export default function AccountsPage() {
               );
             })()}
             <span className="text-sm text-amber-700">
-              for <strong className="text-amber-900">{displayed.length}</strong> account{displayed.length !== 1 ? 's' : ''}
+              for <strong className="text-amber-900">{selectedIds.size > 0 ? selectedIds.size : displayed.length}</strong> account{(selectedIds.size > 0 ? selectedIds.size : displayed.length) !== 1 ? 's' : ''}{selectedIds.size > 0 ? ' (selected)' : ''}
             </span>
             <button
               onClick={() => setBulkConfirm(true)}
@@ -636,6 +641,12 @@ export default function AccountsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
+                {user?.role === 'admin' && (
+                  <th className="w-10 px-3 py-3">
+                    <input type="checkbox" checked={allPageSelected} onChange={selectAllPage}
+                      className="!w-4 !h-4 !p-0 !border-0 !ring-0 shrink-0 accent-brand-600" />
+                  </th>
+                )}
                 <Th label={fieldLabel('accounts', 'account_name', 'Account Name')} field="account_name" />
                 {visibleCols.map(c => (
                   <Th key={c.key} label={fieldLabel('accounts', c.key, c.label)} field={c.key} />
@@ -650,6 +661,12 @@ export default function AccountsPage() {
                 <tr><td colSpan={colCount} className="py-12 text-center text-gray-400">No accounts found.</td></tr>
               ) : paginated.map(a => (
                 <tr key={a.id} onClick={() => navigate(`/accounts/${a.id}`)} className="hover:bg-gray-50 cursor-pointer transition">
+                  {user?.role === 'admin' && (
+                    <td className="w-10 px-3 py-3" onClick={ev => ev.stopPropagation()}>
+                      <input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => toggleSelectId(a.id)}
+                        className="!w-4 !h-4 !p-0 !border-0 !ring-0 shrink-0 accent-brand-600" />
+                    </td>
+                  )}
                   <td className="px-4 py-3">
                     <div className="font-medium text-gray-900 max-w-xs truncate">{a.account_name}</div>
                     <div className="text-xs text-gray-400">{a.tenant_id}</div>
@@ -714,7 +731,7 @@ export default function AccountsPage() {
             <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-900">
               Set <strong>{bulkFieldDefs.find(f => f.key === bulkField)?.label}</strong> to{' '}
               <strong>"{bulkValue}"</strong> for{' '}
-              <strong>{displayed.length} account{displayed.length !== 1 ? 's' : ''}</strong>
+              <strong>{selectedIds.size > 0 ? selectedIds.size : displayed.length} account{(selectedIds.size > 0 ? selectedIds.size : displayed.length) !== 1 ? 's' : ''}</strong>
             </div>
             <div className="flex justify-end gap-3">
               <button onClick={() => setBulkConfirm(false)} disabled={bulkSaving} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">
@@ -722,7 +739,7 @@ export default function AccountsPage() {
               </button>
               <button onClick={handleBulkApply} disabled={bulkSaving}
                 className="px-5 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
-                {bulkSaving ? 'Updating…' : `Update ${displayed.length} account${displayed.length !== 1 ? 's' : ''}`}
+                {bulkSaving ? 'Updating…' : `Update ${selectedIds.size > 0 ? selectedIds.size : displayed.length} account${(selectedIds.size > 0 ? selectedIds.size : displayed.length) !== 1 ? 's' : ''}`}
               </button>
             </div>
           </div>

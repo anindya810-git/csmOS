@@ -57,7 +57,6 @@ export default function FeatureRequestsPage() {
   const [showForm, setShowForm] = useState(false);
   const [editFr, setEditFr]     = useState(null);
   const [form, setForm]         = useState(EMPTY_FORM);
-  const [linkedItems, setLinkedItems] = useState([]);
   const [saving, setSaving]     = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -65,12 +64,32 @@ export default function FeatureRequestsPage() {
   const [linkSearch, setLinkSearch] = useState('');
   const [escalations, setEscalations] = useState([]);
   const [issues, setIssues]           = useState([]);
-  const [pendingLinks, setPendingLinks] = useState(new Set());
+  const [selectedLinks, setSelectedLinks] = useState(new Set());
+  const [escStatusFilter, setEscStatusFilter] = useState('');
+  const [issStatusFilter,  setIssStatusFilter]  = useState('');
+  const [issPriorityFilter, setIssPriorityFilter] = useState('');
   const [linksLoading, setLinksLoading] = useState(false);
 
   const [reviewFr, setReviewFr]     = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [reviewing, setReviewing]   = useState(false);
+
+  const linkedItems = useMemo(() => {
+    const items = [];
+    selectedLinks.forEach(key => {
+      const [rawType, rawId] = key.split(':');
+      const type = rawType === 'esc' ? 'escalation' : 'issue';
+      const id = parseInt(rawId);
+      if (type === 'escalation') {
+        const e = escalations.find(x => x.id === id);
+        if (e) items.push({ type, id, account_name: e.account_name || '', description: e.description || '', status: e.status || '' });
+      } else {
+        const i = issues.find(x => x.id === id);
+        if (i) items.push({ type, id, account_name: i.account_name || '', description: i.description || '', priority: i.priority || '', status: i.status || '' });
+      }
+    });
+    return items;
+  }, [selectedLinks, escalations, issues]);
 
   useEffect(() => { load(); loadRelatedOpts(); }, []);
 
@@ -109,8 +128,9 @@ export default function FeatureRequestsPage() {
   };
 
   const openCreate = () => {
-    setEditFr(null); setForm(EMPTY_FORM); setLinkedItems([]);
-    setPendingLinks(new Set()); setLinkSearch(''); setFormError('');
+    setEditFr(null); setForm(EMPTY_FORM);
+    setSelectedLinks(new Set()); setEscStatusFilter(''); setIssStatusFilter(''); setIssPriorityFilter('');
+    setLinkSearch(''); setFormError('');
     setShowForm(true); loadLinkData();
   };
 
@@ -120,8 +140,8 @@ export default function FeatureRequestsPage() {
     setEditFr(fr);
     setForm({ title: fr.title, description: fr.description || '', related_to: fr.related_to || '', priority: fr.priority || 'P2', expected_rollout_date: fr.expected_rollout_date || '' });
     const existing = (fr.feature_request_links || []).map(l => ({ type: l.link_type, id: l.linked_id, account_name: l.account_name || '' }));
-    setLinkedItems(existing);
-    setPendingLinks(new Set(existing.map(l => `${l.type === 'escalation' ? 'esc' : 'issue'}:${l.id}`)));
+    setSelectedLinks(new Set(existing.map(l => `${l.type === 'escalation' ? 'esc' : 'issue'}:${l.id}`)));
+    setEscStatusFilter(''); setIssStatusFilter(''); setIssPriorityFilter('');
     setLinkSearch(''); setFormError('');
     setShowForm(true); loadLinkData();
   };
@@ -133,31 +153,13 @@ export default function FeatureRequestsPage() {
 
   const toggleLink = (type, id) => {
     const key = `${type === 'escalation' ? 'esc' : 'issue'}:${id}`;
-    setPendingLinks(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
-  };
-
-  const confirmLinks = () => {
-    const items = [];
-    pendingLinks.forEach(key => {
-      const [rawType, rawId] = key.split(':');
-      const type = rawType === 'esc' ? 'escalation' : 'issue';
-      const id = parseInt(rawId);
-      if (type === 'escalation') {
-        const e = escalations.find(x => x.id === id);
-        if (e) items.push({ type, id, account_name: e.account_name || '' });
-      } else {
-        const i = issues.find(x => x.id === id);
-        if (i) items.push({ type, id, account_name: i.account_name || '' });
-      }
-    });
-    setLinkedItems(items);
+    setSelectedLinks(prev => { const n = new Set(prev); n.has(key) ? n.delete(key) : n.add(key); return n; });
   };
 
   const removeLink = (idx) => {
     const item = linkedItems[idx];
-    setLinkedItems(prev => prev.filter((_, i) => i !== idx));
     const key = `${item.type === 'escalation' ? 'esc' : 'issue'}:${item.id}`;
-    setPendingLinks(prev => { const n = new Set(prev); n.delete(key); return n; });
+    setSelectedLinks(prev => { const n = new Set(prev); n.delete(key); return n; });
   };
 
   const handleSave = async () => {
@@ -205,16 +207,27 @@ export default function FeatureRequestsPage() {
   };
 
   const filteredEsc = useMemo(() => {
-    if (!linkSearch) return escalations;
-    const q = linkSearch.toLowerCase();
-    return escalations.filter(e => (e.account_name || '').toLowerCase().includes(q) || (e.description || '').toLowerCase().includes(q));
-  }, [escalations, linkSearch]);
+    return escalations.filter(e => {
+      if (escStatusFilter && e.status !== escStatusFilter) return false;
+      if (linkSearch) {
+        const q = linkSearch.toLowerCase();
+        if (!(e.account_name || '').toLowerCase().includes(q) && !(e.description || '').toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [escalations, linkSearch, escStatusFilter]);
 
   const filteredIss = useMemo(() => {
-    if (!linkSearch) return issues;
-    const q = linkSearch.toLowerCase();
-    return issues.filter(i => (i.account_name || '').toLowerCase().includes(q) || (i.description || '').toLowerCase().includes(q));
-  }, [issues, linkSearch]);
+    return issues.filter(i => {
+      if (issStatusFilter && i.status !== issStatusFilter) return false;
+      if (issPriorityFilter && i.priority !== issPriorityFilter) return false;
+      if (linkSearch) {
+        const q = linkSearch.toLowerCase();
+        if (!(i.account_name || '').toLowerCase().includes(q) && !(i.description || '').toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
+  }, [issues, linkSearch, issStatusFilter, issPriorityFilter]);
 
   return (
     <div className="space-y-5">
@@ -438,8 +451,28 @@ export default function FeatureRequestsPage() {
                         </button>
                       ))}
                     </div>
-                    <div className="p-2 border-b border-gray-100 shrink-0">
+                    <div className="p-2 border-b border-gray-100 shrink-0 space-y-1.5">
                       <input value={linkSearch} onChange={e => setLinkSearch(e.target.value)} placeholder={`Search ${linkTab === 'escalation' ? 'escalations' : 'issues'}…`} className="w-full !py-1.5 text-sm" />
+                      {linkTab === 'escalation' && (
+                        <div className="flex gap-1.5">
+                          <select value={escStatusFilter} onChange={e => setEscStatusFilter(e.target.value)} className="flex-1 !py-1 text-xs !border-gray-200">
+                            <option value="">All Statuses</option>
+                            {['Open','In Progress','Partly Resolved','Resolved'].map(s => <option key={s}>{s}</option>)}
+                          </select>
+                        </div>
+                      )}
+                      {linkTab === 'issue' && (
+                        <div className="flex gap-1.5">
+                          <select value={issStatusFilter} onChange={e => setIssStatusFilter(e.target.value)} className="flex-1 !py-1 text-xs !border-gray-200">
+                            <option value="">All Statuses</option>
+                            {['Open','In Progress','Deferred','Resolved','Closed'].map(s => <option key={s}>{s}</option>)}
+                          </select>
+                          <select value={issPriorityFilter} onChange={e => setIssPriorityFilter(e.target.value)} className="flex-1 !py-1 text-xs !border-gray-200">
+                            <option value="">All Priorities</option>
+                            {['P0','P1','P2','P3'].map(p => <option key={p}>{p}</option>)}
+                          </select>
+                        </div>
+                      )}
                     </div>
                     <div className="flex-1 overflow-y-auto">
                       {linksLoading ? (
@@ -448,15 +481,16 @@ export default function FeatureRequestsPage() {
                         filteredEsc.length === 0 ? (
                           <p className="py-6 text-center text-xs text-gray-400">No escalations found</p>
                         ) : filteredEsc.slice(0, 200).map(esc => {
-                          const key = `esc:${esc.id}`;
-                          const checked = pendingLinks.has(key);
                           return (
-                            <label key={esc.id} className={`flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 ${checked ? 'bg-brand-50' : ''}`}>
-                              <input type="checkbox" checked={checked} onChange={() => toggleLink('escalation', esc.id)} className="mt-0.5 accent-brand-600 shrink-0" />
+                            <label key={esc.id} className={`flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 ${selectedLinks.has(`esc:${esc.id}`) ? 'bg-brand-50' : ''}`}>
+                              <input type="checkbox" checked={selectedLinks.has(`esc:${esc.id}`)} onChange={() => toggleLink('escalation', esc.id)} className="mt-0.5 accent-brand-600 shrink-0" />
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-gray-800 truncate">{esc.account_name || 'Unknown Account'}</p>
-                                <p className="text-xs text-gray-500 truncate">{esc.description || '—'}</p>
-                                <p className="text-xs text-gray-400">{fmtDate(esc.date_of_escalation)}</p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-sm font-semibold text-gray-800 truncate">{esc.account_name || 'Unknown Account'}</p>
+                                  {esc.status && <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full shrink-0 ${esc.status === 'Resolved' ? 'bg-green-100 text-green-700' : esc.status === 'In Progress' ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-700'}`}>{esc.status}</span>}
+                                </div>
+                                <p className="text-xs text-gray-500 truncate mt-0.5">{esc.description || '—'}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{fmtDate(esc.date_of_escalation)}</p>
                               </div>
                             </label>
                           );
@@ -465,26 +499,27 @@ export default function FeatureRequestsPage() {
                         filteredIss.length === 0 ? (
                           <p className="py-6 text-center text-xs text-gray-400">No issues found</p>
                         ) : filteredIss.slice(0, 200).map(iss => {
-                          const key = `issue:${iss.id}`;
-                          const checked = pendingLinks.has(key);
                           return (
-                            <label key={iss.id} className={`flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 ${checked ? 'bg-brand-50' : ''}`}>
-                              <input type="checkbox" checked={checked} onChange={() => toggleLink('issue', iss.id)} className="mt-0.5 accent-brand-600 shrink-0" />
+                            <label key={iss.id} className={`flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 ${selectedLinks.has(`issue:${iss.id}`) ? 'bg-brand-50' : ''}`}>
+                              <input type="checkbox" checked={selectedLinks.has(`issue:${iss.id}`)} onChange={() => toggleLink('issue', iss.id)} className="mt-0.5 accent-brand-600 shrink-0" />
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm font-medium text-gray-800 truncate">{iss.account_name || 'Unknown Account'}</p>
-                                <p className="text-xs text-gray-500 truncate">{iss.description || '—'}</p>
-                                <p className="text-xs text-gray-400">{iss.priority ? `${iss.priority} · ` : ''}{iss.issue_type || ''}</p>
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-sm font-semibold text-gray-800 truncate">{iss.account_name || 'Unknown Account'}</p>
+                                  {iss.priority && <span className={`text-xs font-bold px-1.5 py-0.5 rounded-full shrink-0 ${iss.priority === 'P0' ? 'bg-red-100 text-red-700' : iss.priority === 'P1' ? 'bg-orange-100 text-orange-700' : 'bg-amber-100 text-amber-700'}`}>{iss.priority}</span>}
+                                  {iss.status && <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full shrink-0 ${iss.status === 'Open' ? 'bg-red-100 text-red-700' : iss.status === 'Resolved' || iss.status === 'Closed' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>{iss.status}</span>}
+                                </div>
+                                <p className="text-xs text-gray-500 truncate mt-0.5">{iss.description || '—'}</p>
                               </div>
                             </label>
                           );
                         })
                       )}
                     </div>
-                    <div className="p-3 border-t border-gray-100 bg-gray-50 shrink-0">
-                      <button onClick={confirmLinks} className="w-full py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
-                        Apply {pendingLinks.size > 0 ? `(${pendingLinks.size} selected)` : 'Links'}
-                      </button>
-                    </div>
+                    {selectedLinks.size > 0 && (
+                      <div className="p-2 border-t border-gray-100 bg-brand-50 shrink-0 text-center">
+                        <span className="text-xs text-brand-700 font-medium">{selectedLinks.size} item{selectedLinks.size !== 1 ? 's' : ''} selected</span>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
