@@ -33,7 +33,9 @@ const ROLE_BADGE = {
   ps:          'bg-indigo-100 text-indigo-700',
 };
 
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'csm', csm_name: '', csm_lead: '' };
+const TEAM_OPTIONS = ['India EV', 'India FS', 'US', 'ROW'];
+
+const EMPTY_FORM = { name: '', email: '', password: '', role: 'csm', csm_name: '', csm_lead: '', team: '' };
 
 const DD_FIELDS = [
   { key: 'escalation_status',    label: 'Escalation Status',    section: 'Escalations' },
@@ -109,6 +111,7 @@ function OrgNode({ u, childrenMap, currentUserId, onEdit, onDelete, deleting }) 
             </div>
           </div>
           <div className="mb-1.5"><ActiveStatus at={u.last_active_at} /></div>
+          {u.team && <p className="text-xs text-gray-400 mb-1.5 truncate" title={u.team}>{u.team}</p>}
           <div className="flex items-center justify-between">
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
@@ -279,7 +282,7 @@ export default function SettingsPage() {
   const openAdd = () => { setEditUser(null); setForm(EMPTY_FORM); setError(''); setShowModal(true); };
   const openEdit = (u) => {
     setEditUser(u);
-    setForm({ name: u.name, email: u.email, password: '', role: u.role, csm_name: u.csm_name || '', csm_lead: u.csm_lead || '' });
+    setForm({ name: u.name, email: u.email, password: '', role: u.role, csm_name: u.csm_name || '', csm_lead: u.csm_lead || '', team: u.team || '' });
     setError('');
     setShowModal(true);
   };
@@ -289,7 +292,7 @@ export default function SettingsPage() {
     if (!editUser && !form.password) { setError('Password is required for new users'); return; }
     setSaving(true); setError('');
     try {
-      const payload = { name: form.name, email: form.email, role: form.role, csm_name: form.csm_name, csm_lead: form.csm_lead };
+      const payload = { name: form.name, email: form.email, role: form.role, csm_name: form.csm_name, csm_lead: form.csm_lead, team: form.team };
       if (form.password) payload.password = form.password;
       if (editUser) await axios.put(`/api/admin/users?id=${editUser.id}`, payload);
       else await axios.post('/api/admin/users', { ...payload, password: form.password });
@@ -533,6 +536,7 @@ export default function SettingsPage() {
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Name</th>
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Team</th>
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM Display Name</th>
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Active</th>
                       <th className="px-5 py-3 w-20"></th>
@@ -548,6 +552,7 @@ export default function SettingsPage() {
                         <td className="px-5 py-3">
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
                         </td>
+                        <td className="px-5 py-3 text-gray-600">{u.team || <span className="text-gray-300">—</span>}</td>
                         <td className="px-5 py-3 text-gray-600">{u.csm_name || <span className="text-gray-300">—</span>}</td>
                         <td className="px-5 py-3"><ActiveStatus at={u.last_active_at} /></td>
                         <td className="px-5 py-3">
@@ -925,6 +930,13 @@ export default function SettingsPage() {
                   <option value="product">Product</option>
                   <option value="cx_strategy">CX Strategy</option>
                   <option value="ps">PS</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Team</label>
+                <select value={form.team} onChange={e => setForm(f => ({...f, team: e.target.value}))}>
+                  <option value="">— Select Team —</option>
+                  {TEAM_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
                 </select>
               </div>
               <div>

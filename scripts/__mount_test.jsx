@@ -64,8 +64,8 @@ const FIXTURES = {
   '/api/dropdown-config': {},
   '/api/users': [{ id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin' }],
   '/api/admin/users': [
-    { id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin', last_active_at: new Date().toISOString() },
-    { id: 2, email: 'csm@test.com', name: 'CSM One', csm_name: 'CSM One', role: 'csm', last_active_at: '2026-06-01T10:00:00Z' },
+    { id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin', team: 'India EV', last_active_at: new Date().toISOString() },
+    { id: 2, email: 'csm@test.com', name: 'CSM One', csm_name: 'CSM One', role: 'csm', team: 'US', last_active_at: '2026-06-01T10:00:00Z' },
   ],
 };
 

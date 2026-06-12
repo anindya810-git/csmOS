@@ -16,10 +16,10 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   if (req.method === 'GET') {
-    // Try to include last_active_at; fall back if the column isn't migrated.
+    // Try to include the newer columns; fall back if they aren't migrated.
     let { data, error } = await supabase
       .from('users')
-      .select('id, name, email, role, csm_name, csm_lead, last_active_at')
+      .select('id, name, email, role, csm_name, csm_lead, team, last_active_at')
       .order('name');
     if (error) {
       ({ data, error } = await supabase
@@ -32,7 +32,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { name, email, password, role, csm_name, csm_lead } = req.body;
+    const { name, email, password, role, csm_name, csm_lead, team } = req.body;
     if (!name || !email || !password)
       return res.status(400).json({ error: 'name, email and password are required' });
     if (role && !ALLOWED_ROLES.includes(role))
@@ -40,8 +40,8 @@ export default async function handler(req, res) {
     const password_hash = bcrypt.hashSync(password, 10);
     const { data, error } = await supabase
       .from('users')
-      .insert({ name, email: email.toLowerCase().trim(), password_hash, role: role || 'csm', csm_name: csm_name || null, csm_lead: csm_lead || null })
-      .select('id, name, email, role, csm_name, csm_lead')
+      .insert({ name, email: email.toLowerCase().trim(), password_hash, role: role || 'csm', csm_name: csm_name || null, csm_lead: csm_lead || null, team: team || null })
+      .select('id, name, email, role, csm_name, csm_lead, team')
       .single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json(data);
@@ -49,7 +49,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     if (!id) return res.status(400).json({ error: 'id required' });
-    const { name, email, role, csm_name, csm_lead, password } = req.body;
+    const { name, email, role, csm_name, csm_lead, team, password } = req.body;
     if (role && !ALLOWED_ROLES.includes(role))
       return res.status(400).json({ error: `Invalid role. Must be one of: ${ALLOWED_ROLES.join(', ')}` });
     const updates = {};
@@ -58,6 +58,7 @@ export default async function handler(req, res) {
     if (role !== undefined) updates.role = role;
     if (csm_name !== undefined) updates.csm_name = csm_name || null;
     if (csm_lead !== undefined) updates.csm_lead = csm_lead || null;
+    if (team !== undefined) updates.team = team || null;
     if (password) updates.password_hash = bcrypt.hashSync(password, 10);
 
     let oldCsmName = null;
@@ -70,7 +71,7 @@ export default async function handler(req, res) {
       .from('users')
       .update(updates)
       .eq('id', id)
-      .select('id, name, email, role, csm_name, csm_lead')
+      .select('id, name, email, role, csm_name, csm_lead, team')
       .single();
     if (error) return res.status(500).json({ error: error.message });
 
