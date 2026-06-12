@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -446,7 +447,7 @@ export default function TasksPage() {
                         return <td key={k} className="px-4 py-3 whitespace-nowrap">{cell}</td>;
                       })}
                       <td className="px-3 py-3 sticky right-0 z-10 bg-white group-hover:bg-gray-50 shadow-[-2px_0_6px_rgba(0,0,0,0.05)] whitespace-nowrap">
-                        <div className="flex items-center gap-1">
+                        <div className="flex items-center justify-end gap-1">
                           {ds !== 'Completed' && (
                             <button onClick={() => markComplete(task.id)}
                               className="p-1.5 rounded-md text-gray-400 hover:text-green-600 hover:bg-green-50 transition"
@@ -500,8 +501,8 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* ── Add / Edit Task Panel ───────────────────────────────── */}
-      {showForm && (
+      {/* ── Add / Edit Task Panel (portaled for true full-height) ─── */}
+      {showForm && createPortal(
         <>
           <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowForm(false)} />
           <div className="fixed inset-y-0 right-0 w-[520px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
@@ -574,7 +575,8 @@ export default function TasksPage() {
               </button>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   );

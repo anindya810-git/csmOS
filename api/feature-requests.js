@@ -143,6 +143,33 @@ export default async function handler(req, res) {
       return res.json(data);
     }
 
+    // Append links from an escalation/issue (collaborative — any signed-in user).
+    // Does not touch existing links; dedups against them. Account + MRR are
+    // tagged by buildLinkRows so the report stays accurate.
+    if (body.action === 'add_links') {
+      if (!Array.isArray(body.link_ids) || body.link_ids.length === 0) return res.status(400).json({ error: 'link_ids required' });
+      if (body.link_ids.length > 200) return res.status(400).json({ error: 'too many links (max 200)' });
+      const { data: current } = await supabase
+        .from('feature_request_links').select('link_type, linked_id').eq('feature_request_id', id);
+      const have = new Set((current || []).map(l => `${l.link_type}:${l.linked_id}`));
+      const toAdd = body.link_ids.filter(l => l && l.type && l.id != null && !have.has(`${l.type}:${l.id}`));
+      if (toAdd.length > 0) {
+        const rows = await buildLinkRows(parseInt(id), toAdd);
+        if (rows.length > 0) await supabase.from('feature_request_links').insert(rows);
+      }
+      const { data } = await supabase.from('feature_requests').select('*, feature_request_links(*)').eq('id', id).single();
+      return res.json(data);
+    }
+
+    if (body.action === 'remove_link') {
+      const { link_type, linked_id } = body;
+      if (!link_type || linked_id == null) return res.status(400).json({ error: 'link_type and linked_id required' });
+      await supabase.from('feature_request_links').delete()
+        .eq('feature_request_id', id).eq('link_type', link_type).eq('linked_id', linked_id);
+      const { data } = await supabase.from('feature_requests').select('*, feature_request_links(*)').eq('id', id).single();
+      return res.json(data);
+    }
+
     if (user.role !== 'admin') {
       if (existing.created_by_id !== user.id) return res.status(403).json({ error: 'Access denied' });
       if (existing.status !== 'pending') return res.status(403).json({ error: 'Cannot edit non-pending requests' });

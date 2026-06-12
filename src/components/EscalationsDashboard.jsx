@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import AddToFeatureRequest from './AddToFeatureRequest';
 import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import SelectDropdown from './SelectDropdown';
@@ -809,6 +811,9 @@ export default function EscalationsDashboard() {
                               )}
                             </button>
                             )}
+                            {!isEditing && can('create', 'feature_requests') && (
+                              <AddToFeatureRequest type="escalation" id={e.id} accountName={e.account_name} />
+                            )}
                             {user?.role === 'admin' && !isEditing && (
                               <button
                                 onClick={ev => { ev.stopPropagation(); handleDelete(e.id); }}
@@ -1044,6 +1049,10 @@ export default function EscalationsDashboard() {
                       )}
                     </button>
                     )}
+                    {!isEditing && can('create', 'feature_requests') && (
+                      <AddToFeatureRequest type="escalation" id={e.id} accountName={e.account_name}
+                        className="flex-1 px-3 border-t border-gray-100 flex items-center justify-center text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition" />
+                    )}
                     {user?.role === 'admin' && !isEditing && (
                       <button
                         onClick={() => handleDelete(e.id)}
@@ -1234,8 +1243,8 @@ export default function EscalationsDashboard() {
         </>
       )}
 
-      {/* Right-side edit panel */}
-      {editing && (
+      {/* Right-side edit panel (portaled to body for true full-height) */}
+      {editing && createPortal(
         <>
           <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setEditing(null)} />
           <div className="fixed inset-y-0 right-0 w-[560px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
@@ -1362,7 +1371,8 @@ export default function EscalationsDashboard() {
               </button>
             </div>
           </div>
-        </>
+        </>,
+        document.body
       )}
 
       {bulkConfirm && (
