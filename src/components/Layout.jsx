@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { Suspense, useRef, useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -15,7 +15,7 @@ const NAV_ITEMS = [
   { to: '/issues',      end: false, label: 'Issues',      d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
   { to: '/tasks',       end: false, label: 'Tasks',       d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   { to: '/reports',          end: false, label: 'Reports',     d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
-  { to: '/feature-requests', end: false, label: 'Feature Requests', d: 'M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18' },
+  { to: '/feature-requests', end: false, label: 'Feature Requests', short: 'Features', d: 'M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18' },
 ];
 
 function getInitials(name) {
@@ -122,7 +122,13 @@ export default function Layout() {
       </header>
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-6 pb-24 sm:pb-6">
-        <Outlet />
+        <Suspense fallback={
+          <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        }>
+          <Outlet />
+        </Suspense>
       </main>
 
       {/* Mobile bottom tab bar */}
@@ -130,7 +136,7 @@ export default function Layout() {
         {NAV_ITEMS.map(item => (
           <NavLink key={item.to} to={item.to} end={item.end} className={tabNavClass}>
             {icon(item.d)}
-            <span className="text-[10px] font-medium leading-none truncate max-w-full px-0.5">{item.label}</span>
+            <span className="text-[10px] font-medium leading-none truncate max-w-full px-0.5">{item.short || item.label}</span>
           </NavLink>
         ))}
       </nav>

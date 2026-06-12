@@ -29,6 +29,13 @@ export default function AiPanel({
   const [at, setAt]           = useState(initialAt || null);
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
+  const [showFull, setShowFull] = useState(false);
+
+  // In compact mode (inside expanded rows/cards), clamp long output so the
+  // row stays scannable — especially on mobile.
+  const CLAMP_AT = 400;
+  const isLong   = compact && text.length > CLAMP_AT;
+  const visible  = isLong && !showFull ? text.slice(0, CLAMP_AT).trimEnd() + '…' : text;
 
   const run = async () => {
     setLoading(true); setError('');
@@ -36,6 +43,7 @@ export default function AiPanel({
       const payload = (getPayload ? getPayload() : {}) || {};
       const { data } = await axios.post('/api/dropdown-config', { action: 'ai_generate', section, ...payload });
       setText(data.text || ''); setAt(data.generated_at || new Date().toISOString());
+      setShowFull(false);
       onGenerated?.(data.text || '', data.generated_at);
     } catch (e) {
       setError(e.response?.data?.error || 'AI request failed');
@@ -79,7 +87,12 @@ export default function AiPanel({
         <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2 mt-2">{error}</p>
       ) : text ? (
         <>
-          <div className={`text-gray-700 whitespace-pre-wrap leading-relaxed mt-2 ${compact ? 'text-xs' : 'text-sm'}`}>{text}</div>
+          <div className={`text-gray-700 whitespace-pre-wrap leading-relaxed mt-2 ${compact ? 'text-xs' : 'text-sm'}`}>{visible}</div>
+          {isLong && (
+            <button onClick={() => setShowFull(s => !s)} className="text-[11px] text-brand-600 hover:underline font-medium mt-1">
+              {showFull ? 'Show less' : 'Show more'}
+            </button>
+          )}
           {at && <p className="text-[11px] text-gray-400 mt-2" title={fullTime(at)}>Generated {timeAgo(at)}{ai?.provider ? ` · ${PROVIDER_LABEL[ai.provider] || ai.provider}` : ''}</p>}
         </>
       ) : (

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FieldLabelsProvider } from './context/FieldLabelsContext';
@@ -6,24 +6,27 @@ import { PermissionsProvider } from './context/PermissionsContext';
 import { AiConfigProvider } from './context/AiConfigContext';
 import Login from './components/Login';
 import Layout from './components/Layout';
-import Dashboard from './components/Dashboard';
-import AccountsPage from './components/AccountsPage';
-import AccountDetail from './components/AccountDetail';
-import RenewalDashboard from './components/RenewalDashboard';
-import RAGDashboard from './components/RAGDashboard';
-import EscalationsDashboard from './components/EscalationsDashboard';
-import WeeklyEscalationsDashboard from './components/WeeklyEscalationsDashboard';
-import IssuesDashboard from './components/IssuesDashboard';
 import ReportsPage from './components/ReportsPage';
-import IssuesPivotReport from './components/IssuesPivotReport';
-import AccountMappingReport from './components/AccountMappingReport';
-import SettingsPage from './components/SettingsPage';
-import AccountEdit from './components/AccountEdit';
-import AccountTimeline from './components/AccountTimeline';
-import TasksPage from './components/TasksPage';
-import TaskPivotReport from './components/TaskPivotReport';
-import FeatureRequestsPage from './components/FeatureRequestsPage';
-import FeatureRequestReport from './components/FeatureRequestReport';
+
+// Route-level code splitting: each page chunk loads on demand so the initial
+// bundle stays small (e.g. recharts only ships with the pages that chart).
+const Dashboard                 = lazy(() => import('./components/Dashboard'));
+const AccountsPage              = lazy(() => import('./components/AccountsPage'));
+const AccountDetail             = lazy(() => import('./components/AccountDetail'));
+const AccountEdit               = lazy(() => import('./components/AccountEdit'));
+const AccountTimeline           = lazy(() => import('./components/AccountTimeline'));
+const RenewalDashboard          = lazy(() => import('./components/RenewalDashboard'));
+const RAGDashboard              = lazy(() => import('./components/RAGDashboard'));
+const EscalationsDashboard      = lazy(() => import('./components/EscalationsDashboard'));
+const WeeklyEscalationsDashboard = lazy(() => import('./components/WeeklyEscalationsDashboard'));
+const IssuesDashboard           = lazy(() => import('./components/IssuesDashboard'));
+const IssuesPivotReport         = lazy(() => import('./components/IssuesPivotReport'));
+const AccountMappingReport      = lazy(() => import('./components/AccountMappingReport'));
+const SettingsPage              = lazy(() => import('./components/SettingsPage'));
+const TasksPage                 = lazy(() => import('./components/TasksPage'));
+const TaskPivotReport           = lazy(() => import('./components/TaskPivotReport'));
+const FeatureRequestsPage       = lazy(() => import('./components/FeatureRequestsPage'));
+const FeatureRequestReport      = lazy(() => import('./components/FeatureRequestReport'));
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();

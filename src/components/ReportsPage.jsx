@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
 
 export default function ReportsPage() {
@@ -24,7 +24,14 @@ export default function ReportsPage() {
         <NavLink to="task-pivot"       className={tabClass}>Task Analysis</NavLink>
         <NavLink to="feature-requests" className={tabClass}>Feature Requests</NavLink>
       </div>
-      <Outlet />
+      {/* Keep the tab bar mounted while a lazily-loaded report chunk arrives */}
+      <Suspense fallback={
+        <div className="flex justify-center py-16">
+          <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+      }>
+        <Outlet />
+      </Suspense>
     </div>
   );
 }
