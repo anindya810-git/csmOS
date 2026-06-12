@@ -12,9 +12,19 @@ CREATE TABLE IF NOT EXISTS ai_config (
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_summary TEXT;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_summary_at TIMESTAMPTZ;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_summary_by TEXT;
+-- Legacy combined escalations+issues summary (superseded by the two below;
+-- kept so existing data is not lost).
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_esc_iss_summary TEXT;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_esc_iss_summary_at TIMESTAMPTZ;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_esc_iss_summary_by TEXT;
+
+-- Separate per-section account summaries.
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_escalations_summary TEXT;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_escalations_summary_at TIMESTAMPTZ;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_escalations_summary_by TEXT;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_issues_summary TEXT;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_issues_summary_at TIMESTAMPTZ;
+ALTER TABLE accounts ADD COLUMN IF NOT EXISTS ai_issues_summary_by TEXT;
 
 ALTER TABLE feature_requests ADD COLUMN IF NOT EXISTS ai_recommendation TEXT;
 ALTER TABLE feature_requests ADD COLUMN IF NOT EXISTS ai_recommendation_at TIMESTAMPTZ;

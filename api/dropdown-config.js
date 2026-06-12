@@ -3,7 +3,7 @@ import { verifyToken } from './_utils/auth.js';
 import { setCors } from './_utils/cors.js';
 import { callAI, AI_SECTIONS, DEFAULT_MODELS, PROVIDERS } from './_utils/ai.js';
 
-const PROMPT_KEYS = Object.keys(AI_SECTIONS); // account_summary, account_esc_iss, ...
+const PROMPT_KEYS = Object.keys(AI_SECTIONS); // account_summary, account_escalations, account_issues, ...
 
 // ai_config is a flat key/value table: provider, key_<p>, model_<p>, prompt_<section>.
 async function loadAiConfig() {
@@ -62,28 +62,39 @@ function accountHeader(a) {
 // Gather authoritative context for a section and return the user-prompt text.
 // Returns { user, persist? } where persist describes the write-back target.
 async function buildContext(section, body, user, csmName) {
-  if (section === 'account_summary' || section === 'account_esc_iss') {
+  if (section === 'account_summary' || section === 'account_escalations' || section === 'account_issues') {
     const accountId = body.account_id;
     if (!accountId) throw new Error('account_id required');
     const { data: account } = await supabase.from('accounts').select('*').eq('id', accountId).maybeSingle();
     if (!account) throw new Error('Account not found');
     if (user.role === 'csm' && account.csm !== csmName) { const e = new Error('Access denied'); e.code = 403; throw e; }
 
+    if (section === 'account_escalations') {
+      const { data: escalations } = await supabase.from('escalations').select('*').eq('account_id', accountId).order('date_of_escalation', { ascending: false }).limit(60);
+      const escTxt = (escalations || []).length ? (escalations || []).map(escLine).join('\n') : '(none)';
+      return {
+        user: `Account: ${account.account_name || '–'}\n\nESCALATIONS (${(escalations || []).length}):\n${escTxt}`,
+        persist: { table: 'accounts', id: accountId, col: 'ai_escalations_summary' },
+      };
+    }
+
+    if (section === 'account_issues') {
+      const { data: issues } = await supabase.from('issues').select('*').eq('account_id', accountId).order('reported_date', { ascending: false }).limit(60);
+      const issTxt = (issues || []).length ? (issues || []).map(issueLine).join('\n') : '(none)';
+      return {
+        user: `Account: ${account.account_name || '–'}\n\nISSUES (${(issues || []).length}):\n${issTxt}`,
+        persist: { table: 'accounts', id: accountId, col: 'ai_issues_summary' },
+      };
+    }
+
+    // account_summary — needs the full picture
     const [{ data: issues }, { data: escalations }, { data: tasks }] = await Promise.all([
       supabase.from('issues').select('*').eq('account_id', accountId).order('reported_date', { ascending: false }).limit(40),
       supabase.from('escalations').select('*').eq('account_id', accountId).order('date_of_escalation', { ascending: false }).limit(40),
       supabase.from('tasks').select('task_subject, status, due_date, nature_of_task').eq('account_id', accountId).order('due_date', { ascending: false }).limit(20),
     ]);
-
     const escTxt = (escalations || []).length ? (escalations || []).map(escLine).join('\n') : '(none)';
     const issTxt = (issues || []).length ? (issues || []).map(issueLine).join('\n') : '(none)';
-
-    if (section === 'account_esc_iss') {
-      return {
-        user: `ESCALATIONS (${(escalations || []).length}):\n${escTxt}\n\nISSUES (${(issues || []).length}):\n${issTxt}`,
-        persist: { table: 'accounts', id: accountId, col: 'ai_esc_iss_summary' },
-      };
-    }
     const openTasks = (tasks || []).filter(t => t.status !== 'Completed');
     const taskTxt = openTasks.length ? openTasks.map(t => `- ${t.task_subject} (${t.status}${t.due_date ? ', due ' + fmtDate(t.due_date) : ''})`).join('\n') : '(none open)';
     return {

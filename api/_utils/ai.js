@@ -19,10 +19,15 @@ export const AI_SECTIONS = {
     system: 'You are a Customer Success analyst. Write a single executive summary of this account in NO MORE THAN 200 words. Cover: health (RAG status + why), commercials (MRR, renewal), adoption/stickiness, open escalations and issues with their severity, and the top risks and recommended next actions. Be specific, use the data provided, and never invent facts. Prefer short paragraphs or tight bullets.',
     maxTokens: 700,
   },
-  account_esc_iss: {
-    label: 'Account Escalations & Issues',
-    system: 'You are a Customer Success analyst. Summarize this account\'s escalations and issues in under 150 words: dominant themes, severity, what is open vs resolved, and the most urgent items needing attention. Use the data provided; do not invent.',
-    maxTokens: 500,
+  account_escalations: {
+    label: 'Account Escalations',
+    system: 'You are a Customer Success analyst. Summarize this account\'s escalations in under 120 words: dominant themes, severity, what is open vs resolved, ageing/ETA concerns, and the most urgent items needing attention. Use the data provided; do not invent.',
+    maxTokens: 450,
+  },
+  account_issues: {
+    label: 'Account Issues',
+    system: 'You are a Customer Success analyst. Summarize this account\'s issues in under 120 words: dominant themes/types, priority distribution, what is open vs resolved, and the most urgent items needing attention. Use the data provided; do not invent.',
+    maxTokens: 450,
   },
   feature_request: {
     label: 'Feature Request Recommendation',

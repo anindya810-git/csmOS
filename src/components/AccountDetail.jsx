@@ -340,17 +340,6 @@ export default function AccountDetail() {
         {/* Left — Escalations + POCs */}
         <div className="lg:col-span-2 space-y-5">
 
-          {/* AI summary of this account's escalations & issues */}
-          <AiPanel
-            section="account_esc_iss"
-            title="AI Escalations & Issues Summary"
-            getPayload={() => ({ account_id: id })}
-            initialText={a.ai_esc_iss_summary}
-            initialAt={a.ai_esc_iss_summary_at}
-            onGenerated={(t, at) => setAccount(prev => ({ ...prev, ai_esc_iss_summary: t, ai_esc_iss_summary_at: at }))}
-            hint="Summarizes the escalations and issues on this account. Click Generate."
-          />
-
           {/* Escalations */}
           <div className="card">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-gray-100">
@@ -421,6 +410,17 @@ export default function AccountDetail() {
               <p className="text-sm text-gray-400 italic">No escalations recorded.</p>
             )}
           </div>
+
+          {/* AI summary of this account's escalations */}
+          <AiPanel
+            section="account_escalations"
+            title="AI Escalations Summary"
+            getPayload={() => ({ account_id: id })}
+            initialText={a.ai_escalations_summary}
+            initialAt={a.ai_escalations_summary_at}
+            onGenerated={(t, at) => setAccount(prev => ({ ...prev, ai_escalations_summary: t, ai_escalations_summary_at: at }))}
+            hint="Summarizes this account's escalations. Click Generate."
+          />
 
           {/* Issues */}
           <div className="card">
@@ -528,6 +528,17 @@ export default function AccountDetail() {
               <p className="text-sm text-gray-400 italic">No issues recorded.</p>
             )}
           </div>
+
+          {/* AI summary of this account's issues */}
+          <AiPanel
+            section="account_issues"
+            title="AI Issues Summary"
+            getPayload={() => ({ account_id: id })}
+            initialText={a.ai_issues_summary}
+            initialAt={a.ai_issues_summary_at}
+            onGenerated={(t, at) => setAccount(prev => ({ ...prev, ai_issues_summary: t, ai_issues_summary_at: at }))}
+            hint="Summarizes this account's issues. Click Generate."
+          />
 
           {/* Tasks */}
           <div className="card">

@@ -202,7 +202,8 @@ const AI_PROVIDERS = [
 
 const AI_PROMPT_FIELDS = [
   ['account_summary', 'Account Summary', 'How to summarize an account (≤200 words).'],
-  ['account_esc_iss', 'Account — Escalations & Issues', 'How to summarize an account\'s escalations & issues.'],
+  ['account_escalations', 'Account — Escalations', 'How to summarize an account\'s escalations.'],
+  ['account_issues',      'Account — Issues', 'How to summarize an account\'s issues.'],
   ['feature_request', 'Feature Request Recommendation', 'How to recommend take-up, priority and ETA from linked data.'],
   ['rag',             'RAG Report Analysis', 'How to analyze each RAG band (Red/Amber/Green).'],
   ['issues_overview', 'Issues & Escalations Overview', 'How to summarize the filtered issues & escalations in view.'],
