@@ -4,6 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { FIELD_CATALOG } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
+import { usePermissions, getDefaultPermsForRole, PERM_OBJECTS, PERM_ACTIONS } from '../context/PermissionsContext';
 
 const ROLE_BADGE = {
   admin:       'bg-brand-100 text-brand-700',
@@ -150,6 +151,15 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    key: 'permissions',
+    label: 'Permissions',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+      </svg>
+    ),
+  },
 ];
 
 export default function SettingsPage() {
@@ -185,6 +195,13 @@ export default function SettingsPage() {
   const [frApprover,     setFrApprover]     = useState('');
   const [frApproverSaving, setFrApproverSaving] = useState(false);
 
+  const { reload: reloadPerms } = usePermissions();
+
+  // Permissions tab state
+  const [permRole, setPermRole] = useState('cx_strategy');
+  const [permEdits, setPermEdits] = useState({});
+  const [permSaving, setPermSaving] = useState(false);
+
   // Field renaming
   const { rows: labelRows, reload: labelsReload } = useFieldLabels();
   const [fieldsTab,    setFieldsTab]    = useState('dropdowns'); // dropdowns | rename
@@ -193,15 +210,36 @@ export default function SettingsPage() {
   const [renameSaving, setRenameSaving] = useState(null);
 
   useEffect(() => {
-    if (user?.role !== 'admin') { navigate('/'); return; }
-    loadUsers();
+    if (!user) return;
+    if (user.role !== 'admin' && user.role !== 'cx_strategy') { navigate('/'); return; }
+    if (user.role === 'admin') {
+      loadUsers();
+    }
     loadDD();
+    if (user.role === 'cx_strategy') {
+      setSettingsPage('fields');
+      setFieldsTab('dropdowns');
+    }
   }, [user]);
 
   useEffect(() => {
     const cfg = ddData.fr_default_approver?.[0];
     if (cfg) setFrApprover(cfg.value);
   }, [ddData]);
+
+  useEffect(() => {
+    const defaults = getDefaultPermsForRole(permRole);
+    const stored = ddData.role_permissions?.find(r => r.value === permRole);
+    if (!stored) { setPermEdits(defaults); return; }
+    try {
+      const parsed = JSON.parse(stored.parent_value);
+      const merged = {};
+      PERM_OBJECTS.forEach(o => {
+        merged[o.key] = { ...defaults[o.key], ...(parsed[o.key] || {}) };
+      });
+      setPermEdits(merged);
+    } catch { setPermEdits(defaults); }
+  }, [permRole, ddData.role_permissions]);
 
   const loadUsers = () => {
     setLoading(true);
@@ -357,6 +395,30 @@ export default function SettingsPage() {
     finally { setFrApproverSaving(false); }
   };
 
+  const handlePermSave = async () => {
+    setPermSaving(true);
+    try {
+      const existing = ddData.role_permissions?.find(r => r.value === permRole);
+      if (existing) {
+        await axios.put(`/api/dropdown-config?id=${existing.id}`, { parent_value: JSON.stringify(permEdits) });
+      } else {
+        await axios.post('/api/dropdown-config', {
+          field_name: 'role_permissions',
+          value: permRole,
+          parent_value: JSON.stringify(permEdits),
+          sort_order: 0,
+        });
+      }
+      loadDD();
+      reloadPerms();
+    } catch (e) { alert(e.response?.data?.error || 'Failed to save'); }
+    finally { setPermSaving(false); }
+  };
+
+  const visibleNavItems = user?.role === 'cx_strategy'
+    ? NAV_ITEMS.filter(i => i.key === 'fields')
+    : NAV_ITEMS;
+
   const { roots, childrenMap } = buildTree(users);
   const currentDdItems = ddData[ddField] || [];
   const issueTypes = (ddData.issue_type || []).map(x => x.value);
@@ -370,7 +432,7 @@ export default function SettingsPage() {
 
       {/* ── Mobile tab bar ───────────────────────────────────────────── */}
       <div className="sm:hidden bg-white border-b border-gray-200 flex overflow-x-auto shrink-0">
-        {NAV_ITEMS.map(item => (
+        {visibleNavItems.map(item => (
           <button
             key={item.key}
             onClick={() => setSettingsPage(item.key)}
@@ -392,7 +454,7 @@ export default function SettingsPage() {
           <p className="text-xs text-gray-400 mt-0.5">Admin controls</p>
         </div>
         <nav className="py-3 flex-1">
-          {NAV_ITEMS.map(item => (
+          {visibleNavItems.map(item => (
             <button
               key={item.key}
               onClick={() => setSettingsPage(item.key)}
@@ -497,6 +559,79 @@ export default function SettingsPage() {
           </>
         )}
 
+        {/* ── Permissions page ──────────────────────────────────────── */}
+        {settingsPage === 'permissions' && (
+          <>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Role Permissions</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Configure what each role can view, create, edit, and delete</p>
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {['csm', 'sales', 'product', 'cx_strategy', 'ps'].map(role => (
+                <button key={role} onClick={() => setPermRole(role)}
+                  className={`px-4 py-2 text-sm font-medium rounded-lg border transition ${
+                    permRole === role
+                      ? 'bg-brand-600 text-white border-brand-600'
+                      : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'
+                  }`}>
+                  {role === 'cx_strategy' ? 'CX Strategy' : role.charAt(0).toUpperCase() + role.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <div className="card p-0 overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[540px]">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide w-44">Object</th>
+                      {PERM_ACTIONS.map(a => (
+                        <th key={a.key} className="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wide">{a.label}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {PERM_OBJECTS.map(obj => (
+                      <tr key={obj.key} className="hover:bg-gray-50 transition">
+                        <td className="px-5 py-3 font-medium text-gray-900">{obj.label}</td>
+                        {PERM_ACTIONS.map(act => {
+                          const checked = permEdits[obj.key]?.[act.key] !== false;
+                          const isViewAction = act.key === 'view';
+                          return (
+                            <td key={act.key} className="px-5 py-3 text-center">
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                disabled={isViewAction}
+                                onChange={() => {
+                                  if (isViewAction) return;
+                                  setPermEdits(prev => ({
+                                    ...prev,
+                                    [obj.key]: { ...(prev[obj.key] || {}), [act.key]: !checked }
+                                  }));
+                                }}
+                                className="w-4 h-4 accent-brand-600 cursor-pointer disabled:cursor-default disabled:opacity-40"
+                              />
+                            </td>
+                          );
+                        })}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="flex items-center justify-between px-5 py-3 border-t border-gray-100 bg-gray-50">
+                <p className="text-xs text-gray-400">View permission is always on. Admin always has full access.</p>
+                <button onClick={handlePermSave} disabled={permSaving}
+                  className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50">
+                  {permSaving ? 'Saving…' : 'Save Permissions'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {/* ── Feature Requests settings ─────────────────────────────── */}
         {settingsPage === 'feature-requests' && (
           <>
@@ -544,7 +679,7 @@ export default function SettingsPage() {
 
             {/* Sub-tab: Dropdown Values | Rename Fields */}
             <div className="flex items-center bg-gray-100 rounded-lg p-0.5 w-fit">
-              {[['dropdowns', 'Dropdown Values'], ['rename', 'Rename Fields']].map(([k, lbl]) => (
+              {(user?.role === 'cx_strategy' ? [['dropdowns', 'Dropdown Values']] : [['dropdowns', 'Dropdown Values'], ['rename', 'Rename Fields']]).map(([k, lbl]) => (
                 <button key={k} onClick={() => setFieldsTab(k)}
                   className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${fieldsTab === k ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
                   {lbl}

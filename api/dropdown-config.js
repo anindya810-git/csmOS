@@ -24,11 +24,21 @@ export default async function handler(req, res) {
     return res.json(grouped);
   }
 
-  if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+  const isAdmin = user.role === 'admin';
+  const isCxStrategy = user.role === 'cx_strategy';
+  if (!isAdmin && !isCxStrategy) return res.status(403).json({ error: 'Admin only' });
+
+  const CX_ALLOWED = new Set([
+    'escalation_status','ownership','escalated_by','ps_leader','trigger_reason',
+    'source_of_escalation','issue_type','issue_sub_type','mrr_tier','rag_status',
+    'billing_frequency','renewal_status','churn_status','contraction_risk','churn_risk',
+    'implementation_status','nature_of_task','fr_related_to',
+  ]);
 
   if (req.method === 'POST') {
     const { field_name, value, parent_value, sort_order } = req.body;
     if (!field_name || !value) return res.status(400).json({ error: 'field_name and value are required' });
+    if (isCxStrategy && !CX_ALLOWED.has(field_name)) return res.status(403).json({ error: 'Not permitted' });
     const { data, error } = await supabase
       .from('dropdown_config')
       .insert({ field_name, value, parent_value: parent_value || null, sort_order: sort_order || 0 })
@@ -40,6 +50,13 @@ export default async function handler(req, res) {
 
   const { id } = req.query;
   if (!id) return res.status(400).json({ error: 'id required' });
+
+  if (isCxStrategy) {
+    const { data: row } = await supabase
+      .from('dropdown_config').select('field_name').eq('id', id).maybeSingle();
+    if (!row || !CX_ALLOWED.has(row.field_name))
+      return res.status(403).json({ error: 'Not permitted' });
+  }
 
   if (req.method === 'PUT') {
     const { value, parent_value, sort_order } = req.body;

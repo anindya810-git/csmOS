@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { usePermissions } from '../context/PermissionsContext';
 import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 
@@ -45,6 +46,7 @@ const EMPTY_FORM = { title: '', description: '', related_to: '', priority: 'P2',
 
 export default function FeatureRequestsPage() {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const isAdmin = user?.role === 'admin';
 
   const [frs, setFrs]           = useState([]);
@@ -221,10 +223,12 @@ export default function FeatureRequestsPage() {
           <h1 className="text-xl font-bold text-gray-900">Feature Requests</h1>
           <p className="text-sm text-gray-500 mt-0.5">Track and manage product feature requests</p>
         </div>
-        <button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          New Request
-        </button>
+        {can('create', 'feature_requests') && (
+          <button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+            New Request
+          </button>
+        )}
       </div>
 
       {/* Filters */}
@@ -367,21 +371,21 @@ export default function FeatureRequestsPage() {
         )}
       </div>
 
-      {/* Create / Edit slide-over */}
+      {/* Create / Edit – full screen */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-start justify-end z-50">
-          <div className="bg-white h-full w-full max-w-3xl flex flex-col shadow-2xl">
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
-              <h3 className="text-base font-semibold text-gray-900">{editFr ? 'Edit Feature Request' : 'New Feature Request'}</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600 transition">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
+        <div className="fixed inset-0 bg-white z-50 flex flex-col">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0 shadow-sm">
+            <h3 className="text-base font-semibold text-gray-900">{editFr ? 'Edit Feature Request' : 'New Feature Request'}</h3>
+            <button onClick={() => setShowForm(false)} className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
 
-            <div className="flex-1 overflow-y-auto p-5">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 lg:gap-6">
+          <div className="flex-1 overflow-y-auto p-6">
+            <div className="max-w-6xl mx-auto">
+              <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
                 {/* Left: form fields */}
-                <div className="space-y-4">
+                <div className="lg:col-span-2 space-y-4">
                   {formError && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{formError}</p>}
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Title *</label>
@@ -389,7 +393,7 @@ export default function FeatureRequestsPage() {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-                    <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the feature and business justification…" rows={5} className="w-full resize-none" />
+                    <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the feature and business justification…" rows={6} className="w-full resize-none" />
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
@@ -423,33 +427,33 @@ export default function FeatureRequestsPage() {
                 </div>
 
                 {/* Right: link panel */}
-                <div className="flex flex-col">
+                <div className="lg:col-span-3 flex flex-col">
                   <p className="text-xs font-medium text-gray-600 mb-2">Link Escalations / Issues</p>
-                  <div className="border border-gray-200 rounded-xl overflow-hidden flex flex-col flex-1" style={{ minHeight: 360 }}>
+                  <div className="border border-gray-200 rounded-xl overflow-hidden flex flex-col flex-1" style={{ minHeight: 480 }}>
                     <div className="flex border-b border-gray-100 bg-gray-50 shrink-0">
                       {['escalation', 'issue'].map(t => (
                         <button key={t} onClick={() => { setLinkTab(t); setLinkSearch(''); }}
                           className={`flex-1 py-2.5 text-sm font-medium transition border-b-2 ${linkTab === t ? 'border-brand-600 text-brand-700 bg-white' : 'border-transparent text-gray-500 hover:text-gray-700'}`}>
-                          {t === 'escalation' ? 'Escalations' : 'Issues'}
+                          {t === 'escalation' ? `Escalations (${escalations.length})` : `Issues (${issues.length})`}
                         </button>
                       ))}
                     </div>
                     <div className="p-2 border-b border-gray-100 shrink-0">
                       <input value={linkSearch} onChange={e => setLinkSearch(e.target.value)} placeholder={`Search ${linkTab === 'escalation' ? 'escalations' : 'issues'}…`} className="w-full !py-1.5 text-sm" />
                     </div>
-                    <div className="flex-1 overflow-y-auto" style={{ maxHeight: 280 }}>
+                    <div className="flex-1 overflow-y-auto">
                       {linksLoading ? (
-                        <div className="py-4 text-center text-xs text-gray-400">Loading…</div>
+                        <div className="py-6 text-center text-xs text-gray-400">Loading…</div>
                       ) : linkTab === 'escalation' ? (
                         filteredEsc.length === 0 ? (
-                          <p className="py-4 text-center text-xs text-gray-400">No escalations found</p>
-                        ) : filteredEsc.slice(0, 100).map(esc => {
+                          <p className="py-6 text-center text-xs text-gray-400">No escalations found</p>
+                        ) : filteredEsc.slice(0, 200).map(esc => {
                           const key = `esc:${esc.id}`;
                           const checked = pendingLinks.has(key);
                           return (
                             <label key={esc.id} className={`flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 ${checked ? 'bg-brand-50' : ''}`}>
                               <input type="checkbox" checked={checked} onChange={() => toggleLink('escalation', esc.id)} className="mt-0.5 accent-brand-600 shrink-0" />
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-gray-800 truncate">{esc.account_name || 'Unknown Account'}</p>
                                 <p className="text-xs text-gray-500 truncate">{esc.description || '—'}</p>
                                 <p className="text-xs text-gray-400">{fmtDate(esc.date_of_escalation)}</p>
@@ -459,14 +463,14 @@ export default function FeatureRequestsPage() {
                         })
                       ) : (
                         filteredIss.length === 0 ? (
-                          <p className="py-4 text-center text-xs text-gray-400">No issues found</p>
-                        ) : filteredIss.slice(0, 100).map(iss => {
+                          <p className="py-6 text-center text-xs text-gray-400">No issues found</p>
+                        ) : filteredIss.slice(0, 200).map(iss => {
                           const key = `issue:${iss.id}`;
                           const checked = pendingLinks.has(key);
                           return (
                             <label key={iss.id} className={`flex items-start gap-2.5 px-3 py-2.5 hover:bg-gray-50 cursor-pointer border-b border-gray-50 last:border-0 ${checked ? 'bg-brand-50' : ''}`}>
                               <input type="checkbox" checked={checked} onChange={() => toggleLink('issue', iss.id)} className="mt-0.5 accent-brand-600 shrink-0" />
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <p className="text-sm font-medium text-gray-800 truncate">{iss.account_name || 'Unknown Account'}</p>
                                 <p className="text-xs text-gray-500 truncate">{iss.description || '—'}</p>
                                 <p className="text-xs text-gray-400">{iss.priority ? `${iss.priority} · ` : ''}{iss.issue_type || ''}</p>
@@ -476,8 +480,8 @@ export default function FeatureRequestsPage() {
                         })
                       )}
                     </div>
-                    <div className="p-2 border-t border-gray-100 bg-gray-50 shrink-0">
-                      <button onClick={confirmLinks} className="w-full py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
+                    <div className="p-3 border-t border-gray-100 bg-gray-50 shrink-0">
+                      <button onClick={confirmLinks} className="w-full py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
                         Apply {pendingLinks.size > 0 ? `(${pendingLinks.size} selected)` : 'Links'}
                       </button>
                     </div>
@@ -485,13 +489,13 @@ export default function FeatureRequestsPage() {
                 </div>
               </div>
             </div>
+          </div>
 
-            <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-100 shrink-0">
-              <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
-              <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
-                {saving ? 'Saving…' : editFr ? 'Save Changes' : 'Submit Request'}
-              </button>
-            </div>
+          <div className="flex justify-end gap-3 px-6 py-4 border-t border-gray-100 shrink-0">
+            <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
+            <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+              {saving ? 'Saving…' : editFr ? 'Save Changes' : 'Submit Request'}
+            </button>
           </div>
         </div>
       )}

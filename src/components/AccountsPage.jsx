@@ -10,6 +10,7 @@ import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { ACCOUNT_FIELDS } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
+import { usePermissions } from '../context/PermissionsContext';
 
 // Every account field is available as a column; only these start visible.
 const DEFAULT_ON = ['account_name', 'industry', 'mrr', 'csm', 'rag_status', 'renewal_date', 'churn_status', 'region'];
@@ -160,6 +161,7 @@ function matchesCondition(account, cond, escalationMap, fieldDefs) {
 export default function AccountsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { can } = usePermissions();
   const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'accounts', Object.fromEntries(ACCOUNTS_COLS.map(c => [c.key, !c.off]))
@@ -387,10 +389,10 @@ export default function AccountsPage() {
               Bulk Update
             </button>
           )}
-          <button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
+          {can('create', 'accounts') && (<button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             Add Account
-          </button>
+          </button>)}
         </div>
       </div>
 

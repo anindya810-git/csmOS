@@ -10,6 +10,7 @@ import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { ESCALATION_FIELDS } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
+import { usePermissions } from '../context/PermissionsContext';
 
 // Every escalation field can be shown as a column; these start visible.
 const ESC_DEFAULT_ON = ['account_name', 'rag_status', 'date_of_escalation', 'description', 'status', 'csm', 'ownership', 'eta', 'escalated_by'];
@@ -111,6 +112,7 @@ function EscCell({ e, k }) {
 export default function EscalationsDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { can } = usePermissions();
   const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'escalations', Object.fromEntries(ESC_COLS.map(c => [c.key, !c.off]))
@@ -387,13 +389,15 @@ export default function EscalationsDashboard() {
               Bulk Update
             </button>
           )}
-          <button
-            onClick={() => { setShowForm(s => !s); setForm(EMPTY_FORM); }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Add Escalation
-          </button>
+          {can('create', 'escalations') && (
+            <button
+              onClick={() => { setShowForm(s => !s); setForm(EMPTY_FORM); }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add Escalation
+            </button>
+          )}
         </div>
       </div>
 
@@ -784,6 +788,7 @@ export default function EscalationsDashboard() {
                         ))}
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-1">
+                            {(can('edit', 'escalations') || isEditing) && (
                             <button
                               onClick={ev => { ev.stopPropagation(); isEditing ? setEditing(null) : startEdit(e); }}
                               className={`p-1.5 rounded-md transition ${isEditing ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-100'}`}
@@ -795,6 +800,7 @@ export default function EscalationsDashboard() {
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                               )}
                             </button>
+                            )}
                             {user?.role === 'admin' && !isEditing && (
                               <button
                                 onClick={ev => { ev.stopPropagation(); handleDelete(e.id); }}
@@ -1017,6 +1023,7 @@ export default function EscalationsDashboard() {
                     </div>
                   </button>
                   <div className="flex flex-col border-l border-gray-100 shrink-0">
+                    {(can('edit', 'escalations') || isEditing) && (
                     <button
                       onClick={() => { isEditing ? setEditing(null) : startEdit(e); }}
                       className={`flex-1 px-3 transition ${isEditing ? 'bg-amber-100 text-amber-600' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-50'}`}
@@ -1028,6 +1035,7 @@ export default function EscalationsDashboard() {
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                       )}
                     </button>
+                    )}
                     {user?.role === 'admin' && !isEditing && (
                       <button
                         onClick={() => handleDelete(e.id)}

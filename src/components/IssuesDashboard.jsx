@@ -10,6 +10,7 @@ import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { ISSUE_FIELDS } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
+import { usePermissions } from '../context/PermissionsContext';
 
 // Every issue field can be shown as a column; these start visible.
 const ISSUES_DEFAULT_ON = ['account_name', 'priority', 'description', 'issue_type', 'owner_team', 'status', 'reported_date', 'csm'];
@@ -124,6 +125,7 @@ function IssueCell({ issue, k }) {
 
 export default function IssuesDashboard() {
   const { user } = useAuth();
+  const { can } = usePermissions();
   const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'issues', Object.fromEntries(ISSUES_COLS.map(c => [c.key, !c.off]))
@@ -470,13 +472,15 @@ export default function IssuesDashboard() {
               Bulk Update
             </button>
           )}
-          <button
-            onClick={() => { setShowForm(s => !s); setForm(EMPTY_FORM); }}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Add Issue
-          </button>
+          {can('create', 'issues') && (
+            <button
+              onClick={() => { setShowForm(s => !s); setForm(EMPTY_FORM); }}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Add Issue
+            </button>
+          )}
         </div>
       </div>
 
@@ -724,6 +728,7 @@ export default function IssuesDashboard() {
                           ))}
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-1">
+                              {(can('edit', 'issues') || isEditing) && (
                               <button
                                 onClick={ev => { ev.stopPropagation(); isEditing ? setEditing(null) : startEdit(issue); }}
                                 className={`p-1.5 rounded-md transition ${isEditing ? 'text-amber-600 bg-amber-100 hover:bg-amber-200' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-100'}`}
@@ -733,6 +738,7 @@ export default function IssuesDashboard() {
                                   ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                   : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>}
                               </button>
+                              )}
                               {user?.role === 'admin' && !isEditing && (
                                 <button onClick={ev => { ev.stopPropagation(); handleDelete(issue.id); }}
                                   className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition" title="Delete">
@@ -829,6 +835,7 @@ export default function IssuesDashboard() {
                       </div>
                     </button>
                     <div className="flex flex-col border-l border-gray-100 shrink-0">
+                      {(can('edit', 'issues') || isEditing) && (
                       <button onClick={() => { isEditing ? setEditing(null) : startEdit(issue); }}
                         className={`flex-1 px-3 transition ${isEditing ? 'bg-amber-100 text-amber-600' : 'text-gray-400 hover:text-brand-600 hover:bg-gray-50'}`}
                         title={isEditing ? 'Cancel' : 'Edit'}>
@@ -836,6 +843,7 @@ export default function IssuesDashboard() {
                           ? <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                           : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>}
                       </button>
+                      )}
                       {user?.role === 'admin' && !isEditing && (
                         <button onClick={() => handleDelete(issue.id)}
                           className="flex-1 px-3 border-t border-gray-100 text-gray-400 hover:text-red-600 hover:bg-red-50 transition" title="Delete">

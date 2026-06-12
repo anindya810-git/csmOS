@@ -2,6 +2,7 @@ import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FieldLabelsProvider } from './context/FieldLabelsContext';
+import { PermissionsProvider } from './context/PermissionsContext';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
@@ -39,6 +40,12 @@ function AdminRoute({ children }) {
   return user?.role === 'admin' ? children : <Navigate to="/" replace />;
 }
 
+function AdminOrCxRoute({ children }) {
+  const { user, loading } = useAuth();
+  if (loading) return null;
+  return (user?.role === 'admin' || user?.role === 'cx_strategy') ? children : <Navigate to="/" replace />;
+}
+
 function AppRoutes() {
   const { user } = useAuth();
   return (
@@ -67,7 +74,7 @@ function AppRoutes() {
         <Route path="escalations" element={<EscalationsDashboard />} />
         <Route path="escalations/weekly" element={<Navigate to="/reports/weekly" replace />} />
         <Route path="issues" element={<IssuesDashboard />} />
-        <Route path="settings" element={<AdminRoute><SettingsPage /></AdminRoute>} />
+        <Route path="settings" element={<AdminOrCxRoute><SettingsPage /></AdminOrCxRoute>} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
@@ -75,5 +82,5 @@ function AppRoutes() {
 }
 
 export default function App() {
-  return <AuthProvider><FieldLabelsProvider><AppRoutes /></FieldLabelsProvider></AuthProvider>;
+  return <AuthProvider><FieldLabelsProvider><PermissionsProvider><AppRoutes /></PermissionsProvider></FieldLabelsProvider></AuthProvider>;
 }

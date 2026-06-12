@@ -8,6 +8,7 @@ import SelectDropdown from './SelectDropdown';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { TASK_FIELDS } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
+import { usePermissions } from '../context/PermissionsContext';
 
 // Every task field can be shown as a column; these start visible.
 const TASKS_DEFAULT_ON = ['task_subject', 'nature_of_task', 'account_name', 'assigned_to', 'due_date', 'derived_status'];
@@ -64,6 +65,7 @@ export default function TasksPage() {
   const { user } = useAuth();
   const navigate  = useNavigate();
   const isAdmin   = user?.role === 'admin';
+  const { can } = usePermissions();
   const { label: fieldLabel } = useFieldLabels();
   const visibleTaskCols = TASKS_COLS.filter(c => !c.adminOnly || isAdmin);
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
@@ -278,15 +280,17 @@ export default function TasksPage() {
           <h1 className="text-xl font-bold text-gray-900">Tasks</h1>
           <p className="text-sm text-gray-500 mt-0.5">{counts.Open} open · {counts.Overdue} overdue · {counts.Completed} completed</p>
         </div>
-        <button
-          onClick={openAdd}
-          className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Add Task
-        </button>
+        {can('create', 'tasks') && (
+          <button
+            onClick={openAdd}
+            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add Task
+          </button>
+        )}
       </div>
 
       {/* Status tabs */}
