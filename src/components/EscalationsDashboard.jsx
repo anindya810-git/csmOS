@@ -876,17 +876,17 @@ export default function EscalationsDashboard() {
                                   <LastEdited by={e.updated_by} at={e.updated_at} />
                                 </div>
                               )}
-                              <div className="sm:col-span-2">
-                                <AiPanel
-                                  section="next_steps"
-                                  title="AI Recommended Next Steps"
-                                  compact
-                                  getPayload={() => ({ kind: 'escalation', item: e })}
-                                  initialText={e.ai_next_steps}
-                                  initialAt={e.ai_next_steps_at}
-                                  onGenerated={(t, at) => setEscalations(prev => prev.map(x => x.id === e.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
-                                />
-                              </div>
+                            </div>
+                            <div className="mt-4 pt-4 border-t border-blue-100">
+                              <AiPanel
+                                section="next_steps"
+                                title="AI Recommended Next Steps"
+                                compact
+                                getPayload={() => ({ kind: 'escalation', item: e })}
+                                initialText={e.ai_next_steps}
+                                initialAt={e.ai_next_steps_at}
+                                onGenerated={(t, at) => setEscalations(prev => prev.map(x => x.id === e.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
+                              />
                             </div>
                           </td>
                         </tr>
@@ -1125,6 +1125,17 @@ export default function EscalationsDashboard() {
                     {e.account_id && (
                       <Link to={`/accounts/${e.account_id}`} className="inline-block text-sm text-brand-600 hover:underline font-medium">View Account →</Link>
                     )}
+                    <div className="pt-2 border-t border-gray-100">
+                      <AiPanel
+                        section="next_steps"
+                        title="AI Recommended Next Steps"
+                        compact
+                        getPayload={() => ({ kind: 'escalation', item: e })}
+                        initialText={e.ai_next_steps}
+                        initialAt={e.ai_next_steps_at}
+                        onGenerated={(t, at) => setEscalations(prev => prev.map(x => x.id === e.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
+                      />
+                    </div>
                   </div>
                 )}
                 {false && (

@@ -807,17 +807,17 @@ export default function IssuesDashboard() {
                                     <LastEdited by={issue.updated_by} at={issue.updated_at} />
                                   </div>
                                 )}
-                                <div className="sm:col-span-2">
-                                  <AiPanel
-                                    section="next_steps"
-                                    title="AI Recommended Next Steps"
-                                    compact
-                                    getPayload={() => ({ kind: 'issue', item: issue })}
-                                    initialText={issue.ai_next_steps}
-                                    initialAt={issue.ai_next_steps_at}
-                                    onGenerated={(t, at) => setIssues(prev => prev.map(x => x.id === issue.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
-                                  />
-                                </div>
+                              </div>
+                              <div className="mt-4 pt-4 border-t border-blue-100">
+                                <AiPanel
+                                  section="next_steps"
+                                  title="AI Recommended Next Steps"
+                                  compact
+                                  getPayload={() => ({ kind: 'issue', item: issue })}
+                                  initialText={issue.ai_next_steps}
+                                  initialAt={issue.ai_next_steps_at}
+                                  onGenerated={(t, at) => setIssues(prev => prev.map(x => x.id === issue.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
+                                />
                               </div>
                             </td>
                           </tr>
@@ -892,6 +892,17 @@ export default function IssuesDashboard() {
                         {issue.dev_ticket && <span><span className="font-medium">DT:</span> #{issue.dev_ticket}</span>}
                         {issue.closure_date && <span><span className="font-medium">Closure:</span> {issue.closure_date}</span>}
                         {issue.account_id && <Link to={`/accounts/${issue.account_id}`} className="text-brand-600 hover:underline font-medium">View Account →</Link>}
+                      </div>
+                      <div className="pt-2 border-t border-gray-100">
+                        <AiPanel
+                          section="next_steps"
+                          title="AI Recommended Next Steps"
+                          compact
+                          getPayload={() => ({ kind: 'issue', item: issue })}
+                          initialText={issue.ai_next_steps}
+                          initialAt={issue.ai_next_steps_at}
+                          onGenerated={(t, at) => setIssues(prev => prev.map(x => x.id === issue.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
+                        />
                       </div>
                     </div>
                   )}

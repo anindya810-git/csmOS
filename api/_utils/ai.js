@@ -8,7 +8,7 @@ export const PROVIDERS = ['anthropic', 'openai', 'gemini'];
 export const DEFAULT_MODELS = {
   anthropic: 'claude-3-5-haiku-latest',
   openai:    'gpt-4o-mini',
-  gemini:    'gemini-1.5-flash',
+  gemini:    'gemini-3.1-flash-lite',
 };
 
 // Per-section default system instructions. The admin's custom instruction

@@ -395,6 +395,17 @@ export default function AccountDetail() {
                             {e.escalated_by && <span><span className="font-medium">Escalated by:</span> {e.escalated_by}</span>}
                             {e.ps_leader && <span><span className="font-medium">PS Leader:</span> {e.ps_leader}</span>}
                           </div>
+                          <div className="pt-2 border-t border-gray-100">
+                            <AiPanel
+                              section="next_steps"
+                              title="AI Recommended Next Steps"
+                              compact
+                              getPayload={() => ({ kind: 'escalation', item: e })}
+                              initialText={e.ai_next_steps}
+                              initialAt={e.ai_next_steps_at}
+                              onGenerated={(t, at) => setEscalations(prev => prev.map(x => x.id === e.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
@@ -513,6 +524,17 @@ export default function AccountDetail() {
                               )}
                             </div>
                           )}
+                          <div className="pt-2 border-t border-gray-100">
+                            <AiPanel
+                              section="next_steps"
+                              title="AI Recommended Next Steps"
+                              compact
+                              getPayload={() => ({ kind: 'issue', item: issue })}
+                              initialText={issue.ai_next_steps}
+                              initialAt={issue.ai_next_steps_at}
+                              onGenerated={(t, at) => setIssues(prev => prev.map(x => x.id === issue.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
+                            />
+                          </div>
                         </div>
                       )}
                     </div>
