@@ -500,80 +500,81 @@ export default function TasksPage() {
         </div>
       )}
 
-      {/* ── Add / Edit Task Modal ────────────────────────────────── */}
+      {/* ── Add / Edit Task Panel ───────────────────────────────── */}
       {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 pt-10 overflow-y-auto" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="text-base font-semibold text-gray-900">{editingId ? 'Edit Task' : 'Add Task'}</h3>
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowForm(false)} />
+          <div className="fixed inset-y-0 right-0 w-[520px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+              <h3 className="text-sm font-semibold text-gray-900">{editingId ? 'Edit Task' : 'Add Task'}</h3>
               <button onClick={() => setShowForm(false)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
             </div>
-            <form onSubmit={handleSave} className="p-5 space-y-3">
-              {formError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{formError}</p>}
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Task Subject *</label>
-                <input value={form.task_subject} onChange={e => setForm(f => ({ ...f, task_subject: e.target.value }))}
-                  placeholder="e.g. War room for Acme escalation" required />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
+            <div className="flex-1 overflow-y-auto p-5">
+              <form id="task-slide-form" onSubmit={handleSave} className="space-y-3">
+                {formError && <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{formError}</p>}
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Nature of Task</label>
-                  <select value={form.nature_of_task} onChange={e => setForm(f => ({ ...f, nature_of_task: e.target.value }))}>
-                    <option value="">— Select —</option>
-                    {natureOptions.map(v => <option key={v}>{v}</option>)}
-                  </select>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Task Subject *</label>
+                  <input value={form.task_subject} onChange={e => setForm(f => ({ ...f, task_subject: e.target.value }))}
+                    placeholder="e.g. War room for Acme escalation" required />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Due Date & Time *</label>
-                  <input type="datetime-local" value={form.due_date}
-                    onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} required />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Account</label>
-                  <select value={form.account_id} onChange={onAccountChange}>
-                    <option value="">— No account —</option>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Assigned To</label>
-                  {isAdmin ? (
-                    <select value={form.assigned_to_id} onChange={onAssigneeChange}>
-                      <option value="">— Unassigned —</option>
-                      {csms.map(c => (
-                        <option key={c.id} value={c.id}>{c.csm_name || c.name}</option>
-                      ))}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Nature of Task</label>
+                    <select value={form.nature_of_task} onChange={e => setForm(f => ({ ...f, nature_of_task: e.target.value }))}>
+                      <option value="">— Select —</option>
+                      {natureOptions.map(v => <option key={v}>{v}</option>)}
                     </select>
-                  ) : (
-                    <input value={form.assigned_to || user?.csm_name || user?.name || ''} readOnly className="bg-gray-50 text-gray-500" />
-                  )}
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Due Date & Time *</label>
+                    <input type="datetime-local" value={form.due_date}
+                      onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} required />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Account</label>
+                    <select value={form.account_id} onChange={onAccountChange}>
+                      <option value="">— No account —</option>
+                      {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Assigned To</label>
+                    {isAdmin ? (
+                      <select value={form.assigned_to_id} onChange={onAssigneeChange}>
+                        <option value="">— Unassigned —</option>
+                        {csms.map(c => (
+                          <option key={c.id} value={c.id}>{c.csm_name || c.name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input value={form.assigned_to || user?.csm_name || user?.name || ''} readOnly className="bg-gray-50 text-gray-500" />
+                    )}
+                  </div>
                 </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-500 mb-1">Task Description</label>
-                <textarea rows={3} value={form.task_description}
-                  onChange={e => setForm(f => ({ ...f, task_description: e.target.value }))}
-                  placeholder="Details, context, links…" className="resize-none" />
-              </div>
-
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setShowForm(false)}
-                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
-                <button type="submit" disabled={saving}
-                  className="px-4 py-2 text-sm font-medium bg-brand-600 hover:bg-brand-700 text-white rounded-lg transition disabled:opacity-50">
-                  {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Task'}
-                </button>
-              </div>
-            </form>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Task Description</label>
+                  <textarea rows={4} value={form.task_description}
+                    onChange={e => setForm(f => ({ ...f, task_description: e.target.value }))}
+                    placeholder="Details, context, links…" className="resize-none" />
+                </div>
+              </form>
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
+              <button type="submit" form="task-slide-form" disabled={saving}
+                className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50">
+                {saving ? 'Saving…' : editingId ? 'Save Changes' : 'Add Task'}
+              </button>
+              <button type="button" onClick={() => setShowForm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-lg transition">
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

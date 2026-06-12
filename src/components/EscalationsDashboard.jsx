@@ -1237,8 +1237,8 @@ export default function EscalationsDashboard() {
       {/* Right-side edit panel */}
       {editing && (
         <>
-          <div className="fixed inset-0 z-30 bg-black/10" onClick={() => setEditing(null)} />
-          <div className="fixed inset-y-0 right-0 w-[560px] max-w-[90vw] bg-white shadow-2xl z-40 flex flex-col border-l border-gray-200">
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setEditing(null)} />
+          <div className="fixed inset-y-0 right-0 w-[560px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Edit Escalation</h3>
