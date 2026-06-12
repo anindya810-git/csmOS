@@ -8,7 +8,7 @@ import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
-import { ISSUE_FIELDS } from '../fieldCatalog';
+import { ISSUE_FIELDS, toFieldDef } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 
@@ -284,23 +284,14 @@ export default function IssuesDashboard() {
 
   const dd = (key, fb = []) => (dropdownConfig[key]?.length ? dropdownConfig[key].map(o => o.value) : fb);
 
-  const fieldDefs = [
-    { key: 'account_name',   label: 'Account Name',   type: 'text' },
-    { key: 'description',    label: 'Description',    type: 'text' },
-    { key: 'next_steps',     label: 'Next Steps',     type: 'text' },
-    { key: 'status',         label: 'Status',         type: 'select', opts: ['Open','In Progress','Deferred','Resolved','Closed'] },
-    { key: 'priority',       label: 'Priority',       type: 'select', opts: ['P0','P1','P2','P3'] },
-    { key: 'csm',            label: 'CSM',            type: 'select', opts: allCsms },
-    { key: 'owner_team',     label: 'Owner Team',     type: 'select', opts: allOwnerTeams },
-    { key: 'issue_type',     label: 'Issue Type',     type: 'select', opts: dd('issue_type', ['Configuration Failures','PS','Reports & Dashboards','Integration Failures','Platform Issue','Misc','Support']) },
-    { key: 'issue_sub_type', label: 'Issue Sub-Type', type: 'text' },
-    { key: 'reported_date',  label: 'Reported Date',  type: 'date' },
-    { key: 'closure_date',   label: 'Closure Date',   type: 'text' },
-    { key: 'support_ticket', label: 'Support Ticket', type: 'number' },
-    { key: 'dev_ticket',     label: 'Dev Ticket',     type: 'number' },
-    { key: 'tenant_id', label: 'Tenant ID', type: 'text' },
-    { key: 'csm_lead',  label: 'CSM Lead',  type: 'text' },
-  ];
+  // Derived from the field catalog (single source of truth) — any field added
+  // to ISSUE_FIELDS automatically appears in the advanced filter list.
+  const dynamicOpts = { csms: allCsms, ownerTeams: allOwnerTeams };
+  const fieldDefs = ISSUE_FIELDS.map(f => toFieldDef(f, ff =>
+    ff.filtersKey ? dynamicOpts[ff.filtersKey]
+    : ff.ddKey    ? dd(ff.ddKey, [])
+    : undefined
+  ));
 
   const bulkFieldDefs = [
     { key: 'account_id',     label: 'Account',        type: 'account', group: 'Account' },

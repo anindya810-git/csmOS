@@ -8,7 +8,7 @@ import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
-import { ACCOUNT_FIELDS } from '../fieldCatalog';
+import { ACCOUNT_FIELDS, toFieldDef } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 
@@ -192,29 +192,21 @@ export default function AccountsPage() {
   const [perPage,          setPerPage]          = useState(100);
 
   // Field definitions with dynamic options from filters
+  // Derived from the field catalog (single source of truth) — any field added
+  // to ACCOUNT_FIELDS automatically appears here. Plus a few virtual fields
+  // (POC across slots, escalation join) that aren't real account columns.
   const fieldDefs = useMemo(() => [
-    { key: 'account_name',          label: 'Account Name',             type: 'text' },
-    { key: 'tenant_id',             label: 'Tenant ID',                type: 'text' },
-    { key: 'industry',              label: 'Industry',                 type: 'select', opts: filters.industries || [] },
-    { key: 'region',                label: 'Region',                   type: 'select', opts: filters.regions   || ['North','South','East','West'] },
-    { key: 'rag_status',            label: 'RAG Status',               type: 'select', opts: ['Green','Amber','Red'] },
-    { key: 'csm',                   label: 'CSM',                      type: 'select', opts: filters.csms      || [] },
-    { key: 'csm_lead',              label: 'CSM Lead',                 type: 'text' },
-    { key: 'mrr',                   label: 'MRR (₹)',                  type: 'number' },
-    { key: 'mrr_tier',              label: 'MRR Tier',                 type: 'select', opts: filters.tiers     || [] },
-    { key: 'renewal_date',          label: 'Renewal Date',             type: 'date' },
-    { key: 'renewal_status',        label: 'Renewal Status',           type: 'text' },
-    { key: 'churn_status',          label: 'Churn Status',             type: 'select', opts: ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted'] },
-    { key: 'implementation_status', label: 'Implementation Status',    type: 'text' },
-    { key: 'meeting_done',          label: 'Ring Fence Meeting Done',  type: 'select', opts: ['Yes','No'] },
-    { key: 'adoption_score',        label: 'Adoption Score',           type: 'number' },
-    { key: 'stickiness_score',      label: 'Stickiness Score',         type: 'number' },
-    { key: 'poc_name',              label: 'POC Name',                 type: 'text' },
-    { key: 'poc_email',             label: 'POC Email',                type: 'text' },
-    { key: 'escalation_status',     label: 'Escalation Status',        type: 'select', opts: ['Open','In Progress','Partly Resolved','Resolved'] },
-    { key: 'escalation_date',       label: 'Escalation Date',          type: 'date' },
-    { key: 'has_escalation',        label: 'Has Any Escalation',       type: 'bool' },
-  ], [filters]);
+    ...ACCOUNT_FIELDS.map(f => toFieldDef(f, ff =>
+      ff.filtersKey ? filters[ff.filtersKey]
+      : ff.ddKey    ? (ddConfig[ff.ddKey] || []).map(o => o.value)
+      : undefined
+    )),
+    { key: 'poc_name',          label: 'POC Name',           type: 'text' },
+    { key: 'poc_email',         label: 'POC Email',          type: 'text' },
+    { key: 'escalation_status', label: 'Escalation Status',  type: 'select', opts: ['Open','In Progress','Partly Resolved','Resolved'] },
+    { key: 'escalation_date',   label: 'Escalation Date',    type: 'date' },
+    { key: 'has_escalation',    label: 'Has Any Escalation', type: 'bool' },
+  ], [filters, ddConfig]);
 
   const bulkFieldDefs = useMemo(() => {
     const dd = (key, fb) => ddConfig[key]?.length ? ddConfig[key].map(o => o.value) : fb;

@@ -8,7 +8,7 @@ import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
-import { ESCALATION_FIELDS } from '../fieldCatalog';
+import { ESCALATION_FIELDS, toFieldDef } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 
@@ -292,26 +292,14 @@ export default function EscalationsDashboard() {
   const allOwnerships = [...new Set(escalations.map(e => e.ownership).filter(Boolean))].sort();
   const allIssueTypes = [...new Set(escalations.map(e => e.issue_type).filter(Boolean))].sort();
 
-  const fieldDefs = [
-    { key: 'account_name',         label: 'Account Name',         type: 'text' },
-    { key: 'description',          label: 'Description',          type: 'text' },
-    { key: 'action_taken',         label: 'Action Taken',         type: 'text' },
-    { key: 'status',               label: 'Status',               type: 'select', opts: (dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']) },
-    { key: 'csm',                  label: 'CSM',                  type: 'select', opts: allCsms },
-    { key: 'ownership',            label: 'Ownership',            type: 'select', opts: (dropdownConfig.ownership || []).map(o => o.value) },
-    { key: 'ps_leader',            label: 'PS Leader',            type: 'select', opts: (dropdownConfig.ps_leader || []).map(o => o.value) },
-    { key: 'escalated_by',         label: 'Escalated By',         type: 'select', opts: (dropdownConfig.escalated_by || []).map(o => o.value) },
-    { key: 'trigger_reason',       label: 'Trigger Reason',       type: 'select', opts: (dropdownConfig.trigger_reason || []).map(o => o.value) },
-    { key: 'source_of_escalation', label: 'Source of Escalation', type: 'select', opts: (dropdownConfig.source_of_escalation || []).map(o => o.value) },
-    { key: 'issue_type',           label: 'Issue Type',           type: 'select', opts: (dropdownConfig.issue_type || []).map(o => o.value) },
-    { key: 'issue_sub_type',       label: 'Issue Sub-Type',       type: 'text' },
-    { key: 'date_of_escalation',   label: 'Date of Escalation',   type: 'date' },
-    { key: 'eta',                  label: 'ETA',                  type: 'date' },
-    { key: 'month',                label: 'Month',                type: 'select', opts: MONTHS },
-    { key: 'tenant_id',     label: 'Tenant ID',     type: 'text' },
-    { key: 'email_subject', label: 'Email Subject',  type: 'text' },
-    { key: 'rag_status',    label: 'RAG Status',     type: 'select', opts: ['Green','Amber','Red'] },
-  ];
+  // Derived from the field catalog (single source of truth) — any field added
+  // to ESCALATION_FIELDS automatically appears in the advanced filter list.
+  const dynamicOpts = { csms: allCsms };
+  const fieldDefs = ESCALATION_FIELDS.map(f => toFieldDef(f, ff =>
+    ff.filtersKey ? dynamicOpts[ff.filtersKey]
+    : ff.ddKey    ? (dropdownConfig[ff.ddKey] || []).map(o => o.value)
+    : undefined
+  ));
 
   const bulkFieldDefs = [
     { key: 'status',               label: 'Status',               type: 'select', group: 'Status & Resolution', opts: (dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']) },
