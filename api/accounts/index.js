@@ -1,13 +1,14 @@
 import supabase from '../_utils/supabase.js';
-import { verifyToken } from '../_utils/auth.js';
+import { verifyAuth } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
+import { ACCOUNT_EDITABLE_FIELDS } from '../_utils/accountFields.js';
 
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   let user;
-  try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
   // Always resolve csm_name fresh from DB so stale JWTs don't cause empty results
   let csmName = null;
@@ -73,12 +74,24 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'POST') {
-    const { account_name, tenant_id, industry, mrr_tier, mrr, region, csm_lead, csm, rag_status } = req.body;
+    const { account_name } = req.body;
     if (!account_name) return res.status(400).json({ error: 'account_name required' });
+
+    // Accept any editable account field on create (UI sends a subset; the
+    // open API can send the full record in one call).
+    const row = { account_name };
+    for (const field of ACCOUNT_EDITABLE_FIELDS) {
+      const v = req.body[field];
+      if (v !== undefined) row[field] = v === '' ? null : v;
+    }
+    row.mrr = row.mrr || 0;
+    row.rag_status = row.rag_status || 'Green';
+    row.updated_by = user.name || null;
+    row.updated_at = new Date().toISOString();
 
     const { data, error } = await supabase
       .from('accounts')
-      .insert({ account_name, tenant_id, industry, mrr_tier, mrr: mrr || 0, region, csm_lead, csm, rag_status: rag_status || 'Green' })
+      .insert(row)
       .select()
       .single();
 

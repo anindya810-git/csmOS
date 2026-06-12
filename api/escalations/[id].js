@@ -1,5 +1,5 @@
 import supabase from '../_utils/supabase.js';
-import { verifyToken } from '../_utils/auth.js';
+import { verifyAuth } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
 
 const EDITABLE_FIELDS = [
@@ -14,7 +14,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   let user;
-  try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
   const { id } = req.query;
 
@@ -45,7 +45,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
-    if (user.role === 'csm') return res.status(403).json({ error: 'Only admins can delete escalations' });
+    if (user.role === 'csm' || user.role === 'api') return res.status(403).json({ error: 'Only admins can delete escalations' });
     const { error } = await supabase.from('escalations').delete().eq('id', id);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ success: true });

@@ -1,5 +1,5 @@
 import supabase from '../_utils/supabase.js';
-import { verifyToken } from '../_utils/auth.js';
+import { verifyAuth } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
 
 function deriveStatus(task) {
@@ -13,7 +13,7 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   let user;
-  try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
   // Resolve fresh identity for CSMs
   let freshUser = null;

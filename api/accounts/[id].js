@@ -1,27 +1,14 @@
 import supabase from '../_utils/supabase.js';
-import { verifyToken } from '../_utils/auth.js';
+import { verifyAuth } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
-
-const EDITABLE_FIELDS = [
-  'account_name','tenant_id','industry','mrr_tier','mrr','region','csm_lead','csm',
-  'closure_eta','cp','tam_assigned','billing_frequency','renewal_date','renewal_status',
-  'churn_status','churn_reason','renewal_comments','implementation_status','implementation_type',
-  'ps_engagement','ps_solutioning','account_understanding_session','new_csm_intro_done',
-  'csm_escalation_matrix_shared','ring_fence_meeting_initiated','meeting_planned_date',
-  'meeting_done','issue_mapping_sheet_updated','review_cadence_alignment',
-  'adoption_score','stickiness_score','rag_status','rag_reason','actions_taken',
-  'contraction_risk','churn_risk','grr','nps','adoption_rate','sa_status','golive_date',
-  'poc1_name','poc1_email','poc1_phone','poc1_designation',
-  'poc2_name','poc2_email','poc2_phone','poc2_designation',
-  'poc3_name','poc3_email','poc3_phone','poc3_designation',
-];
+import { ACCOUNT_EDITABLE_FIELDS as EDITABLE_FIELDS } from '../_utils/accountFields.js';
 
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   let user;
-  try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
   const { id } = req.query;
 
@@ -80,12 +67,15 @@ export default async function handler(req, res) {
 
     if (error) return res.status(500).json({ error: error.message });
 
-    await supabase.from('activity_log').insert({
-      account_id: Number(id),
-      user_id: user.id,
-      action: 'update',
-      changes
-    });
+    // API-key callers have no user row; skip the FK-backed activity log.
+    if (user.id != null) {
+      await supabase.from('activity_log').insert({
+        account_id: Number(id),
+        user_id: user.id,
+        action: 'update',
+        changes
+      });
+    }
 
     return res.json(updated);
   }

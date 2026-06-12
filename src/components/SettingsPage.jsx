@@ -192,6 +192,15 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    key: 'api',
+    label: 'API Access',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+      </svg>
+    ),
+  },
 ];
 
 const AI_PROVIDERS = [
@@ -208,6 +217,66 @@ const AI_PROMPT_FIELDS = [
   ['rag',             'RAG Report Analysis', 'How to analyze each RAG band (Red/Amber/Green).'],
   ['issues_overview', 'Issues & Escalations Overview', 'How to summarize the filtered issues & escalations in view.'],
   ['next_steps',      'Issue / Escalation Next Steps', 'How to recommend next steps for a single issue or escalation.'],
+];
+
+const API_METHOD_BADGE = {
+  GET:  'bg-green-100 text-green-700',
+  POST: 'bg-blue-100 text-blue-700',
+  PUT:  'bg-amber-100 text-amber-700',
+};
+
+// Open REST API reference rendered in Settings → API Access.
+const API_DOCS = [
+  {
+    entity: 'Accounts',
+    endpoints: [
+      ['GET',  '/api/accounts',       'List accounts. Optional filters: csm, industry, region, rag_status, churn_status, mrr_tier, search.'],
+      ['GET',  '/api/accounts/{id}',  'Get one account (includes recent activity log).'],
+      ['POST', '/api/accounts',       'Create an account. Required: account_name. Accepts any editable field — tenant_id, csm, csm_lead, region, industry, mrr, mrr_tier, rag_status, renewal_date, renewal_status, churn_status, golive_date, poc1_name/email/phone, adoption_score, …'],
+      ['PUT',  '/api/accounts/{id}',  'Edit an account. Partial update — send only the fields you want to change.'],
+    ],
+    example: `curl -X POST {BASE}/api/accounts \\
+  -H "Authorization: Bearer csmos_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"account_name":"Acme Corp","tenant_id":"acme1","csm":"Jane Doe","region":"North","mrr":250000,"rag_status":"Green"}'`,
+  },
+  {
+    entity: 'Issues',
+    endpoints: [
+      ['GET',  '/api/issues',         'List issues. Optional filters: account_id, status, csm, issue_type, priority.'],
+      ['POST', '/api/issues',         'Create an issue. Required: description. Fields: account_id, account_name, tenant_id, csm, csm_lead, priority, status, issue_type, issue_sub_type, owner_team, support_ticket, dev_ticket, reported_date, closure_date, next_steps.'],
+      ['PUT',  '/api/issues?id={id}', 'Edit an issue. Full update — send the complete record; fields you omit are cleared.'],
+    ],
+    example: `curl -X POST {BASE}/api/issues \\
+  -H "Authorization: Bearer csmos_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"description":"Dashboard report times out","account_id":12,"account_name":"Acme Corp","priority":"P1","status":"Open","issue_type":"Performance","reported_date":"2026-06-12"}'`,
+  },
+  {
+    entity: 'Escalations',
+    endpoints: [
+      ['GET',  '/api/escalations',      'List escalations. Optional filters: account_id, status, csm, month.'],
+      ['GET',  '/api/escalations/{id}', 'Get one escalation.'],
+      ['POST', '/api/escalations',      'Create an escalation. Required: description. Fields: account_id, account_name, tenant_id, date_of_escalation, month, status, csm, ownership, eta, action_taken, email_subject, ps_leader, escalated_by, trigger_reason, source_of_escalation, issue_type, issue_sub_type.'],
+      ['PUT',  '/api/escalations/{id}', 'Edit an escalation. Partial update — send only the fields you want to change.'],
+    ],
+    example: `curl -X POST {BASE}/api/escalations \\
+  -H "Authorization: Bearer csmos_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"description":"Customer escalated downtime issue","account_id":12,"account_name":"Acme Corp","date_of_escalation":"2026-06-12","status":"Open","escalated_by":"Customer CTO"}'`,
+  },
+  {
+    entity: 'Tasks',
+    endpoints: [
+      ['GET',  '/api/tasks',          'List tasks. Optional filter: account_id.'],
+      ['POST', '/api/tasks',          'Create a task. Required: task_subject, due_date (ISO datetime). Fields: task_description, nature_of_task, account_id, account_name, assigned_to, assigned_to_id.'],
+      ['PUT',  '/api/tasks?id={id}',  'Edit a task. Partial update. Fields: task_subject, task_description, nature_of_task, due_date, account_id, account_name, assigned_to, status (Open / Completed).'],
+    ],
+    example: `curl -X POST {BASE}/api/tasks \\
+  -H "Authorization: Bearer csmos_YOUR_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"task_subject":"Follow up on renewal","due_date":"2026-06-20T10:00:00Z","account_id":12,"account_name":"Acme Corp","assigned_to":"Jane Doe"}'`,
+  },
 ];
 
 export default function SettingsPage() {
@@ -256,6 +325,14 @@ export default function SettingsPage() {
   const [aiSaving, setAiSaving] = useState(false);
   const [aiMsg,    setAiMsg]    = useState('');
 
+  // API Access (open REST API keys)
+  const [apiKeys,     setApiKeys]     = useState([]);
+  const [newKeyLabel, setNewKeyLabel] = useState('');
+  const [creatingKey, setCreatingKey] = useState(false);
+  const [createdKey,  setCreatedKey]  = useState(null); // { key, label } — shown once
+  const [keyError,    setKeyError]    = useState('');
+  const [copiedTag,   setCopiedTag]   = useState('');
+
   // Field renaming
   const { rows: labelRows, reload: labelsReload } = useFieldLabels();
   const [fieldsTab,    setFieldsTab]    = useState('dropdowns'); // dropdowns | rename
@@ -291,6 +368,52 @@ export default function SettingsPage() {
       prompts: { ...(aiConfig.prompts || {}) },
     });
   }, [aiConfig]);
+
+  // ── API keys ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (settingsPage !== 'api' || user?.role !== 'admin') return;
+    axios.get('/api/admin/users?resource=api_keys')
+      .then(r => setApiKeys(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
+  }, [settingsPage, user]);
+
+  const copyText = (text, tag) => {
+    navigator.clipboard?.writeText(text).then(() => {
+      setCopiedTag(tag);
+      setTimeout(() => setCopiedTag(''), 1500);
+    }).catch(() => {});
+  };
+
+  const createApiKey = async () => {
+    const label = newKeyLabel.trim();
+    if (!label) { setKeyError('Give the key a label (e.g. "LeadSquared sync")'); return; }
+    setCreatingKey(true); setKeyError('');
+    try {
+      const { data } = await axios.post('/api/admin/users', { resource: 'api_keys', label });
+      const { key, ...row } = data;
+      setCreatedKey({ key, label: row.label });
+      setApiKeys(prev => [row, ...prev]);
+      setNewKeyLabel('');
+    } catch (e) {
+      setKeyError(e.response?.data?.error || 'Failed to create key');
+    } finally { setCreatingKey(false); }
+  };
+
+  const revokeApiKey = async (k, revoke) => {
+    if (revoke && !confirm(`Revoke "${k.label}"? Integrations using this key will stop working immediately.`)) return;
+    try {
+      const { data } = await axios.put(`/api/admin/users?resource=api_keys&id=${k.id}`, { resource: 'api_keys', revoke });
+      setApiKeys(prev => prev.map(x => x.id === k.id ? data : x));
+    } catch (e) { alert(e.response?.data?.error || 'Failed'); }
+  };
+
+  const deleteApiKey = async (k) => {
+    if (!confirm(`Permanently delete "${k.label}"? This cannot be undone.`)) return;
+    try {
+      await axios.delete(`/api/admin/users?resource=api_keys&id=${k.id}`);
+      setApiKeys(prev => prev.filter(x => x.id !== k.id));
+    } catch (e) { alert(e.response?.data?.error || 'Failed'); }
+  };
 
   const saveAi = async () => {
     setAiSaving(true); setAiMsg('');
@@ -855,6 +978,143 @@ export default function SettingsPage() {
                 {aiSaving ? 'Saving…' : 'Save AI Settings'}
               </button>
               {aiMsg && <span className={`text-sm ${aiMsg === 'Saved' ? 'text-green-600' : 'text-red-600'}`}>{aiMsg}</span>}
+            </div>
+          </>
+        )}
+
+        {/* ── API Access page ────────────────────────────────────────── */}
+        {settingsPage === 'api' && (
+          <>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">API Access</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Open REST API for external systems to read, create and edit Accounts, Issues, Escalations and Tasks. Authenticate with an API key — no login session needed.</p>
+            </div>
+
+            {/* Keys */}
+            <div className="card space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-800">API Keys</h3>
+                <p className="text-xs text-gray-400 mt-0.5">Keys can read, create and edit records. They cannot delete records, manage users or change settings. Edits made via a key show as “API · &lt;label&gt;” in last-edited stamps.</p>
+              </div>
+
+              {/* Create */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  value={newKeyLabel}
+                  onChange={e => { setNewKeyLabel(e.target.value); setKeyError(''); }}
+                  onKeyDown={e => { if (e.key === 'Enter') createApiKey(); }}
+                  placeholder='Key label, e.g. "LeadSquared sync"'
+                  className="flex-1 text-sm"
+                />
+                <button onClick={createApiKey} disabled={creatingKey}
+                  className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60 shrink-0">
+                  {creatingKey ? 'Generating…' : 'Generate Key'}
+                </button>
+              </div>
+              {keyError && <p className="text-xs text-red-600">{keyError}</p>}
+
+              {/* One-time key reveal */}
+              {createdKey && (
+                <div className="rounded-xl border border-green-200 bg-green-50 p-4 space-y-2">
+                  <p className="text-sm font-semibold text-green-800">Key created for “{createdKey.label}”</p>
+                  <div className="flex items-center gap-2">
+                    <code className="flex-1 text-xs font-mono bg-white border border-green-200 rounded-lg px-3 py-2 break-all select-all">{createdKey.key}</code>
+                    <button onClick={() => copyText(createdKey.key, 'newkey')}
+                      className="px-3 py-2 text-xs font-medium bg-green-600 hover:bg-green-700 text-white rounded-lg transition shrink-0">
+                      {copiedTag === 'newkey' ? 'Copied ✓' : 'Copy'}
+                    </button>
+                  </div>
+                  <p className="text-xs text-green-700">Copy it now — for security it is stored hashed and <span className="font-semibold">cannot be shown again</span>.</p>
+                  <button onClick={() => setCreatedKey(null)} className="text-xs text-green-700 hover:underline">Done, I’ve copied it</button>
+                </div>
+              )}
+
+              {/* Key list */}
+              {apiKeys.length === 0 ? (
+                <p className="text-sm text-gray-400 italic">No API keys yet. Generate one to start using the API.</p>
+              ) : (
+                <div className="overflow-x-auto -mx-5 px-5">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                        <th className="py-2 pr-4 font-semibold">Label</th>
+                        <th className="py-2 pr-4 font-semibold">Key</th>
+                        <th className="py-2 pr-4 font-semibold">Created</th>
+                        <th className="py-2 pr-4 font-semibold">Last used</th>
+                        <th className="py-2 pr-4 font-semibold">Status</th>
+                        <th className="py-2 font-semibold text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {apiKeys.map(k => (
+                        <tr key={k.id}>
+                          <td className="py-2.5 pr-4 font-medium text-gray-800">{k.label}</td>
+                          <td className="py-2.5 pr-4 font-mono text-xs text-gray-500">{k.key_prefix}</td>
+                          <td className="py-2.5 pr-4 text-xs text-gray-500" title={fullTime(k.created_at)}>{timeAgo(k.created_at)}{k.created_by ? ` · ${k.created_by}` : ''}</td>
+                          <td className="py-2.5 pr-4 text-xs text-gray-500" title={k.last_used_at ? fullTime(k.last_used_at) : ''}>{k.last_used_at ? timeAgo(k.last_used_at) : 'Never'}</td>
+                          <td className="py-2.5 pr-4">
+                            {k.revoked_at
+                              ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">Revoked</span>
+                              : <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-100 text-green-700">Active</span>}
+                          </td>
+                          <td className="py-2.5 text-right whitespace-nowrap">
+                            {k.revoked_at ? (
+                              <button onClick={() => revokeApiKey(k, false)} className="text-xs text-brand-600 hover:underline mr-3">Restore</button>
+                            ) : (
+                              <button onClick={() => revokeApiKey(k, true)} className="text-xs text-amber-600 hover:underline mr-3">Revoke</button>
+                            )}
+                            <button onClick={() => deleteApiKey(k)} className="text-xs text-red-500 hover:underline">Delete</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Authentication */}
+            <div className="card space-y-3">
+              <h3 className="text-sm font-semibold text-gray-800">Authentication</h3>
+              <p className="text-xs text-gray-500">All requests need an API key in the <code className="bg-gray-100 px-1 py-0.5 rounded">Authorization</code> header (or <code className="bg-gray-100 px-1 py-0.5 rounded">X-Api-Key</code>). Requests and responses are JSON.</p>
+              <div className="space-y-1.5 text-xs font-mono bg-gray-900 text-gray-100 rounded-xl p-4 overflow-x-auto">
+                <p><span className="text-gray-400"># Base URL</span></p>
+                <p>{window.location.origin}</p>
+                <p className="pt-2"><span className="text-gray-400"># Header</span></p>
+                <p>Authorization: Bearer csmos_YOUR_KEY</p>
+              </div>
+            </div>
+
+            {/* Endpoint reference */}
+            {API_DOCS.map(group => (
+              <div key={group.entity} className="card space-y-3">
+                <h3 className="text-sm font-semibold text-gray-800">{group.entity}</h3>
+                <div className="space-y-2">
+                  {group.endpoints.map(([method, path, desc]) => (
+                    <div key={method + path} className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${API_METHOD_BADGE[method]}`}>{method}</span>
+                        <code className="text-xs font-mono text-gray-800">{path}</code>
+                      </div>
+                      <p className="text-xs text-gray-500 leading-relaxed">{desc}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="relative">
+                  <pre className="text-[11px] font-mono bg-gray-900 text-gray-100 rounded-xl p-4 overflow-x-auto whitespace-pre">{group.example.replaceAll('{BASE}', window.location.origin)}</pre>
+                  <button
+                    onClick={() => copyText(group.example.replaceAll('{BASE}', window.location.origin), group.entity)}
+                    className="absolute top-2 right-2 px-2 py-1 text-[10px] font-medium bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-md transition">
+                    {copiedTag === group.entity ? 'Copied ✓' : 'Copy'}
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            <div className="card bg-amber-50/60 border-amber-100">
+              <p className="text-xs text-amber-800 leading-relaxed">
+                <span className="font-semibold">Notes:</span> dates use <code className="bg-amber-100 px-1 rounded">YYYY-MM-DD</code> (task due dates use ISO datetime). API keys see all records (no CSM filtering), cannot delete anything, and every write is stamped with the key’s label for auditing. Run <code className="bg-amber-100 px-1 rounded">supabase/migrate_api_keys.sql</code> once before generating keys.
+              </p>
             </div>
           </>
         )}
