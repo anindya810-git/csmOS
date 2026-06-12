@@ -20,6 +20,19 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  // Heartbeat: re-ping /api/auth/me so the server keeps last_active_at fresh
+  // while the tab is open. Skips while the tab is hidden to avoid noise.
+  useEffect(() => {
+    const beat = () => {
+      if (document.visibilityState === 'hidden') return;
+      if (!localStorage.getItem('token')) return;
+      axios.get('/api/auth/me').catch(() => {});
+    };
+    const interval = setInterval(beat, 120000);
+    document.addEventListener('visibilitychange', beat);
+    return () => { clearInterval(interval); document.removeEventListener('visibilitychange', beat); };
+  }, []);
+
   const login = async (email, password) => {
     const r = await axios.post('/api/auth/login', { email, password });
     localStorage.setItem('token', r.data.token);

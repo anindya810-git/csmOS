@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import axios from 'axios';
+import LastEdited from './LastEdited';
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 function toMonth(dateStr) {
@@ -287,6 +288,7 @@ export default function AccountDetail() {
               {a.rag_status && <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${RAG_COLOR[a.rag_status] || 'bg-gray-100 text-gray-600'}`}>{a.rag_status}</span>}
               {a.churn_status && <span className={`text-xs font-medium px-2.5 py-0.5 rounded-full border ${CHURN_COLOR[a.churn_status] || 'bg-gray-100 text-gray-600'}`}>{a.churn_status}</span>}
             </div>
+            <LastEdited by={a.updated_by} at={a.updated_at} className="mt-1.5" />
           </div>
         </div>
         <div className="flex flex-wrap gap-2 shrink-0">

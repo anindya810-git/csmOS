@@ -9,6 +9,7 @@ import MultiSelectDropdown from './MultiSelectDropdown';
 import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
+import LastEdited from './LastEdited';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { ESCALATION_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
@@ -223,6 +224,8 @@ export default function EscalationsDashboard() {
       source_of_escalation: e.source_of_escalation || '',
       issue_type: e.issue_type || '',
       issue_sub_type: e.issue_sub_type || '',
+      updated_by: e.updated_by || '',
+      updated_at: e.updated_at || '',
     });
   };
 
@@ -857,6 +860,11 @@ export default function EscalationsDashboard() {
                                   </Link>
                                 )}
                               </div>
+                              {(e.updated_by || e.updated_at) && (
+                                <div className="sm:col-span-2 pt-1 border-t border-blue-100">
+                                  <LastEdited by={e.updated_by} at={e.updated_at} />
+                                </div>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -1252,6 +1260,7 @@ export default function EscalationsDashboard() {
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Edit Escalation</h3>
                 <p className="text-xs text-gray-500 mt-0.5">{editForm.account_name}</p>
+                <LastEdited by={editForm.updated_by} at={editForm.updated_at} className="mt-0.5" />
               </div>
               <button onClick={() => setEditing(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

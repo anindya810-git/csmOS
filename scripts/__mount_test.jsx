@@ -30,7 +30,8 @@ const FIXTURES = {
     { id: 11, account_id: 1, account_name: 'Acme Corp', tenant_id: 'acme1', priority: 'P1',
       description: 'Something broke', issue_type: 'PS', issue_sub_type: '', owner_team: 'CS',
       status: 'Open', reported_date: '2026-01-15', closure_date: null, csm: 'CSM One',
-      csm_lead: 'Lead One', support_ticket: 123, dev_ticket: null, next_steps: 'Investigate' },
+      csm_lead: 'Lead One', support_ticket: 123, dev_ticket: null, next_steps: 'Investigate',
+      updated_by: 'Admin', updated_at: '2026-06-10T09:30:00Z' },
   ],
   '/api/escalations': [
     { id: 21, account_id: 1, account_name: 'Acme Corp', tenant_id: 'acme1',
@@ -38,6 +39,7 @@ const FIXTURES = {
       action_taken: 'Called them', status: 'Open', csm: 'CSM One', ownership: 'PS',
       eta: '2026-02-01', email_subject: 'URGENT', ps_leader: 'PS Lead', escalated_by: 'Customer',
       trigger_reason: 'Bug', source_of_escalation: 'Email', issue_type: 'PS', issue_sub_type: '',
+      updated_by: 'Admin', updated_at: '2026-06-11T14:00:00Z',
       accounts: { rag_status: 'Green' } },
   ],
   '/api/tasks': [
@@ -62,8 +64,8 @@ const FIXTURES = {
   '/api/dropdown-config': {},
   '/api/users': [{ id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin' }],
   '/api/admin/users': [
-    { id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin' },
-    { id: 2, email: 'csm@test.com', name: 'CSM One', csm_name: 'CSM One', role: 'csm' },
+    { id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin', last_active_at: new Date().toISOString() },
+    { id: 2, email: 'csm@test.com', name: 'CSM One', csm_name: 'CSM One', role: 'csm', last_active_at: '2026-06-01T10:00:00Z' },
   ],
 };
 

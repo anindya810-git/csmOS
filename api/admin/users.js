@@ -16,10 +16,17 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase
+    // Try to include last_active_at; fall back if the column isn't migrated.
+    let { data, error } = await supabase
       .from('users')
-      .select('id, name, email, role, csm_name, csm_lead')
+      .select('id, name, email, role, csm_name, csm_lead, last_active_at')
       .order('name');
+    if (error) {
+      ({ data, error } = await supabase
+        .from('users')
+        .select('id, name, email, role, csm_name, csm_lead')
+        .order('name'));
+    }
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }

@@ -37,6 +37,7 @@ export default async function handler(req, res) {
       }
     }
     updates.updated_at = new Date().toISOString();
+    updates.updated_by = user.name || null;
 
     const { data, error } = await supabase.from('escalations').update(updates).eq('id', id).select().single();
     if (error) return res.status(500).json({ error: error.message });

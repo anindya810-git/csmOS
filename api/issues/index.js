@@ -66,6 +66,8 @@ export default async function handler(req, res) {
       closure_date: closure_date || null,
       status: status || 'Open',
       next_steps: next_steps || null,
+      updated_by: user.name || null,
+      updated_at: new Date().toISOString(),
     }).select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json(data);
@@ -98,6 +100,7 @@ export default async function handler(req, res) {
       closure_date: closure_date || null,
       status: status || 'Open',
       next_steps: next_steps || null,
+      updated_by: user.name || null,
       updated_at: new Date().toISOString(),
     }).eq('id', id).select().single();
     if (error) return res.status(500).json({ error: error.message });
@@ -125,7 +128,7 @@ export default async function handler(req, res) {
     if (!field || !ALLOWED.includes(field)) return res.status(400).json({ error: 'invalid field' });
     const coerced = value === '' || value === null || value === undefined ? null : value;
 
-    let updateObj = { updated_at: new Date().toISOString() };
+    let updateObj = { updated_at: new Date().toISOString(), updated_by: user.name || null };
     if (field === 'account_id') {
       updateObj.account_id = coerced ? parseInt(coerced) : null;
       if (coerced) {

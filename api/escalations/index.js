@@ -73,6 +73,8 @@ export default async function handler(req, res) {
       source_of_escalation: source_of_escalation || null,
       issue_type: issue_type || null,
       issue_sub_type: issue_sub_type || null,
+      updated_by: user.name || null,
+      updated_at: new Date().toISOString(),
     }).select().single();
 
     if (error) return res.status(500).json({ error: error.message });
@@ -92,7 +94,7 @@ export default async function handler(req, res) {
     const coerced = value === '' || value === null || value === undefined ? null : value;
     const { error } = await supabase
       .from('escalations')
-      .update({ [field]: coerced, updated_at: new Date().toISOString() })
+      .update({ [field]: coerced, updated_at: new Date().toISOString(), updated_by: user.name || null })
       .in('id', ids);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ updated: ids.length });

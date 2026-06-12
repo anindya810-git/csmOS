@@ -73,6 +73,7 @@ export default async function handler(req, res) {
     if (Object.keys(updates).length === 0) return res.json(current);
 
     updates.updated_at = new Date().toISOString();
+    updates.updated_by = user.name || null;
 
     const { data: updated, error } = await supabase
       .from('accounts').update(updates).eq('id', id).select().single();

@@ -10,6 +10,7 @@ import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
+import LastEdited from './LastEdited';
 import { ISSUE_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
@@ -226,6 +227,8 @@ export default function IssuesDashboard() {
       closure_date: issue.closure_date || '',
       status: issue.status || 'Open',
       next_steps: issue.next_steps || '',
+      updated_by: issue.updated_by || '',
+      updated_at: issue.updated_at || '',
     });
   };
 
@@ -788,6 +791,11 @@ export default function IssuesDashboard() {
                                     </Link>
                                   )}
                                 </div>
+                                {(issue.updated_by || issue.updated_at) && (
+                                  <div className="sm:col-span-2 pt-1 border-t border-blue-100">
+                                    <LastEdited by={issue.updated_by} at={issue.updated_at} />
+                                  </div>
+                                )}
                               </div>
                             </td>
                           </tr>
@@ -881,6 +889,7 @@ export default function IssuesDashboard() {
               <div>
                 <h3 className="text-sm font-semibold text-gray-900">Edit Issue</h3>
                 <p className="text-xs text-gray-500 mt-0.5">{editForm.account_name}</p>
+                <LastEdited by={editForm.updated_by} at={editForm.updated_at} className="mt-0.5" />
               </div>
               <button onClick={() => setEditing(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

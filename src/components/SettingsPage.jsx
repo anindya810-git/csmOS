@@ -5,6 +5,24 @@ import { useNavigate } from 'react-router-dom';
 import { FIELD_CATALOG } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions, getDefaultPermsForRole, PERM_OBJECTS, PERM_ACTIONS } from '../context/PermissionsContext';
+import { timeAgo, fullTime } from './LastEdited';
+
+// Users seen within this window count as currently active.
+const ACTIVE_WINDOW_MIN = 5;
+
+function ActiveStatus({ at }) {
+  if (!at) return <span className="text-xs text-gray-300">Never</span>;
+  const diffMin = (Date.now() - new Date(at).getTime()) / 60000;
+  const online = diffMin >= 0 && diffMin < ACTIVE_WINDOW_MIN;
+  return (
+    <span className="inline-flex items-center gap-1.5 text-xs" title={fullTime(at)}>
+      <span className={`w-2 h-2 rounded-full shrink-0 ${online ? 'bg-green-500' : 'bg-gray-300'}`} />
+      <span className={online ? 'text-green-700 font-medium' : 'text-gray-500'}>
+        {online ? 'Active now' : timeAgo(at)}
+      </span>
+    </span>
+  );
+}
 
 const ROLE_BADGE = {
   admin:       'bg-brand-100 text-brand-700',
@@ -90,6 +108,7 @@ function OrgNode({ u, childrenMap, currentUserId, onEdit, onDelete, deleting }) 
               </p>
             </div>
           </div>
+          <div className="mb-1.5"><ActiveStatus at={u.last_active_at} /></div>
           <div className="flex items-center justify-between">
             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
             <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition">
@@ -515,6 +534,7 @@ export default function SettingsPage() {
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Email</th>
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM Display Name</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Active</th>
                       <th className="px-5 py-3 w-20"></th>
                     </tr>
                   </thead>
@@ -529,6 +549,7 @@ export default function SettingsPage() {
                           <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_BADGE[u.role] || 'bg-gray-100 text-gray-600'}`}>{u.role}</span>
                         </td>
                         <td className="px-5 py-3 text-gray-600">{u.csm_name || <span className="text-gray-300">—</span>}</td>
+                        <td className="px-5 py-3"><ActiveStatus at={u.last_active_at} /></td>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-1">
                             <button onClick={() => openEdit(u)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded-md transition" title="Edit user">
