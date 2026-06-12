@@ -4,19 +4,20 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import SelectDropdown from './SelectDropdown';
+import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
+import { ACCOUNT_FIELDS } from '../fieldCatalog';
+import { useFieldLabels } from '../context/FieldLabelsContext';
 
-const ACCOUNTS_COLS = [
-  { key: 'account_name', label: 'Account',      alwaysVisible: true },
-  { key: 'industry',     label: 'Industry' },
-  { key: 'mrr',          label: 'MRR' },
-  { key: 'csm',          label: 'CSM' },
-  { key: 'rag_status',   label: 'RAG' },
-  { key: 'renewal_date', label: 'Renewal Date' },
-  { key: 'churn_status', label: 'Churn Status' },
-  { key: 'region',       label: 'Region' },
-];
+// Every account field is available as a column; only these start visible.
+const DEFAULT_ON = ['account_name', 'industry', 'mrr', 'csm', 'rag_status', 'renewal_date', 'churn_status', 'region'];
+const ACCOUNTS_COLS = ACCOUNT_FIELDS.map(f => ({
+  ...f,
+  alwaysVisible: f.key === 'account_name',
+  off: !DEFAULT_ON.includes(f.key),
+}));
 
 function fmt(n) {
   if (!n) return '—';
@@ -37,6 +38,23 @@ const CHURN_BADGE = {
   'Churn Executed':        'bg-gray-100 text-gray-600 border border-gray-200',
   'Contraction Predicted': 'bg-yellow-100 text-yellow-700 border border-yellow-200',
 };
+
+function AccountCell({ a, k }) {
+  if (k === 'mrr') return <span className="font-medium text-gray-800">{fmt(a.mrr)}</span>;
+  if (k === 'rag_status') {
+    return a.rag_status
+      ? <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${RAG_BADGE[a.rag_status] || ''}`}>{a.rag_status}</span>
+      : <span className="text-gray-300">—</span>;
+  }
+  if (k === 'churn_status') {
+    return a.churn_status
+      ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CHURN_BADGE[a.churn_status] || 'bg-gray-100 text-gray-600'}`}>{a.churn_status}</span>
+      : <span className="text-gray-300">—</span>;
+  }
+  const v = a[k];
+  if (v === null || v === undefined || v === '') return <span className="text-gray-300">—</span>;
+  return <span className="block max-w-[240px] truncate" title={String(v)}>{String(v)}</span>;
+}
 
 const OPS_TEXT   = ['contains','does not contain','is','is not','is empty','is not empty'];
 const OPS_SELECT = ['is','is not','is one of','is empty','is not empty'];
@@ -142,10 +160,12 @@ function matchesCondition(account, cond, escalationMap, fieldDefs) {
 export default function AccountsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
-    user?.email, 'accounts', Object.fromEntries(ACCOUNTS_COLS.map(c => [c.key, true]))
+    user?.email, 'accounts', Object.fromEntries(ACCOUNTS_COLS.map(c => [c.key, !c.off]))
   );
-  const colCount = ACCOUNTS_COLS.filter(c => showCol(c.key)).length + 1;
+  const visibleCols = ACCOUNTS_COLS.filter(c => c.key !== 'account_name' && showCol(c.key));
+  const colCount = visibleCols.length + 2; // +account_name +actions
   const [accounts,         setAccounts]         = useState([]);
   const [filters,          setFilters]          = useState({});
   const [loading,          setLoading]          = useState(true);
@@ -268,9 +288,10 @@ export default function AccountsPage() {
     }
   }, [advancedOpen, escalationsReady]);
 
+  const NUMERIC_SORT = ['mrr', 'grr', 'nps', 'adoption_score', 'stickiness_score', 'adoption_rate'];
   const sorted = [...accounts].sort((a, b) => {
     let va = a[sortField], vb = b[sortField];
-    if (sortField === 'mrr') { va = va || 0; vb = vb || 0; return sortDir === 'asc' ? va - vb : vb - va; }
+    if (NUMERIC_SORT.includes(sortField)) { va = Number(va) || 0; vb = Number(vb) || 0; return sortDir === 'asc' ? va - vb : vb - va; }
     return sortDir === 'asc' ? String(va||'').localeCompare(String(vb||'')) : String(vb||'').localeCompare(String(va||''));
   });
 
@@ -399,7 +420,7 @@ export default function AccountsPage() {
           <MultiSelectDropdown options={filters.industries || []} value={query.industry} onChange={v => setQuery(q => ({...q, industry: v}))} placeholder="All Industries" />
           <MultiSelectDropdown options={['North','South','East','West']} value={query.region} onChange={v => setQuery(q => ({...q, region: v}))} placeholder="All Regions" />
           <MultiSelectDropdown options={filters.tiers || []} value={query.mrr_tier} onChange={v => setQuery(q => ({...q, mrr_tier: v}))} placeholder="All Tiers" />
-          <ColumnToggle columns={ACCOUNTS_COLS} prefs={colPrefs} onToggle={toggleCol} />
+          <ColumnToggle columns={ACCOUNTS_COLS.map(c => ({ ...c, label: fieldLabel('accounts', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
@@ -458,26 +479,28 @@ export default function AccountsPage() {
                   )}
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* Field selector */}
-                    <select
+                    <SelectDropdown
+                      compact
+                      clearable={false}
+                      className="w-48"
+                      options={fieldDefs.map(f => ({ value: f.key, label: f.label }))}
                       value={cond.field}
-                      onChange={e => {
-                        const nd = fieldDefs.find(f => f.key === e.target.value);
+                      onChange={v => {
+                        const nd = fieldDefs.find(f => f.key === v);
                         const no = getOps(nd?.type || 'text');
-                        updateCondition(cond.id, { field: e.target.value, operator: no[0], value: '' });
+                        updateCondition(cond.id, { field: v, operator: no[0], value: '' });
                       }}
-                      className="!w-auto text-sm !py-1.5"
-                    >
-                      {fieldDefs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                    </select>
+                    />
 
                     {/* Operator selector */}
-                    <select
+                    <SelectDropdown
+                      compact
+                      clearable={false}
+                      className="w-40"
+                      options={ops}
                       value={cond.operator}
-                      onChange={e => updateCondition(cond.id, { operator: e.target.value, value: e.target.value === 'is one of' ? [] : '' })}
-                      className="!w-auto text-sm !py-1.5"
-                    >
-                      {ops.map(op => <option key={op}>{op}</option>)}
-                    </select>
+                      onChange={v => updateCondition(cond.id, { operator: v, value: v === 'is one of' ? [] : '' })}
+                    />
 
                     {/* Value input — type-aware */}
                     {needsValue(cond.operator) && (
@@ -490,14 +513,14 @@ export default function AccountsPage() {
                             onChange={v => updateCondition(cond.id, { value: v })}
                           />
                         ) : (
-                          <select
+                          <SelectDropdown
+                            compact
+                            className="w-48"
+                            placeholder="Select…"
+                            options={def.opts || []}
                             value={cond.value}
-                            onChange={e => updateCondition(cond.id, { value: e.target.value })}
-                            className="!w-auto text-sm !py-1.5"
-                          >
-                            <option value="">Select…</option>
-                            {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
+                            onChange={v => updateCondition(cond.id, { value: v })}
+                          />
                         )
                       ) : def?.type === 'number' ? (
                         <input
@@ -508,11 +531,11 @@ export default function AccountsPage() {
                           placeholder="Enter number"
                         />
                       ) : def?.type === 'date' ? (
-                        <input
-                          type="date"
+                        <DatePicker
+                          compact
+                          className="w-40"
                           value={cond.value}
-                          onChange={e => updateCondition(cond.id, { value: e.target.value })}
-                          className="!w-auto text-sm !py-1.5"
+                          onChange={v => updateCondition(cond.id, { value: v })}
                         />
                       ) : (
                         <input
@@ -560,32 +583,26 @@ export default function AccountsPage() {
               <span className="text-sm font-semibold text-amber-800">Bulk Update</span>
             </div>
             <span className="text-sm text-amber-700">Set</span>
-            <select
+            <SelectDropdown
+              compact
+              clearable={false}
+              className="w-56"
+              options={bulkFieldDefs.map(f => ({ value: f.key, label: `${f.group} · ${f.label}` }))}
               value={bulkField}
-              onChange={e => { setBulkField(e.target.value); setBulkValue(''); }}
-              className="!w-auto text-sm !py-1.5 border-amber-200 bg-white"
-            >
-              {Object.entries(bulkFieldDefs.reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc; }, {})).map(([group, fields]) => (
-                <optgroup key={group} label={group}>
-                  {fields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                </optgroup>
-              ))}
-            </select>
+              onChange={v => { setBulkField(v); setBulkValue(''); }}
+            />
             <span className="text-sm text-amber-700">to</span>
             {(() => {
               const def = bulkFieldDefs.find(f => f.key === bulkField);
               if (!def) return null;
               if (def.type === 'select') return (
-                <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
-                  <option value="">— Select value —</option>
-                  {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                <SelectDropdown compact className="w-48" placeholder="— Select value —" options={def.opts || []} value={bulkValue} onChange={setBulkValue} />
               );
               if (def.type === 'number') return (
                 <input type="number" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Enter value…" className="!w-40 text-sm !py-1.5 border-amber-200 bg-white" />
               );
               if (def.type === 'date') return (
-                <input type="date" value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white" />
+                <DatePicker compact className="w-40" value={bulkValue} onChange={setBulkValue} />
               );
               return (
                 <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Enter value…" className="!w-48 text-sm !py-1.5 border-amber-200 bg-white" />
@@ -617,14 +634,10 @@ export default function AccountsPage() {
           <table className="w-full text-sm">
             <thead className="bg-gray-50 border-b border-gray-100">
               <tr>
-                <Th label="Account Name" field="account_name" />
-                {showCol('industry')     && <Th label="Industry"     field="industry" />}
-                {showCol('mrr')          && <Th label="MRR"          field="mrr" />}
-                {showCol('csm')          && <Th label="CSM"          field="csm" />}
-                {showCol('rag_status')   && <Th label="RAG"          field="rag_status" />}
-                {showCol('renewal_date') && <Th label="Renewal Date" field="renewal_date" />}
-                {showCol('churn_status') && <Th label="Churn Status" field="churn_status" />}
-                {showCol('region')       && <Th label="Region"       field="region" />}
+                <Th label={fieldLabel('accounts', 'account_name', 'Account Name')} field="account_name" />
+                {visibleCols.map(c => (
+                  <Th key={c.key} label={fieldLabel('accounts', c.key, c.label)} field={c.key} />
+                ))}
                 <th className="px-4 py-3"></th>
               </tr>
             </thead>
@@ -639,23 +652,11 @@ export default function AccountsPage() {
                     <div className="font-medium text-gray-900 max-w-xs truncate">{a.account_name}</div>
                     <div className="text-xs text-gray-400">{a.tenant_id}</div>
                   </td>
-                  {showCol('industry')     && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.industry || '—'}</td>}
-                  {showCol('mrr')          && <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">{fmt(a.mrr)}</td>}
-                  {showCol('csm')          && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.csm || '—'}</td>}
-                  {showCol('rag_status')   && (
-                    <td className="px-4 py-3">
-                      {a.rag_status ? <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ${RAG_BADGE[a.rag_status] || ''}`}>{a.rag_status}</span> : '—'}
+                  {visibleCols.map(c => (
+                    <td key={c.key} className="px-4 py-3 text-gray-600 whitespace-nowrap">
+                      <AccountCell a={a} k={c.key} />
                     </td>
-                  )}
-                  {showCol('renewal_date') && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.renewal_date || '—'}</td>}
-                  {showCol('churn_status') && (
-                    <td className="px-4 py-3">
-                      {a.churn_status
-                        ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CHURN_BADGE[a.churn_status] || 'bg-gray-100 text-gray-600'}`}>{a.churn_status}</span>
-                        : <span className="text-gray-300">—</span>}
-                    </td>
-                  )}
-                  {showCol('region')       && <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{a.region || '—'}</td>}
+                  ))}
                   <td className="px-4 py-3">
                     <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                   </td>
@@ -762,16 +763,11 @@ function AddAccountModal({ onClose, onSave }) {
             <div><label className="block text-xs font-medium text-gray-600 mb-1">Industry</label><input value={form.industry} onChange={e => setForm(f=>({...f, industry: e.target.value}))} /></div>
             <div><label className="block text-xs font-medium text-gray-600 mb-1">MRR (₹)</label><input type="number" value={form.mrr} onChange={e => setForm(f=>({...f, mrr: e.target.value}))} /></div>
             <div><label className="block text-xs font-medium text-gray-600 mb-1">Region</label>
-              <select value={form.region} onChange={e => setForm(f=>({...f, region: e.target.value}))}>
-                <option value="">—</option>
-                {['North','South','East','West'].map(r => <option key={r}>{r}</option>)}
-              </select>
+              <SelectDropdown options={['North','South','East','West']} value={form.region} onChange={v => setForm(f=>({...f, region: v}))} placeholder="—" />
             </div>
             <div><label className="block text-xs font-medium text-gray-600 mb-1">CSM</label><input value={form.csm} onChange={e => setForm(f=>({...f, csm: e.target.value}))} /></div>
             <div><label className="block text-xs font-medium text-gray-600 mb-1">RAG Status</label>
-              <select value={form.rag_status} onChange={e => setForm(f=>({...f, rag_status: e.target.value}))}>
-                <option>Green</option><option>Amber</option><option>Red</option>
-              </select>
+              <SelectDropdown options={['Green','Amber','Red']} value={form.rag_status} onChange={v => setForm(f=>({...f, rag_status: v}))} clearable={false} />
             </div>
           </div>
         </div>

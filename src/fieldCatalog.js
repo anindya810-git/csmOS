@@ -1,0 +1,113 @@
+// Canonical field catalog for every object in the system.
+// Used by: column visibility toggles (all fields selectable as table columns)
+// and Settings → Field Management → Rename Fields.
+
+export const ACCOUNT_FIELDS = [
+  { key: 'account_name',          label: 'Account Name' },
+  { key: 'tenant_id',             label: 'Tenant ID' },
+  { key: 'industry',              label: 'Industry' },
+  { key: 'mrr_tier',              label: 'MRR Tier' },
+  { key: 'mrr',                   label: 'MRR' },
+  { key: 'region',                label: 'Region' },
+  { key: 'csm_lead',              label: 'CSM Lead' },
+  { key: 'csm',                   label: 'CSM' },
+  { key: 'cp',                    label: 'CP' },
+  { key: 'tam_assigned',          label: 'TAM Assigned' },
+  { key: 'sa_status',             label: 'SA Status' },
+  { key: 'billing_frequency',     label: 'Billing Frequency' },
+  { key: 'golive_date',           label: 'Go-live Date' },
+  { key: 'renewal_date',          label: 'Renewal Date' },
+  { key: 'renewal_status',        label: 'Renewal Status' },
+  { key: 'closure_eta',           label: 'Closure ETA' },
+  { key: 'churn_status',          label: 'Churn Status' },
+  { key: 'churn_reason',          label: 'Churn Reason' },
+  { key: 'contraction_risk',      label: 'Contraction Risk' },
+  { key: 'churn_risk',            label: 'Churn Risk' },
+  { key: 'rag_status',            label: 'RAG Status' },
+  { key: 'rag_reason',            label: 'RAG Reason' },
+  { key: 'actions_taken',         label: 'Actions Taken' },
+  { key: 'adoption_score',        label: 'Adoption Score' },
+  { key: 'stickiness_score',      label: 'Stickiness Score' },
+  { key: 'adoption_rate',         label: 'Adoption Rate' },
+  { key: 'grr',                   label: 'GRR' },
+  { key: 'nps',                   label: 'NPS' },
+  { key: 'implementation_status', label: 'Implementation Status' },
+  { key: 'implementation_type',   label: 'Implementation Type' },
+  { key: 'ps_engagement',         label: 'PS Engagement' },
+  { key: 'meeting_planned_date',  label: 'Meeting Planned Date' },
+  { key: 'meeting_done',          label: 'Meeting Done' },
+  { key: 'poc1_name',             label: 'POC 1 Name' },
+  { key: 'poc1_email',            label: 'POC 1 Email' },
+  { key: 'poc2_name',             label: 'POC 2 Name' },
+  { key: 'poc2_email',            label: 'POC 2 Email' },
+];
+
+export const ESCALATION_FIELDS = [
+  { key: 'account_name',         label: 'Account' },
+  { key: 'rag_status',           label: 'RAG' },
+  { key: 'tenant_id',            label: 'Tenant ID' },
+  { key: 'date_of_escalation',   label: 'Date' },
+  { key: 'month',                label: 'Month' },
+  { key: 'description',          label: 'Description' },
+  { key: 'action_taken',         label: 'Action Taken' },
+  { key: 'status',               label: 'Status' },
+  { key: 'csm',                  label: 'CSM' },
+  { key: 'ownership',            label: 'Ownership' },
+  { key: 'eta',                  label: 'ETA' },
+  { key: 'email_subject',        label: 'Email Subject' },
+  { key: 'ps_leader',            label: 'PS Leader' },
+  { key: 'escalated_by',         label: 'Escalated By' },
+  { key: 'trigger_reason',       label: 'Trigger Reason' },
+  { key: 'source_of_escalation', label: 'Source of Escalation' },
+  { key: 'issue_type',           label: 'Issue Type' },
+  { key: 'issue_sub_type',       label: 'Issue Sub-Type' },
+];
+
+export const ISSUE_FIELDS = [
+  { key: 'account_name',   label: 'Account' },
+  { key: 'tenant_id',      label: 'Tenant ID' },
+  { key: 'priority',       label: 'Priority' },
+  { key: 'description',    label: 'Description' },
+  { key: 'issue_type',     label: 'Issue Type' },
+  { key: 'issue_sub_type', label: 'Issue Sub-Type' },
+  { key: 'owner_team',     label: 'Owner' },
+  { key: 'status',         label: 'Status' },
+  { key: 'reported_date',  label: 'Reported' },
+  { key: 'closure_date',   label: 'Closure Date' },
+  { key: 'csm',            label: 'CSM' },
+  { key: 'csm_lead',       label: 'CSM Lead' },
+  { key: 'support_ticket', label: 'Support Ticket' },
+  { key: 'dev_ticket',     label: 'Dev Ticket' },
+  { key: 'next_steps',     label: 'Next Steps' },
+];
+
+export const TASK_FIELDS = [
+  { key: 'task_subject',     label: 'Subject' },
+  { key: 'task_description', label: 'Description' },
+  { key: 'nature_of_task',   label: 'Nature' },
+  { key: 'account_name',     label: 'Account' },
+  { key: 'assigned_to',      label: 'Assigned To' },
+  { key: 'assigned_by',      label: 'Assigned By' },
+  { key: 'due_date',         label: 'Due' },
+  { key: 'derived_status',   label: 'Status' },
+  { key: 'completed_at',     label: 'Completed At' },
+];
+
+export const FEATURE_REQUEST_FIELDS = [
+  { key: 'title',                 label: 'Title' },
+  { key: 'description',           label: 'Description' },
+  { key: 'related_to',            label: 'Related To' },
+  { key: 'priority',              label: 'Priority' },
+  { key: 'expected_rollout_date', label: 'Expected Rollout Date' },
+  { key: 'status',                label: 'Status' },
+  { key: 'created_by',            label: 'Created By' },
+  { key: 'approved_by',           label: 'Approved By' },
+];
+
+export const FIELD_CATALOG = {
+  accounts:         { label: 'Accounts',         fields: ACCOUNT_FIELDS },
+  escalations:      { label: 'Escalations',      fields: ESCALATION_FIELDS },
+  issues:           { label: 'Issues',           fields: ISSUE_FIELDS },
+  tasks:            { label: 'Tasks',            fields: TASK_FIELDS },
+  feature_requests: { label: 'Feature Requests', fields: FEATURE_REQUEST_FIELDS },
+};

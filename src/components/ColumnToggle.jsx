@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 export default function ColumnToggle({ columns, prefs, onToggle }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, right: 0 });
+  const [search, setSearch] = useState('');
   const triggerRef = useRef(null);
   const panelRef = useRef(null);
 
@@ -14,7 +15,7 @@ export default function ColumnToggle({ columns, prefs, onToggle }) {
   }, [open]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) { setSearch(''); return; }
     const handler = (e) => {
       if (triggerRef.current?.contains(e.target)) return;
       if (panelRef.current?.contains(e.target)) return;
@@ -27,6 +28,10 @@ export default function ColumnToggle({ columns, prefs, onToggle }) {
   const optional = columns.filter(c => !c.alwaysVisible);
   const hiddenCount = optional.filter(c => prefs[c.key] === false).length;
   const showAll = () => optional.filter(c => prefs[c.key] === false).forEach(c => onToggle(c.key));
+  const searchable = columns.length > 10;
+  const visibleCols = search
+    ? columns.filter(c => c.label.toLowerCase().includes(search.toLowerCase()))
+    : columns;
 
   return (
     <div className="relative">
@@ -66,8 +71,23 @@ export default function ColumnToggle({ columns, prefs, onToggle }) {
               </button>
             )}
           </div>
-          <div className="py-1.5">
-            {columns.map(col => (
+          {searchable && (
+            <div className="p-2 border-b border-gray-100">
+              <input
+                autoFocus
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search fields…"
+                className="w-full !py-1.5 !px-2.5 text-sm !rounded-lg"
+                onKeyDown={e => { if (e.key === 'Escape') setOpen(false); }}
+              />
+            </div>
+          )}
+          <div className="py-1.5 max-h-72 overflow-y-auto">
+            {visibleCols.length === 0 && (
+              <p className="px-3 py-2 text-sm text-gray-400 italic">No matches</p>
+            )}
+            {visibleCols.map(col => (
               <label key={col.key}
                 className={`flex items-center gap-2.5 px-3 py-2.5 select-none transition
                   ${col.alwaysVisible ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer hover:bg-gray-50'}`}>

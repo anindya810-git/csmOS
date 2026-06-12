@@ -4,19 +4,20 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import SelectDropdown from './SelectDropdown';
+import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
+import { ISSUE_FIELDS } from '../fieldCatalog';
+import { useFieldLabels } from '../context/FieldLabelsContext';
 
-const ISSUES_COLS = [
-  { key: 'account_name',  label: 'Account',    alwaysVisible: true },
-  { key: 'priority',      label: 'Priority' },
-  { key: 'description',   label: 'Description' },
-  { key: 'issue_type',    label: 'Issue Type' },
-  { key: 'owner_team',    label: 'Owner' },
-  { key: 'status',        label: 'Status' },
-  { key: 'reported_date', label: 'Reported' },
-  { key: 'csm',           label: 'CSM' },
-];
+// Every issue field can be shown as a column; these start visible.
+const ISSUES_DEFAULT_ON = ['account_name', 'priority', 'description', 'issue_type', 'owner_team', 'status', 'reported_date', 'csm'];
+const ISSUES_COLS = ISSUE_FIELDS.map(f => ({
+  ...f,
+  alwaysVisible: f.key === 'account_name',
+  off: !ISSUES_DEFAULT_ON.includes(f.key),
+}));
 
 const PRIORITY_BADGE = {
   P0: 'bg-red-100 text-red-800 border border-red-200',
@@ -97,12 +98,38 @@ function StatusBadge({ status }) {
   );
 }
 
+function IssueCell({ issue, k }) {
+  if (k === 'priority') return <PriorityBadge priority={issue.priority} />;
+  if (k === 'status')   return <StatusBadge status={issue.status} />;
+  if (k === 'description' || k === 'next_steps') {
+    return issue[k] ? <p className="text-gray-700 line-clamp-2 text-xs max-w-xs">{issue[k]}</p> : <span className="text-gray-300">—</span>;
+  }
+  if (k === 'issue_type') {
+    return (
+      <>
+        <div className="text-xs text-gray-700">{issue.issue_type || '—'}</div>
+        {issue.issue_sub_type && <div className="text-xs text-gray-400">{issue.issue_sub_type}</div>}
+      </>
+    );
+  }
+  if (k === 'reported_date' || k === 'closure_date') {
+    return issue[k]
+      ? <span className="text-gray-500 text-xs whitespace-nowrap">{new Date(issue[k] + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+      : <span className="text-gray-300">—</span>;
+  }
+  const v = issue[k];
+  if (v === null || v === undefined || v === '') return <span className="text-gray-300">—</span>;
+  return <span className="block max-w-[220px] truncate text-gray-600 text-xs" title={String(v)}>{String(v)}</span>;
+}
+
 export default function IssuesDashboard() {
   const { user } = useAuth();
+  const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
-    user?.email, 'issues', Object.fromEntries(ISSUES_COLS.map(c => [c.key, true]))
+    user?.email, 'issues', Object.fromEntries(ISSUES_COLS.map(c => [c.key, !c.off]))
   );
-  const colCount = ISSUES_COLS.filter(c => showCol(c.key)).length + 1;
+  const visibleIssueCols = ISSUES_COLS.filter(c => c.key !== 'account_name' && showCol(c.key));
+  const colCount = visibleIssueCols.length + 2;
   const [issues,       setIssues]       = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [accounts,     setAccounts]     = useState([]);
@@ -510,7 +537,7 @@ export default function IssuesDashboard() {
             <MultiSelectDropdown placeholder="All CSMs" options={allCsms} value={filters.csm} onChange={v => setFilter('csm', v)} />
           )}
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
-          <ColumnToggle columns={ISSUES_COLS} prefs={colPrefs} onToggle={toggleCol} />
+          <ColumnToggle columns={ISSUES_COLS.map(c => ({ ...c, label: fieldLabel('issues', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
@@ -552,15 +579,25 @@ export default function IssuesDashboard() {
                     </div>
                   )}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <select value={cond.field} onChange={ev => {
-                      const nd = fieldDefs.find(f => f.key === ev.target.value);
-                      updateCondition(cond.id, { field: ev.target.value, operator: getOps(nd?.type || 'text')[0], value: '' });
-                    }} className="!w-auto text-sm !py-1.5">
-                      {fieldDefs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                    </select>
-                    <select value={cond.operator} onChange={ev => updateCondition(cond.id, { operator: ev.target.value, value: ev.target.value === 'is one of' ? [] : '' })} className="!w-auto text-sm !py-1.5">
-                      {ops.map(op => <option key={op}>{op}</option>)}
-                    </select>
+                    <SelectDropdown
+                      compact
+                      clearable={false}
+                      className="w-48"
+                      options={fieldDefs.map(f => ({ value: f.key, label: f.label }))}
+                      value={cond.field}
+                      onChange={v => {
+                        const nd = fieldDefs.find(f => f.key === v);
+                        updateCondition(cond.id, { field: v, operator: getOps(nd?.type || 'text')[0], value: '' });
+                      }}
+                    />
+                    <SelectDropdown
+                      compact
+                      clearable={false}
+                      className="w-40"
+                      options={ops}
+                      value={cond.operator}
+                      onChange={v => updateCondition(cond.id, { operator: v, value: v === 'is one of' ? [] : '' })}
+                    />
                     {needsValue(cond.operator) && (
                       def?.type === 'select' ? (
                         cond.operator === 'is one of' ? (
@@ -571,13 +608,10 @@ export default function IssuesDashboard() {
                             onChange={v => updateCondition(cond.id, { value: v })}
                           />
                         ) : (
-                          <select value={cond.value} onChange={ev => updateCondition(cond.id, { value: ev.target.value })} className="!w-auto text-sm !py-1.5">
-                            <option value="">Select…</option>
-                            {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
+                          <SelectDropdown compact className="w-48" placeholder="Select…" options={def.opts || []} value={cond.value} onChange={v => updateCondition(cond.id, { value: v })} />
                         )
                       ) : def?.type === 'date' ? (
-                        <input type="date" value={cond.value} onChange={ev => updateCondition(cond.id, { value: ev.target.value })} className="!w-auto text-sm !py-1.5" />
+                        <DatePicker compact className="w-40" value={cond.value} onChange={v => updateCondition(cond.id, { value: v })} />
                       ) : def?.type === 'number' ? (
                         <input type="number" value={cond.value} onChange={ev => updateCondition(cond.id, { value: ev.target.value })} className="!w-36 text-sm !py-1.5" placeholder="Number…" />
                       ) : (
@@ -610,28 +644,25 @@ export default function IssuesDashboard() {
               <span className="text-sm font-semibold text-amber-800">Bulk Update</span>
             </div>
             <span className="text-sm text-amber-700">Set</span>
-            <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue(''); }} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
-              {Object.entries(bulkFieldDefs.reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc; }, {})).map(([group, fields]) => (
-                <optgroup key={group} label={group}>
-                  {fields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                </optgroup>
-              ))}
-            </select>
+            <SelectDropdown
+              compact
+              clearable={false}
+              className="w-60"
+              options={bulkFieldDefs.map(f => ({ value: f.key, label: `${f.group} · ${f.label}` }))}
+              value={bulkField}
+              onChange={v => { setBulkField(v); setBulkValue(''); }}
+            />
             <span className="text-sm text-amber-700">to</span>
             {(() => {
               const def = bulkFieldDefs.find(f => f.key === bulkField);
               if (!def) return null;
               if (def.type === 'account') return (
-                <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
-                  <option value="">— Select account —</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-                </select>
+                <SelectDropdown compact className="w-56" placeholder="— Select account —"
+                  options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
+                  value={bulkValue} onChange={setBulkValue} />
               );
               if (def.type === 'select') return (
-                <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
-                  <option value="">— Select value —</option>
-                  {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                <SelectDropdown compact className="w-48" placeholder="— Select value —" options={def.opts || []} value={bulkValue} onChange={setBulkValue} />
               );
               return <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Enter value…" className="!w-48 text-sm !py-1.5 border-amber-200 bg-white" />;
             })()}
@@ -660,14 +691,10 @@ export default function IssuesDashboard() {
               <table className="w-full text-sm">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Account</th>
-                    {showCol('priority')      && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Priority</th>}
-                    {showCol('description')   && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>}
-                    {showCol('issue_type')    && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Issue Type</th>}
-                    {showCol('owner_team')    && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Owner</th>}
-                    {showCol('status')        && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>}
-                    {showCol('reported_date') && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Reported</th>}
-                    {showCol('csm')           && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM</th>}
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldLabel('issues', 'account_name', 'Account')}</th>
+                    {visibleIssueCols.map(c => (
+                      <th key={c.key} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{fieldLabel('issues', c.key, c.label)}</th>
+                    ))}
                     <th className="px-3 py-3 w-10"></th>
                   </tr>
                 </thead>
@@ -690,26 +717,11 @@ export default function IssuesDashboard() {
                             )}
                             {issue.tenant_id && <div className="text-xs text-gray-400 font-mono truncate max-w-[140px]">{issue.tenant_id}</div>}
                           </td>
-                          {showCol('priority') && <td className="px-4 py-3"><PriorityBadge priority={issue.priority} /></td>}
-                          {showCol('description') && (
-                            <td className="px-4 py-3 max-w-xs">
-                              <p className="text-gray-700 line-clamp-2 text-xs">{issue.description}</p>
+                          {visibleIssueCols.map(c => (
+                            <td key={c.key} className="px-4 py-3">
+                              <IssueCell issue={issue} k={c.key} />
                             </td>
-                          )}
-                          {showCol('issue_type') && (
-                            <td className="px-4 py-3">
-                              <div className="text-xs text-gray-700">{issue.issue_type || '—'}</div>
-                              {issue.issue_sub_type && <div className="text-xs text-gray-400">{issue.issue_sub_type}</div>}
-                            </td>
-                          )}
-                          {showCol('owner_team')    && <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{issue.owner_team || '—'}</td>}
-                          {showCol('status')        && <td className="px-4 py-3"><StatusBadge status={issue.status} /></td>}
-                          {showCol('reported_date') && (
-                            <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap">
-                              {issue.reported_date ? new Date(issue.reported_date + 'T00:00:00').toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
-                            </td>
-                          )}
-                          {showCol('csm') && <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{issue.csm || '—'}</td>}
+                          ))}
                           <td className="px-3 py-3">
                             <div className="flex items-center gap-1">
                               <button

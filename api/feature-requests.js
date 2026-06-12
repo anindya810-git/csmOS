@@ -2,6 +2,10 @@ import supabase from './_utils/supabase.js';
 import { verifyToken } from './_utils/auth.js';
 import { setCors } from './_utils/cors.js';
 
+const PRIORITIES = ['P0', 'P1', 'P2', 'P3'];
+// % and _ are LIKE wildcards — escape so user input is matched literally
+const escapeLike = (s) => String(s).replace(/[\\%_]/g, '\\$&');
+
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -20,7 +24,7 @@ export default async function handler(req, res) {
     if (status)     query = query.eq('status', status);
     if (priority)   query = query.eq('priority', priority);
     if (related_to) query = query.eq('related_to', related_to);
-    if (search)     query = query.ilike('title', `%${search}%`);
+    if (search)     query = query.ilike('title', `%${escapeLike(search)}%`);
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data || []);
@@ -29,6 +33,9 @@ export default async function handler(req, res) {
   if (req.method === 'POST') {
     const { title, description, related_to, priority, expected_rollout_date, link_ids } = req.body;
     if (!title?.trim()) return res.status(400).json({ error: 'title required' });
+    if (title.trim().length > 500) return res.status(400).json({ error: 'title too long (max 500 chars)' });
+    if (priority && !PRIORITIES.includes(priority)) return res.status(400).json({ error: 'invalid priority' });
+    if (Array.isArray(link_ids) && link_ids.length > 200) return res.status(400).json({ error: 'too many links (max 200)' });
 
     const { data: fr, error: frErr } = await supabase
       .from('feature_requests')
@@ -140,6 +147,12 @@ export default async function handler(req, res) {
       if (existing.created_by_id !== user.id) return res.status(403).json({ error: 'Access denied' });
       if (existing.status !== 'pending') return res.status(403).json({ error: 'Cannot edit non-pending requests' });
     }
+
+    if (body.priority && !PRIORITIES.includes(body.priority)) return res.status(400).json({ error: 'invalid priority' });
+    if (body.title !== undefined && (!body.title?.trim() || body.title.trim().length > 500)) {
+      return res.status(400).json({ error: 'title must be 1-500 chars' });
+    }
+    if (Array.isArray(body.link_ids) && body.link_ids.length > 200) return res.status(400).json({ error: 'too many links (max 200)' });
 
     const EDITABLE = ['title', 'description', 'related_to', 'priority', 'expected_rollout_date'];
     const updates = { updated_at: new Date().toISOString() };

@@ -4,20 +4,20 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import SelectDropdown from './SelectDropdown';
+import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
+import { ESCALATION_FIELDS } from '../fieldCatalog';
+import { useFieldLabels } from '../context/FieldLabelsContext';
 
-const ESC_COLS = [
-  { key: 'account_name',       label: 'Account',      alwaysVisible: true },
-  { key: 'rag_status',         label: 'RAG' },
-  { key: 'date_of_escalation', label: 'Date' },
-  { key: 'description',        label: 'Description' },
-  { key: 'status',             label: 'Status' },
-  { key: 'csm',                label: 'CSM' },
-  { key: 'ownership',          label: 'Ownership' },
-  { key: 'eta',                label: 'ETA' },
-  { key: 'escalated_by',       label: 'Escalated By' },
-];
+// Every escalation field can be shown as a column; these start visible.
+const ESC_DEFAULT_ON = ['account_name', 'rag_status', 'date_of_escalation', 'description', 'status', 'csm', 'ownership', 'eta', 'escalated_by'];
+const ESC_COLS = ESCALATION_FIELDS.map(f => ({
+  ...f,
+  alwaysVisible: f.key === 'account_name',
+  off: !ESC_DEFAULT_ON.includes(f.key),
+}));
 
 const STATUS_STYLES = {
   'Resolved':        'bg-green-100 text-green-800',
@@ -87,13 +87,36 @@ function StatusBadge({ status }) {
   );
 }
 
+function EscCell({ e, k }) {
+  if (k === 'rag_status') {
+    const rag = e.accounts?.rag_status;
+    return rag
+      ? <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${RAG_BADGE[rag] || 'bg-gray-100 text-gray-700'}`}>{rag}</span>
+      : <span className="text-gray-300">—</span>;
+  }
+  if (k === 'date_of_escalation') {
+    return e.date_of_escalation
+      ? <span className="text-gray-500 whitespace-nowrap">{new Date(e.date_of_escalation).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' })}</span>
+      : <span className="text-gray-300">—</span>;
+  }
+  if (k === 'description' || k === 'action_taken' || k === 'email_subject') {
+    return e[k] ? <p className="text-gray-700 line-clamp-2 max-w-xs">{e[k]}</p> : <span className="text-gray-300">—</span>;
+  }
+  if (k === 'status') return <StatusBadge status={e.status} />;
+  const v = e[k];
+  if (v === null || v === undefined || v === '') return <span className="text-gray-300">—</span>;
+  return <span className="block max-w-[220px] truncate text-gray-600" title={String(v)}>{String(v)}</span>;
+}
+
 export default function EscalationsDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
-    user?.email, 'escalations', Object.fromEntries(ESC_COLS.map(c => [c.key, true]))
+    user?.email, 'escalations', Object.fromEntries(ESC_COLS.map(c => [c.key, !c.off]))
   );
-  const colCount = ESC_COLS.filter(c => showCol(c.key)).length + 1;
+  const visibleEscCols = ESC_COLS.filter(c => c.key !== 'account_name' && showCol(c.key));
+  const colCount = visibleEscCols.length + 2;
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [filters,     setFilters]     = useState({ status: [], csm: [], ownership: [], issue_type: [], month: [] });
@@ -552,7 +575,7 @@ export default function EscalationsDashboard() {
           <MultiSelectDropdown placeholder="All Ownerships" options={allOwnerships} value={filters.ownership} onChange={v => setFilter('ownership', v)} />
           <MultiSelectDropdown placeholder="All Issue Types" options={allIssueTypes} value={filters.issue_type} onChange={v => setFilter('issue_type', v)} />
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
-          <ColumnToggle columns={ESC_COLS} prefs={colPrefs} onToggle={toggleCol} />
+          <ColumnToggle columns={ESC_COLS.map(c => ({ ...c, label: fieldLabel('escalations', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
@@ -596,20 +619,26 @@ export default function EscalationsDashboard() {
                     </div>
                   )}
                   <div className="flex items-center gap-2 flex-wrap">
-                    <select value={cond.field}
-                      onChange={ev => {
-                        const nd = fieldDefs.find(f => f.key === ev.target.value);
+                    <SelectDropdown
+                      compact
+                      clearable={false}
+                      className="w-48"
+                      options={fieldDefs.map(f => ({ value: f.key, label: f.label }))}
+                      value={cond.field}
+                      onChange={v => {
+                        const nd = fieldDefs.find(f => f.key === v);
                         const no = getOps(nd?.type || 'text');
-                        updateCondition(cond.id, { field: ev.target.value, operator: no[0], value: '' });
+                        updateCondition(cond.id, { field: v, operator: no[0], value: '' });
                       }}
-                      className="!w-auto text-sm !py-1.5">
-                      {fieldDefs.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                    </select>
-                    <select value={cond.operator}
-                      onChange={ev => updateCondition(cond.id, { operator: ev.target.value, value: ev.target.value === 'is one of' ? [] : '' })}
-                      className="!w-auto text-sm !py-1.5">
-                      {ops.map(op => <option key={op}>{op}</option>)}
-                    </select>
+                    />
+                    <SelectDropdown
+                      compact
+                      clearable={false}
+                      className="w-40"
+                      options={ops}
+                      value={cond.operator}
+                      onChange={v => updateCondition(cond.id, { operator: v, value: v === 'is one of' ? [] : '' })}
+                    />
                     {needsValue(cond.operator) && (
                       def?.type === 'select' ? (
                         cond.operator === 'is one of' ? (
@@ -620,17 +649,17 @@ export default function EscalationsDashboard() {
                             onChange={v => updateCondition(cond.id, { value: v })}
                           />
                         ) : (
-                          <select value={cond.value}
-                            onChange={ev => updateCondition(cond.id, { value: ev.target.value })}
-                            className="!w-auto text-sm !py-1.5">
-                            <option value="">Select…</option>
-                            {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
-                          </select>
+                          <SelectDropdown
+                            compact
+                            className="w-48"
+                            placeholder="Select…"
+                            options={def.opts || []}
+                            value={cond.value}
+                            onChange={v => updateCondition(cond.id, { value: v })}
+                          />
                         )
                       ) : def?.type === 'date' ? (
-                        <input type="date" value={cond.value}
-                          onChange={ev => updateCondition(cond.id, { value: ev.target.value })}
-                          className="!w-auto text-sm !py-1.5" />
+                        <DatePicker compact className="w-40" value={cond.value} onChange={v => updateCondition(cond.id, { value: v })} />
                       ) : (
                         <input type="text" value={cond.value}
                           onChange={ev => updateCondition(cond.id, { value: ev.target.value })}
@@ -665,26 +694,23 @@ export default function EscalationsDashboard() {
               <span className="text-sm font-semibold text-amber-800">Bulk Update</span>
             </div>
             <span className="text-sm text-amber-700">Set</span>
-            <select value={bulkField} onChange={e => { setBulkField(e.target.value); setBulkValue(''); }}
-              className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
-              {Object.entries(bulkFieldDefs.reduce((acc, f) => { (acc[f.group] = acc[f.group] || []).push(f); return acc; }, {})).map(([group, fields]) => (
-                <optgroup key={group} label={group}>
-                  {fields.map(f => <option key={f.key} value={f.key}>{f.label}</option>)}
-                </optgroup>
-              ))}
-            </select>
+            <SelectDropdown
+              compact
+              clearable={false}
+              className="w-60"
+              options={bulkFieldDefs.map(f => ({ value: f.key, label: `${f.group} · ${f.label}` }))}
+              value={bulkField}
+              onChange={v => { setBulkField(v); setBulkValue(''); }}
+            />
             <span className="text-sm text-amber-700">to</span>
             {(() => {
               const def = bulkFieldDefs.find(f => f.key === bulkField);
               if (!def) return null;
               if (def.type === 'select') return (
-                <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white">
-                  <option value="">— Select value —</option>
-                  {(def.opts || []).map(o => <option key={o} value={o}>{o}</option>)}
-                </select>
+                <SelectDropdown compact className="w-48" placeholder="— Select value —" options={def.opts || []} value={bulkValue} onChange={setBulkValue} />
               );
               if (def.type === 'date') return (
-                <input type="date" value={bulkValue} onChange={e => setBulkValue(e.target.value)} className="!w-auto text-sm !py-1.5 border-amber-200 bg-white" />
+                <DatePicker compact className="w-40" value={bulkValue} onChange={setBulkValue} />
               );
               return (
                 <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Enter value…" className="!w-48 text-sm !py-1.5 border-amber-200 bg-white" />
@@ -720,15 +746,10 @@ export default function EscalationsDashboard() {
             <table className="w-full text-sm">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Account</th>
-                  {showCol('rag_status')         && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">RAG</th>}
-                  {showCol('date_of_escalation') && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Date</th>}
-                  {showCol('description')        && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Description</th>}
-                  {showCol('status')             && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>}
-                  {showCol('csm')                && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM</th>}
-                  {showCol('ownership')          && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Ownership</th>}
-                  {showCol('eta')                && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">ETA</th>}
-                  {showCol('escalated_by')       && <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Escalated By</th>}
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldLabel('escalations', 'account_name', 'Account')}</th>
+                  {visibleEscCols.map(c => (
+                    <th key={c.key} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{fieldLabel('escalations', c.key, c.label)}</th>
+                  ))}
                   <th className="px-3 py-3 w-10"></th>
                 </tr>
               </thead>
@@ -756,28 +777,11 @@ export default function EscalationsDashboard() {
                           )}
                           {e.tenant_id && <div className="text-xs text-gray-400 font-mono">{e.tenant_id}</div>}
                         </td>
-                        {showCol('rag_status') && (
-                          <td className="px-4 py-3">
-                            {rag ? (
-                              <span className={`inline-flex items-center text-xs font-semibold px-2 py-0.5 rounded-full ${RAG_BADGE[rag] || 'bg-gray-100 text-gray-700'}`}>{rag}</span>
-                            ) : <span className="text-gray-300">—</span>}
+                        {visibleEscCols.map(c => (
+                          <td key={c.key} className="px-4 py-3">
+                            <EscCell e={e} k={c.key} />
                           </td>
-                        )}
-                        {showCol('date_of_escalation') && (
-                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                            {e.date_of_escalation ? new Date(e.date_of_escalation).toLocaleDateString('en-IN', { day:'2-digit', month:'short', year:'numeric' }) : '—'}
-                          </td>
-                        )}
-                        {showCol('description') && (
-                          <td className="px-4 py-3 max-w-xs">
-                            <p className="text-gray-700 line-clamp-2">{e.description}</p>
-                          </td>
-                        )}
-                        {showCol('status')       && <td className="px-4 py-3"><StatusBadge status={e.status} /></td>}
-                        {showCol('csm')          && <td className="px-4 py-3 text-gray-700 whitespace-nowrap">{e.csm || '—'}</td>}
-                        {showCol('ownership')    && <td className="px-4 py-3 text-gray-600 text-xs">{e.ownership || '—'}</td>}
-                        {showCol('eta')          && <td className="px-4 py-3 text-gray-600 text-xs whitespace-nowrap">{e.eta || '—'}</td>}
-                        {showCol('escalated_by') && <td className="px-4 py-3 text-gray-600 text-xs">{e.escalated_by || '—'}</td>}
+                        ))}
                         <td className="px-3 py-3">
                           <div className="flex items-center gap-1">
                             <button

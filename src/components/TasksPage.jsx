@@ -4,16 +4,19 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import Pagination from './Pagination';
 import ColumnToggle from './ColumnToggle';
+import SelectDropdown from './SelectDropdown';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
+import { TASK_FIELDS } from '../fieldCatalog';
+import { useFieldLabels } from '../context/FieldLabelsContext';
 
-const TASKS_COLS = [
-  { key: 'task_subject',    label: 'Subject',      alwaysVisible: true },
-  { key: 'nature_of_task',  label: 'Nature' },
-  { key: 'account_name',    label: 'Account' },
-  { key: 'assigned_to',     label: 'Assigned To' },
-  { key: 'due_date',        label: 'Due' },
-  { key: 'derived_status',  label: 'Status' },
-];
+// Every task field can be shown as a column; these start visible.
+const TASKS_DEFAULT_ON = ['task_subject', 'nature_of_task', 'account_name', 'assigned_to', 'due_date', 'derived_status'];
+const TASKS_COLS = TASK_FIELDS.map(f => ({
+  ...f,
+  alwaysVisible: f.key === 'task_subject',
+  adminOnly: f.key === 'assigned_to' || f.key === 'assigned_by',
+  off: !TASKS_DEFAULT_ON.includes(f.key),
+}));
 
 const STATUS_STYLES = {
   Open:      'bg-blue-100 text-blue-800',
@@ -61,11 +64,13 @@ export default function TasksPage() {
   const { user } = useAuth();
   const navigate  = useNavigate();
   const isAdmin   = user?.role === 'admin';
+  const { label: fieldLabel } = useFieldLabels();
   const visibleTaskCols = TASKS_COLS.filter(c => !c.adminOnly || isAdmin);
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
-    user?.email, 'tasks', Object.fromEntries(visibleTaskCols.map(c => [c.key, true]))
+    user?.email, 'tasks', Object.fromEntries(visibleTaskCols.map(c => [c.key, !c.off]))
   );
-  const colCount = visibleTaskCols.filter(c => showCol(c.key)).length + (isAdmin ? 2 : 1); // +checkbox for admin, +actions
+  const dataCols = visibleTaskCols.filter(c => c.key !== 'task_subject' && showCol(c.key));
+  const colCount = dataCols.length + 1 + (isAdmin ? 2 : 1); // +subject, +checkbox for admin, +actions
 
   const [tasks,     setTasks]     = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -310,22 +315,16 @@ export default function TasksPage() {
           placeholder="Search tasks…"
           className="!w-56 text-sm"
         />
-        <select value={natureFilter} onChange={e => setNatureFilter(e.target.value)} className="!w-auto text-sm">
-          <option value="">All types</option>
-          {natureOptions.map(v => <option key={v}>{v}</option>)}
-        </select>
+        <SelectDropdown compact className="w-40" placeholder="All types" options={natureOptions} value={natureFilter} onChange={setNatureFilter} />
         {isAdmin && (
-          <select value={assigneeFilter} onChange={e => setAssigneeFilter(e.target.value)} className="!w-auto text-sm">
-            <option value="">All assignees</option>
-            {assigneeOptions.map(v => <option key={v}>{v}</option>)}
-          </select>
+          <SelectDropdown compact className="w-44" placeholder="All assignees" options={assigneeOptions} value={assigneeFilter} onChange={setAssigneeFilter} />
         )}
         {search || natureFilter || assigneeFilter ? (
           <button onClick={() => { setSearch(''); setNatureFilter(''); setAssigneeFilter(''); }}
             className="text-xs text-gray-400 hover:text-gray-600 transition">Clear</button>
         ) : null}
         <div className="ml-auto">
-          <ColumnToggle columns={visibleTaskCols} prefs={colPrefs} onToggle={toggleCol} />
+          <ColumnToggle columns={visibleTaskCols.map(c => ({ ...c, label: fieldLabel('tasks', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
         </div>
         {selected.size > 0 && isAdmin && (
           <div className="ml-auto flex items-center gap-2">
@@ -359,12 +358,10 @@ export default function TasksPage() {
                       className="!w-4 !h-4 !p-0 !border-0 !ring-0 shrink-0 accent-brand-600" />
                   </th>
                 )}
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Subject</th>
-                {showCol('nature_of_task') && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Nature</th>}
-                {showCol('account_name')   && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Account</th>}
-                {isAdmin && showCol('assigned_to') && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Assigned To</th>}
-                {showCol('due_date')        && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">Due</th>}
-                {showCol('derived_status')  && <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>}
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide">{fieldLabel('tasks', 'task_subject', 'Subject')}</th>
+                {dataCols.map(c => (
+                  <th key={c.key} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{fieldLabel('tasks', c.key, c.label)}</th>
+                ))}
                 <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
               </tr>
             </thead>
@@ -390,43 +387,53 @@ export default function TasksPage() {
                           )}
                         </button>
                       </td>
-                      {showCol('nature_of_task') && (
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          {task.nature_of_task
+                      {dataCols.map(c => {
+                        const k = c.key;
+                        let cell;
+                        if (k === 'nature_of_task') {
+                          cell = task.nature_of_task
                             ? <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200">{task.nature_of_task}</span>
-                            : <span className="text-gray-300">—</span>}
-                        </td>
-                      )}
-                      {showCol('account_name') && (
-                        <td className="px-4 py-3">
-                          {task.account_id ? (
+                            : <span className="text-gray-300">—</span>;
+                        } else if (k === 'account_name') {
+                          cell = task.account_id ? (
                             <button type="button" onClick={() => navigate(`/accounts/${task.account_id}`)}
                               className="text-xs text-brand-600 hover:underline font-medium truncate max-w-[140px] block">
                               {task.account_name || '—'}
                             </button>
-                          ) : <span className="text-xs text-gray-400">{task.account_name || '—'}</span>}
-                        </td>
-                      )}
-                      {isAdmin && showCol('assigned_to') && (
-                        <td className="px-4 py-3 text-xs text-gray-600 whitespace-nowrap">{task.assigned_to || '—'}</td>
-                      )}
-                      {showCol('due_date') && (
-                        <td className="px-4 py-3 whitespace-nowrap">
-                          <p className={`text-xs font-medium ${ds === 'Overdue' ? 'text-red-700' : 'text-gray-700'}`}>
-                            {fmtDT(task.due_date)}
-                          </p>
-                          {ds === 'Completed' && task.completed_at && (
-                            <p className="text-xs text-gray-400 mt-0.5">Done {fmtDate(task.completed_at)}</p>
-                          )}
-                        </td>
-                      )}
-                      {showCol('derived_status') && (
-                        <td className="px-4 py-3">
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[ds] || 'bg-gray-100 text-gray-700'}`}>
-                            {ds}
-                          </span>
-                        </td>
-                      )}
+                          ) : <span className="text-xs text-gray-400">{task.account_name || '—'}</span>;
+                        } else if (k === 'due_date') {
+                          cell = (
+                            <>
+                              <p className={`text-xs font-medium ${ds === 'Overdue' ? 'text-red-700' : 'text-gray-700'}`}>
+                                {fmtDT(task.due_date)}
+                              </p>
+                              {ds === 'Completed' && task.completed_at && (
+                                <p className="text-xs text-gray-400 mt-0.5">Done {fmtDate(task.completed_at)}</p>
+                              )}
+                            </>
+                          );
+                        } else if (k === 'derived_status') {
+                          cell = (
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_STYLES[ds] || 'bg-gray-100 text-gray-700'}`}>
+                              {ds}
+                            </span>
+                          );
+                        } else if (k === 'completed_at') {
+                          cell = task.completed_at
+                            ? <span className="text-xs text-gray-600 whitespace-nowrap">{fmtDT(task.completed_at)}</span>
+                            : <span className="text-gray-300">—</span>;
+                        } else if (k === 'task_description') {
+                          cell = task.task_description
+                            ? <p className="text-xs text-gray-600 line-clamp-2 max-w-xs">{task.task_description}</p>
+                            : <span className="text-gray-300">—</span>;
+                        } else {
+                          const v = task[k];
+                          cell = (v === null || v === undefined || v === '')
+                            ? <span className="text-gray-300">—</span>
+                            : <span className="block max-w-[180px] truncate text-xs text-gray-600" title={String(v)}>{String(v)}</span>;
+                        }
+                        return <td key={k} className="px-4 py-3 whitespace-nowrap">{cell}</td>;
+                      })}
                       <td className="px-4 py-3 text-right whitespace-nowrap">
                         <div className="inline-flex items-center gap-1">
                           {ds !== 'Completed' && (

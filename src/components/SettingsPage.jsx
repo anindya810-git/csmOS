@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { FIELD_CATALOG } from '../fieldCatalog';
+import { useFieldLabels } from '../context/FieldLabelsContext';
 
 const ROLE_BADGE = {
   admin:       'bg-brand-100 text-brand-700',
@@ -183,6 +185,13 @@ export default function SettingsPage() {
   const [frApprover,     setFrApprover]     = useState('');
   const [frApproverSaving, setFrApproverSaving] = useState(false);
 
+  // Field renaming
+  const { rows: labelRows, reload: labelsReload } = useFieldLabels();
+  const [fieldsTab,    setFieldsTab]    = useState('dropdowns'); // dropdowns | rename
+  const [renameObj,    setRenameObj]    = useState('accounts');
+  const [renameEdits,  setRenameEdits]  = useState({});
+  const [renameSaving, setRenameSaving] = useState(null);
+
   useEffect(() => {
     if (user?.role !== 'admin') { navigate('/'); return; }
     loadUsers();
@@ -294,6 +303,41 @@ export default function SettingsPage() {
       axios.put(`/api/dropdown-config?id=${other.id}`, { sort_order: order1 === order2 ? idx + 1    : order1 }),
     ]);
     loadDD();
+  };
+
+  const customLabelFor = (objKey, fieldKey) =>
+    labelRows.find(r => r.value === `${objKey}.${fieldKey}`);
+
+  const handleRenameSave = async (objKey, fieldKey) => {
+    const id = `${objKey}.${fieldKey}`;
+    const newLabel = (renameEdits[id] ?? '').trim();
+    const existing = customLabelFor(objKey, fieldKey);
+    setRenameSaving(id);
+    try {
+      if (existing && !newLabel) {
+        await axios.delete(`/api/dropdown-config?id=${existing.id}`);
+      } else if (existing && newLabel !== existing.parent_value) {
+        await axios.put(`/api/dropdown-config?id=${existing.id}`, { parent_value: newLabel });
+      } else if (!existing && newLabel) {
+        await axios.post('/api/dropdown-config', { field_name: 'field_label', value: id, parent_value: newLabel, sort_order: 0 });
+      }
+      setRenameEdits(e => { const n = { ...e }; delete n[id]; return n; });
+      labelsReload();
+    } catch (e) { alert(e.response?.data?.error || 'Failed to save'); }
+    finally { setRenameSaving(null); }
+  };
+
+  const handleRenameReset = async (objKey, fieldKey) => {
+    const existing = customLabelFor(objKey, fieldKey);
+    if (!existing) return;
+    const id = `${objKey}.${fieldKey}`;
+    setRenameSaving(id);
+    try {
+      await axios.delete(`/api/dropdown-config?id=${existing.id}`);
+      setRenameEdits(e => { const n = { ...e }; delete n[id]; return n; });
+      labelsReload();
+    } catch (e) { alert(e.response?.data?.error || 'Failed to reset'); }
+    finally { setRenameSaving(null); }
   };
 
   const handleFrApproverSave = async () => {
@@ -495,9 +539,76 @@ export default function SettingsPage() {
           <>
             <div>
               <h2 className="text-xl font-bold text-gray-900">Field Management</h2>
-              <p className="text-sm text-gray-500 mt-0.5">Manage dropdown values for escalation and account fields</p>
+              <p className="text-sm text-gray-500 mt-0.5">Manage dropdown values and rename fields across all objects</p>
             </div>
 
+            {/* Sub-tab: Dropdown Values | Rename Fields */}
+            <div className="flex items-center bg-gray-100 rounded-lg p-0.5 w-fit">
+              {[['dropdowns', 'Dropdown Values'], ['rename', 'Rename Fields']].map(([k, lbl]) => (
+                <button key={k} onClick={() => setFieldsTab(k)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition ${fieldsTab === k ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                  {lbl}
+                </button>
+              ))}
+            </div>
+
+            {/* ── Rename Fields ── */}
+            {fieldsTab === 'rename' && (
+              <div className="card p-0 overflow-hidden">
+                <div className="border-b border-gray-100 bg-gray-50 overflow-x-auto">
+                  <div className="flex min-w-max">
+                    {Object.entries(FIELD_CATALOG).map(([objKey, obj]) => (
+                      <button key={objKey}
+                        onClick={() => { setRenameObj(objKey); setRenameEdits({}); }}
+                        className={`px-4 py-2.5 text-sm whitespace-nowrap border-b-2 transition
+                          ${renameObj === objKey ? 'border-brand-600 text-brand-700 font-semibold bg-white' : 'border-transparent text-gray-600 hover:text-gray-800'}`}>
+                        {obj.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="p-4 space-y-1">
+                  <p className="text-xs text-gray-400 mb-3">Renamed fields show their new label in tables, column pickers, and reports. Leave blank and save to restore the default.</p>
+                  {FIELD_CATALOG[renameObj].fields.map(f => {
+                    const id = `${renameObj}.${f.key}`;
+                    const existing = customLabelFor(renameObj, f.key);
+                    const editVal = renameEdits[id] !== undefined ? renameEdits[id] : (existing?.parent_value || '');
+                    const dirty = renameEdits[id] !== undefined && renameEdits[id].trim() !== (existing?.parent_value || '');
+                    return (
+                      <div key={f.key} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 group">
+                        <span className="w-48 shrink-0 text-sm text-gray-500 truncate" title={f.key}>{f.label}</span>
+                        <input
+                          value={editVal}
+                          onChange={e => setRenameEdits(prev => ({ ...prev, [id]: e.target.value }))}
+                          onKeyDown={e => { if (e.key === 'Enter' && dirty) handleRenameSave(renameObj, f.key); }}
+                          placeholder={f.label}
+                          className="flex-1 !py-1.5 text-sm"
+                        />
+                        <div className="flex items-center gap-1 shrink-0 w-28 justify-end">
+                          {dirty && (
+                            <button onClick={() => handleRenameSave(renameObj, f.key)} disabled={renameSaving === id}
+                              className="text-xs px-2.5 py-1 bg-brand-600 text-white rounded-md hover:bg-brand-700 transition disabled:opacity-50">
+                              {renameSaving === id ? '…' : 'Save'}
+                            </button>
+                          )}
+                          {existing && !dirty && (
+                            <button onClick={() => handleRenameReset(renameObj, f.key)} disabled={renameSaving === id}
+                              className="text-xs px-2 py-1 text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100">
+                              {renameSaving === id ? '…' : 'Reset'}
+                            </button>
+                          )}
+                          {existing && !dirty && (
+                            <span className="w-2 h-2 rounded-full bg-brand-500" title="Custom label active" />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {fieldsTab === 'dropdowns' && (
             <div className="card p-0 overflow-hidden">
               {/* Mobile: horizontal scrollable tab bar */}
               <div className="sm:hidden border-b border-gray-100 bg-gray-50 overflow-x-auto">
@@ -620,6 +731,7 @@ export default function SettingsPage() {
                 </div>
               </div>
             </div>
+            )}
           </>
         )}
       </div>

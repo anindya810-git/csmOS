@@ -15,7 +15,7 @@ function toISO(y, m, d) {
   return `${y}-${String(m + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
 }
 
-export default function DatePicker({ value, onChange, placeholder = 'Select date', className = '' }) {
+export default function DatePicker({ value, onChange, placeholder = 'Select date', className = '', compact = false }) {
   const now = new Date();
   const todayY = now.getFullYear(), todayM = now.getMonth(), todayD = now.getDate();
   const parsed = parse(value);
@@ -103,7 +103,9 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
         ref={triggerRef}
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition cursor-pointer"
+        className={compact
+          ? 'w-full flex items-center justify-between gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition cursor-pointer whitespace-nowrap'
+          : 'w-full flex items-center justify-between px-3.5 py-2.5 text-sm border border-gray-200 rounded-xl bg-gray-50 hover:bg-white focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-200 focus:border-brand-400 transition cursor-pointer'}
       >
         <span className={displayText ? 'text-gray-800' : 'text-gray-400'}>{displayText || placeholder}</span>
         <div className="flex items-center gap-1.5">
