@@ -716,7 +716,7 @@ export default function IssuesDashboard() {
                     {visibleIssueCols.map(c => (
                       <th key={c.key} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{fieldLabel('issues', c.key, c.label)}</th>
                     ))}
-                    <th className="px-3 py-3 w-10"></th>
+                    <th className="px-3 py-3 w-16 sticky right-0 bg-gray-50 z-10 shadow-[-2px_0_6px_rgba(0,0,0,0.05)]"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -725,7 +725,7 @@ export default function IssuesDashboard() {
                     return (
                       <React.Fragment key={issue.id}>
                         <tr
-                          className={`transition ${isEditing ? 'bg-amber-50/40' : 'hover:bg-gray-50 cursor-pointer'}`}
+                          className={`group transition ${isEditing ? 'bg-amber-50/40' : 'hover:bg-gray-50 cursor-pointer'}`}
                           onClick={() => { if (!isEditing) setExpanded(expanded === issue.id ? null : issue.id); }}
                         >
                           {user?.role === 'admin' && (
@@ -749,7 +749,7 @@ export default function IssuesDashboard() {
                               <IssueCell issue={issue} k={c.key} />
                             </td>
                           ))}
-                          <td className="px-3 py-3">
+                          <td className={`px-3 py-3 sticky right-0 z-10 shadow-[-2px_0_6px_rgba(0,0,0,0.05)] ${isEditing ? 'bg-amber-50/40' : 'bg-white group-hover:bg-gray-50'}`}>
                             <div className="flex items-center gap-1">
                               {(can('edit', 'issues') || isEditing) && (
                               <button
@@ -802,23 +802,6 @@ export default function IssuesDashboard() {
                           </tr>
                         )}
 
-                        {isEditing && (
-                          <tr className="bg-amber-50">
-                            <td colSpan={colCount} className="px-4 py-4">
-                              <div className="space-y-4">
-                                <p className="text-sm font-semibold text-gray-800">Edit Issue</p>
-                                <IssueFormFields f={editForm} set={setEditForm} isEdit={true} />
-                                <div className="flex gap-2 pt-1">
-                                  <button onClick={handleEditSave} disabled={editSaving || !editForm.description}
-                                    className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
-                                    {editSaving ? 'Saving…' : 'Save Changes'}
-                                  </button>
-                                  <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
-                                </div>
-                              </div>
-                            </td>
-                          </tr>
-                        )}
                       </React.Fragment>
                     );
                   })}
@@ -887,22 +870,40 @@ export default function IssuesDashboard() {
                       </div>
                     </div>
                   )}
-                  {isEditing && (
-                    <div className="px-4 pb-4 pt-3 bg-amber-50 border-t border-amber-100 space-y-4">
-                      <p className="text-sm font-semibold text-gray-800">Edit Issue</p>
-                      <IssueFormFields f={editForm} set={setEditForm} isEdit={true} />
-                      <div className="flex gap-2">
-                        <button onClick={handleEditSave} disabled={editSaving || !editForm.description}
-                          className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
-                          {editSaving ? 'Saving…' : 'Save Changes'}
-                        </button>
-                        <button onClick={() => setEditing(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 border border-gray-200 rounded-lg transition">Cancel</button>
-                      </div>
-                    </div>
-                  )}
                 </div>
               );
             })}
+          </div>
+        </>
+      )}
+
+      {/* Right-side edit panel */}
+      {editing && (
+        <>
+          <div className="fixed inset-0 z-30 bg-black/10" onClick={() => setEditing(null)} />
+          <div className="fixed inset-y-0 right-0 w-[520px] max-w-[90vw] bg-white shadow-2xl z-40 flex flex-col border-l border-gray-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">Edit Issue</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{editForm.account_name}</p>
+              </div>
+              <button onClick={() => setEditing(null)} className="p-1.5 text-gray-400 hover:bg-gray-100 rounded-lg transition">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <IssueFormFields f={editForm} set={setEditForm} isEdit={true} />
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
+              <button onClick={handleEditSave} disabled={editSaving || !editForm.description}
+                className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+                {editSaving ? 'Saving…' : 'Save Changes'}
+              </button>
+              <button onClick={() => setEditing(null)}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-lg transition">
+                Cancel
+              </button>
+            </div>
           </div>
         </>
       )}

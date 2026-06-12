@@ -651,7 +651,7 @@ export default function AccountsPage() {
                 {visibleCols.map(c => (
                   <Th key={c.key} label={fieldLabel('accounts', c.key, c.label)} field={c.key} />
                 ))}
-                <th className="px-4 py-3"></th>
+                <th className="px-3 py-3 w-10 sticky right-0 bg-gray-50 z-10 shadow-[-2px_0_6px_rgba(0,0,0,0.05)]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -660,7 +660,7 @@ export default function AccountsPage() {
               ) : displayed.length === 0 ? (
                 <tr><td colSpan={colCount} className="py-12 text-center text-gray-400">No accounts found.</td></tr>
               ) : paginated.map(a => (
-                <tr key={a.id} onClick={() => navigate(`/accounts/${a.id}`)} className="hover:bg-gray-50 cursor-pointer transition">
+                <tr key={a.id} onClick={() => navigate(`/accounts/${a.id}`)} className="group hover:bg-gray-50 cursor-pointer transition">
                   {user?.role === 'admin' && (
                     <td className="w-10 px-3 py-3" onClick={ev => ev.stopPropagation()}>
                       <input type="checkbox" checked={selectedIds.has(a.id)} onChange={() => toggleSelectId(a.id)}
@@ -676,7 +676,7 @@ export default function AccountsPage() {
                       <AccountCell a={a} k={c.key} />
                     </td>
                   ))}
-                  <td className="px-4 py-3">
+                  <td className="px-3 py-3 sticky right-0 z-10 bg-white group-hover:bg-gray-50 shadow-[-2px_0_6px_rgba(0,0,0,0.05)]">
                     <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                   </td>
                 </tr>

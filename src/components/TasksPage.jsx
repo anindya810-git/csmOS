@@ -373,7 +373,7 @@ export default function TasksPage() {
                 {dataCols.map(c => (
                   <th key={c.key} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide whitespace-nowrap">{fieldLabel('tasks', c.key, c.label)}</th>
                 ))}
-                <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wide">Actions</th>
+                <th className="px-3 py-3 w-16 sticky right-0 bg-gray-50 z-10 shadow-[-2px_0_6px_rgba(0,0,0,0.05)]"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -382,7 +382,7 @@ export default function TasksPage() {
                 const isOpen = expanded === task.id;
                 return (
                   <React.Fragment key={task.id}>
-                    <tr className={`hover:bg-gray-50 transition ${ds === 'Overdue' ? 'bg-red-50/30' : ''}`}>
+                    <tr className={`group hover:bg-gray-50 transition ${ds === 'Overdue' ? 'bg-red-50/30' : ''}`}>
                       {isAdmin && (
                         <td className="w-10 px-3 py-3">
                           <input type="checkbox" checked={selected.has(task.id)} onChange={() => toggleSelect(task.id)}
@@ -445,31 +445,33 @@ export default function TasksPage() {
                         }
                         return <td key={k} className="px-4 py-3 whitespace-nowrap">{cell}</td>;
                       })}
-                      <td className="px-4 py-3 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1">
+                      <td className="px-3 py-3 sticky right-0 z-10 bg-white group-hover:bg-gray-50 shadow-[-2px_0_6px_rgba(0,0,0,0.05)] whitespace-nowrap">
+                        <div className="flex items-center gap-1">
                           {ds !== 'Completed' && (
                             <button onClick={() => markComplete(task.id)}
-                              className="text-xs px-2 py-1 rounded bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 transition font-medium"
+                              className="p-1.5 rounded-md text-gray-400 hover:text-green-600 hover:bg-green-50 transition"
                               title="Mark complete">
-                              ✓ Done
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
                             </button>
                           )}
                           {ds === 'Completed' && (
                             <button onClick={() => markOpen(task.id)}
-                              className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-500 border border-gray-200 hover:bg-gray-100 transition"
+                              className="p-1.5 rounded-md text-gray-400 hover:text-brand-600 hover:bg-gray-100 transition"
                               title="Reopen">
-                              Reopen
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                             </button>
                           )}
                           {isAdmin && (
                             <>
                               <button onClick={() => openEdit(task)}
-                                className="text-xs px-2 py-1 rounded bg-gray-50 text-gray-600 border border-gray-200 hover:bg-gray-100 transition">
-                                Edit
+                                className="p-1.5 rounded-md text-gray-400 hover:text-brand-600 hover:bg-gray-100 transition"
+                                title="Edit">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                               </button>
                               <button onClick={() => deleteTask(task.id)}
-                                className="text-xs px-2 py-1 rounded bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition">
-                                Del
+                                className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                                title="Delete">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                               </button>
                             </>
                           )}
