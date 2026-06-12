@@ -4,8 +4,12 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
 const ROLE_BADGE = {
-  admin: 'bg-brand-100 text-brand-700',
-  csm:   'bg-gray-100 text-gray-600',
+  admin:       'bg-brand-100 text-brand-700',
+  csm:         'bg-gray-100 text-gray-600',
+  sales:       'bg-purple-100 text-purple-700',
+  product:     'bg-blue-100 text-blue-700',
+  cx_strategy: 'bg-teal-100 text-teal-700',
+  ps:          'bg-indigo-100 text-indigo-700',
 };
 
 const EMPTY_FORM = { name: '', email: '', password: '', role: 'csm', csm_name: '', csm_lead: '' };
@@ -28,6 +32,7 @@ const DD_FIELDS = [
   { key: 'churn_risk',           label: 'Churn Risk',           section: 'Accounts' },
   { key: 'implementation_status',label: 'Implementation Status',section: 'Accounts' },
   { key: 'nature_of_task',        label: 'Nature of Task',        section: 'Tasks' },
+  { key: 'fr_related_to',        label: 'FR: Related To',        section: 'Feature Requests' },
 ];
 
 function getInitials(name) {
@@ -134,6 +139,15 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    key: 'feature-requests',
+    label: 'Feature Requests',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18" />
+      </svg>
+    ),
+  },
 ];
 
 export default function SettingsPage() {
@@ -165,11 +179,20 @@ export default function SettingsPage() {
   const [ddEditParent,setDdEditParent]= useState('');
   const [ddSaving,    setDdSaving]    = useState(false);
 
+  // Feature Requests settings
+  const [frApprover,     setFrApprover]     = useState('');
+  const [frApproverSaving, setFrApproverSaving] = useState(false);
+
   useEffect(() => {
     if (user?.role !== 'admin') { navigate('/'); return; }
     loadUsers();
     loadDD();
   }, [user]);
+
+  useEffect(() => {
+    const cfg = ddData.fr_default_approver?.[0];
+    if (cfg) setFrApprover(cfg.value);
+  }, [ddData]);
 
   const loadUsers = () => {
     setLoading(true);
@@ -202,7 +225,7 @@ export default function SettingsPage() {
     try {
       const payload = { name: form.name, email: form.email, role: form.role, csm_name: form.csm_name, csm_lead: form.csm_lead };
       if (form.password) payload.password = form.password;
-      if (editUser) await axios.put(`/api/admin/users/${editUser.id}`, payload);
+      if (editUser) await axios.put(`/api/admin/users?id=${editUser.id}`, payload);
       else await axios.post('/api/admin/users', { ...payload, password: form.password });
       setShowModal(false); loadUsers();
     } catch (e) { setError(e.response?.data?.error || 'Failed to save'); }
@@ -212,7 +235,7 @@ export default function SettingsPage() {
   const handleDelete = async (u) => {
     if (!window.confirm(`Delete user "${u.name}"? This cannot be undone.`)) return;
     setDeleting(u.id);
-    try { await axios.delete(`/api/admin/users/${u.id}`); loadUsers(); }
+    try { await axios.delete(`/api/admin/users?id=${u.id}`); loadUsers(); }
     catch (e) { alert(e.response?.data?.error || 'Failed to delete'); }
     finally { setDeleting(null); }
   };
@@ -256,6 +279,38 @@ export default function SettingsPage() {
     setDdEditId(item.id);
     setDdEditValue(item.value);
     setDdEditParent(item.parent_value || '');
+  };
+
+  const handleDdReorder = async (item, direction) => {
+    const items = ddData[ddField] || [];
+    const idx = items.findIndex(x => x.id === item.id);
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (swapIdx < 0 || swapIdx >= items.length) return;
+    const other = items[swapIdx];
+    const order1 = item.sort_order ?? idx + 1;
+    const order2 = other.sort_order ?? swapIdx + 1;
+    await Promise.all([
+      axios.put(`/api/dropdown-config?id=${item.id}`,  { sort_order: order1 === order2 ? swapIdx + 1 : order2 }),
+      axios.put(`/api/dropdown-config?id=${other.id}`, { sort_order: order1 === order2 ? idx + 1    : order1 }),
+    ]);
+    loadDD();
+  };
+
+  const handleFrApproverSave = async () => {
+    if (!frApprover) return;
+    setFrApproverSaving(true);
+    try {
+      const existing = ddData.fr_default_approver?.[0];
+      const selectedUser = users.find(u => String(u.id) === String(frApprover));
+      if (!selectedUser) return;
+      if (existing) {
+        await axios.put(`/api/dropdown-config?id=${existing.id}`, { value: String(selectedUser.id), parent_value: selectedUser.name });
+      } else {
+        await axios.post('/api/dropdown-config', { field_name: 'fr_default_approver', value: String(selectedUser.id), parent_value: selectedUser.name, sort_order: 1 });
+      }
+      loadDD();
+    } catch (e) { alert(e.response?.data?.error || 'Failed to save'); }
+    finally { setFrApproverSaving(false); }
   };
 
   const { roots, childrenMap } = buildTree(users);
@@ -398,6 +453,43 @@ export default function SettingsPage() {
           </>
         )}
 
+        {/* ── Feature Requests settings ─────────────────────────────── */}
+        {settingsPage === 'feature-requests' && (
+          <>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Feature Requests</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Configure approval workflow for feature requests</p>
+            </div>
+            <div className="card p-5 max-w-md">
+              <h3 className="text-sm font-semibold text-gray-800 mb-3">Default Approver</h3>
+              <p className="text-xs text-gray-500 mb-4">When a feature request is submitted, a review task is automatically created for this user.</p>
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Approver</label>
+                  <select value={frApprover} onChange={e => setFrApprover(e.target.value)} className="w-full">
+                    <option value="">— Select approver —</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.name}{u.csm_name ? ` (${u.csm_name})` : ''}</option>
+                    ))}
+                  </select>
+                </div>
+                <button
+                  onClick={handleFrApproverSave}
+                  disabled={frApproverSaving || !frApprover}
+                  className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50"
+                >
+                  {frApproverSaving ? 'Saving…' : 'Save'}
+                </button>
+                {ddData.fr_default_approver?.[0] && (
+                  <p className="text-xs text-gray-400">
+                    Current: <span className="font-medium text-gray-600">{ddData.fr_default_approver[0].parent_value}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
+
         {/* ── Field Management page ──────────────────────────────────── */}
         {settingsPage === 'fields' && (
           <>
@@ -511,12 +603,15 @@ export default function SettingsPage() {
                         </div>
                       ) : (
                         <div className="space-y-1">
-                          {currentDdItems.map(item => (
+                          {currentDdItems.map((item, idx) => (
                             <DdRow key={item.id} item={item} isEditing={ddEditId === item.id}
                               editValue={ddEditValue} onStartEdit={() => startDdEdit(item)}
                               onCancelEdit={() => setDdEditId(null)} onSaveEdit={() => handleDdEdit(item.id)}
                               onDelete={() => handleDdDelete(item.id, item.value)}
-                              onChangeValue={setDdEditValue} saving={ddSaving} />
+                              onChangeValue={setDdEditValue} saving={ddSaving}
+                              isFirst={idx === 0} isLast={idx === currentDdItems.length - 1}
+                              onReorderUp={() => handleDdReorder(item, 'up')}
+                              onReorderDown={() => handleDdReorder(item, 'down')} />
                           ))}
                         </div>
                       )}
@@ -558,6 +653,10 @@ export default function SettingsPage() {
                 <select value={form.role} onChange={e => setForm(f => ({...f, role: e.target.value}))}>
                   <option value="csm">CSM</option>
                   <option value="admin">Admin</option>
+                  <option value="sales">Sales</option>
+                  <option value="product">Product</option>
+                  <option value="cx_strategy">CX Strategy</option>
+                  <option value="ps">PS</option>
                 </select>
               </div>
               <div>
@@ -587,7 +686,7 @@ export default function SettingsPage() {
   );
 }
 
-function DdRow({ item, isEditing, editValue, editParent, showParent, issueTypes = [], onStartEdit, onCancelEdit, onSaveEdit, onDelete, onChangeValue, onChangeParent, saving }) {
+function DdRow({ item, isEditing, editValue, editParent, showParent, issueTypes = [], onStartEdit, onCancelEdit, onSaveEdit, onDelete, onChangeValue, onChangeParent, saving, isFirst, isLast, onReorderUp, onReorderDown }) {
   return (
     <div className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-50 group border border-transparent hover:border-gray-100">
       {isEditing ? (
@@ -604,6 +703,16 @@ function DdRow({ item, isEditing, editValue, editParent, showParent, issueTypes 
         </>
       ) : (
         <>
+          {onReorderUp && (
+            <div className="flex flex-col gap-0 shrink-0 opacity-0 group-hover:opacity-100 transition">
+              <button onClick={onReorderUp} disabled={isFirst} className="p-0.5 text-gray-300 hover:text-gray-600 disabled:opacity-20 transition leading-none" title="Move up">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+              </button>
+              <button onClick={onReorderDown} disabled={isLast} className="p-0.5 text-gray-300 hover:text-gray-600 disabled:opacity-20 transition leading-none" title="Move down">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+            </div>
+          )}
           <span className="flex-1 text-sm text-gray-800">{item.value}</span>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition shrink-0">
             <button onClick={onStartEdit} className="p-1 text-gray-400 hover:text-brand-600 rounded transition" title="Edit">

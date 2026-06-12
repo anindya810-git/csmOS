@@ -19,6 +19,8 @@ import AccountEdit from './components/AccountEdit';
 import AccountTimeline from './components/AccountTimeline';
 import TasksPage from './components/TasksPage';
 import TaskPivotReport from './components/TaskPivotReport';
+import FeatureRequestsPage from './components/FeatureRequestsPage';
+import FeatureRequestReport from './components/FeatureRequestReport';
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -48,6 +50,7 @@ function AppRoutes() {
         <Route path="accounts/:id/edit" element={<AccountEdit />} />
         <Route path="accounts/:id/timeline" element={<AccountTimeline />} />
         <Route path="tasks" element={<TasksPage />} />
+        <Route path="feature-requests" element={<FeatureRequestsPage />} />
         <Route path="reports" element={<ReportsPage />}>
           <Route index element={<Navigate to="rag" replace />} />
           <Route path="rag"            element={<RAGDashboard />} />
@@ -56,6 +59,7 @@ function AppRoutes() {
           <Route path="issues-pivot"   element={<IssuesPivotReport />} />
           <Route path="account-mapping" element={<AccountMappingReport />} />
           <Route path="task-pivot"     element={<TaskPivotReport />} />
+          <Route path="feature-requests" element={<FeatureRequestReport />} />
         </Route>
         <Route path="renewal" element={<Navigate to="/reports/renewals" replace />} />
         <Route path="rag" element={<Navigate to="/reports/rag" replace />} />
