@@ -13,6 +13,8 @@ import IssuesDashboard from '../src/components/IssuesDashboard';
 import EscalationsDashboard from '../src/components/EscalationsDashboard';
 import TasksPage from '../src/components/TasksPage';
 import AccountsPage from '../src/components/AccountsPage';
+import FeatureRequestsPage from '../src/components/FeatureRequestsPage';
+import FeatureRequestReport from '../src/components/FeatureRequestReport';
 
 const FIXTURES = {
   '/api/auth/me': { id: 1, email: 'admin@test.com', role: 'admin', name: 'Admin' },
@@ -40,6 +42,20 @@ const FIXTURES = {
     { id: 31, task_subject: 'Follow up', task_description: 'Call client', nature_of_task: 'Call',
       account_id: 1, account_name: 'Acme Corp', assigned_to: 'admin@test.com',
       assigned_by: 'admin@test.com', due_date: '2026-06-20', status: 'Open', completed_at: null },
+    { id: 32, task_subject: 'Review Feature Request FR-00001: Bulk export', task_description: 'Approve or reject',
+      nature_of_task: 'Feature Request', account_id: null, account_name: null, assigned_to: 'admin@test.com',
+      assigned_to_id: 1, assigned_by: 'admin@test.com', due_date: '2026-06-20', status: 'Open',
+      completed_at: null, feature_request_id: 1 },
+  ],
+  '/api/feature-requests': [
+    { id: 1, request_id: 'FR-00001', title: 'Bulk export', description: 'Need CSV export',
+      related_to: 'Reports', priority: 'P1', status: 'pending', created_by: 'CSM One', created_by_id: 2,
+      approver_id: 1, approver_name: 'Admin', expected_rollout_date: '2026-09-01',
+      feature_request_links: [
+        { link_type: 'escalation', linked_id: 21, account_id: 1, account_name: 'Acme Corp', mrr: 120000 },
+        { link_type: 'issue', linked_id: 11, account_id: 1, account_name: 'Acme Corp', mrr: 120000 },
+        { link_type: 'issue', linked_id: 12, account_id: 2, account_name: 'Beta Inc', mrr: 50000 },
+      ] },
   ],
   '/api/dropdown-config': {},
   '/api/users': [{ id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin' }],
@@ -107,6 +123,8 @@ export async function run() {
   failed = (await mountOne('EscalationsDashboard', EscalationsDashboard)) || failed;
   failed = (await mountOne('TasksPage', TasksPage)) || failed;
   failed = (await mountOne('AccountsPage', AccountsPage)) || failed;
+  failed = (await mountOne('FeatureRequestsPage', FeatureRequestsPage)) || failed;
+  failed = (await mountOne('FeatureRequestReport', FeatureRequestReport)) || failed;
   if (unknownUrls.length) console.log('\nUnmocked URLs:', [...new Set(unknownUrls)].join(', '));
   return failed;
 }

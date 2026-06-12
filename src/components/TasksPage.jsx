@@ -101,6 +101,11 @@ export default function TasksPage() {
   const [formError, setFormError] = useState(null);
   const [editingId, setEditingId] = useState(null);
 
+  // Feature-request approval (review) from the task itself
+  const [rejectTask, setRejectTask]   = useState(null);
+  const [rejectReason, setRejectReason] = useState('');
+  const [reviewing, setReviewing]     = useState(false);
+
   // Reference data
   const [accounts,   setAccounts]   = useState([]);
   const [csms,       setCsms]       = useState([]);
@@ -217,6 +222,31 @@ export default function TasksPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  // A "Review Feature Request" task can be approved/rejected in place by the
+  // assigned approver or any admin; this drives the linked feature request.
+  const canReviewTask = (t) =>
+    t.nature_of_task === 'Feature Request' && t.feature_request_id != null &&
+    (isAdmin || String(t.assigned_to_id) === String(user?.id));
+
+  async function approveFR(task) {
+    setReviewing(true);
+    try {
+      await axios.put(`/api/feature-requests?id=${task.feature_request_id}`, { action: 'approve' });
+      setReload(r => r + 1);
+    } catch (e) { alert(e.response?.data?.error || 'Failed to approve'); }
+    finally { setReviewing(false); }
+  }
+
+  async function submitReject() {
+    if (!rejectTask) return;
+    setReviewing(true);
+    try {
+      await axios.put(`/api/feature-requests?id=${rejectTask.feature_request_id}`, { action: 'reject', rejection_reason: rejectReason });
+      setRejectTask(null); setRejectReason(''); setReload(r => r + 1);
+    } catch (e) { alert(e.response?.data?.error || 'Failed to reject'); }
+    finally { setReviewing(false); }
   }
 
   async function markComplete(taskId) {
@@ -448,19 +478,38 @@ export default function TasksPage() {
                       })}
                       <td className="px-3 py-3 sticky right-0 z-10 bg-white group-hover:bg-gray-50 shadow-[-2px_0_6px_rgba(0,0,0,0.05)] whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1">
-                          {ds !== 'Completed' && (
-                            <button onClick={() => markComplete(task.id)}
-                              className="p-1.5 rounded-md text-gray-400 hover:text-green-600 hover:bg-green-50 transition"
-                              title="Mark complete">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            </button>
-                          )}
-                          {ds === 'Completed' && (
-                            <button onClick={() => markOpen(task.id)}
-                              className="p-1.5 rounded-md text-gray-400 hover:text-brand-600 hover:bg-gray-100 transition"
-                              title="Reopen">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
-                            </button>
+                          {canReviewTask(task) ? (
+                            ds !== 'Completed' && (
+                              <>
+                                <button onClick={() => approveFR(task)} disabled={reviewing}
+                                  className="p-1.5 rounded-md text-gray-400 hover:text-green-600 hover:bg-green-50 transition disabled:opacity-50"
+                                  title="Approve feature request">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </button>
+                                <button onClick={() => { setRejectTask(task); setRejectReason(''); }} disabled={reviewing}
+                                  className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition disabled:opacity-50"
+                                  title="Reject feature request">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14l4-4m-4 0l4 4m5-2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </button>
+                              </>
+                            )
+                          ) : (
+                            <>
+                              {ds !== 'Completed' && (
+                                <button onClick={() => markComplete(task.id)}
+                                  className="p-1.5 rounded-md text-gray-400 hover:text-green-600 hover:bg-green-50 transition"
+                                  title="Mark complete">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                                </button>
+                              )}
+                              {ds === 'Completed' && (
+                                <button onClick={() => markOpen(task.id)}
+                                  className="p-1.5 rounded-md text-gray-400 hover:text-brand-600 hover:bg-gray-100 transition"
+                                  title="Reopen">
+                                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                </button>
+                              )}
+                            </>
                           )}
                           {isAdmin && (
                             <>
@@ -576,6 +625,35 @@ export default function TasksPage() {
             </div>
           </div>
         </>,
+        document.body
+      )}
+
+      {/* Reject feature request (from its review task) */}
+      {rejectTask && createPortal(
+        <div className="fixed inset-0 z-[60] bg-black/40 flex items-center justify-center p-4" onClick={() => setRejectTask(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900">Reject Feature Request</h3>
+              <button onClick={() => setRejectTask(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-sm text-gray-600">{rejectTask.task_subject}</p>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Rejection reason <span className="text-gray-400">(required)</span></label>
+                <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3} className="w-full resize-none text-sm" placeholder="Explain why this is being rejected…" autoFocus />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 px-5 pb-5">
+              <button onClick={() => setRejectTask(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
+              <button onClick={submitReject} disabled={reviewing || !rejectReason.trim()}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+                {reviewing ? '…' : 'Reject'}
+              </button>
+            </div>
+          </div>
+        </div>,
         document.body
       )}
     </div>

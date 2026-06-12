@@ -66,7 +66,10 @@ export default async function handler(req, res) {
       .limit(1)
       .maybeSingle();
 
+    const reqId = `FR-${String(fr.id).padStart(5, '0')}`;
     let taskId = null;
+    let approverId = null;
+    let approverName = null;
     if (config?.value) {
       const { data: approver } = await supabase
         .from('users')
@@ -74,24 +77,33 @@ export default async function handler(req, res) {
         .eq('id', config.value)
         .maybeSingle();
       if (approver) {
+        approverId = approver.id;
+        approverName = approver.name;
+        // Give the approver two days to action it; surfaces as Overdue after.
+        const due = new Date(); due.setDate(due.getDate() + 2);
         const { data: task } = await supabase.from('tasks').insert({
-          task_subject: `Review Feature Request: ${fr.title}`,
-          task_description: `Priority: ${fr.priority}${fr.related_to ? ` | Related to: ${fr.related_to}` : ''}`,
+          task_subject: `Review Feature Request ${reqId}: ${fr.title}`,
+          task_description: `Priority: ${fr.priority}${fr.related_to ? ` | Related to: ${fr.related_to}` : ''}\nApprove or reject this request from the task actions.`,
           nature_of_task: 'Feature Request',
-          due_date: null,
+          due_date: due.toISOString(),
           assigned_to_id: approver.id,
           assigned_to: approver.name,
           assigned_by_id: user.id,
           assigned_by: user.name,
           status: 'Open',
+          feature_request_id: fr.id,
         }).select('id').single();
         taskId = task?.id || null;
       }
     }
 
-    const reqId = `FR-${String(fr.id).padStart(5, '0')}`;
     await supabase.from('feature_requests')
-      .update({ request_id: reqId, ...(taskId ? { approval_task_id: taskId } : {}) })
+      .update({
+        request_id: reqId,
+        approver_id: approverId,
+        approver_name: approverName,
+        ...(taskId ? { approval_task_id: taskId } : {}),
+      })
       .eq('id', fr.id);
 
     const { data: full } = await supabase
@@ -110,8 +122,12 @@ export default async function handler(req, res) {
 
     const body = req.body;
 
+    // Approve / reject may be performed by an admin OR the assigned approver.
+    const isApprover = existing.approver_id != null && String(existing.approver_id) === String(user.id);
+    const canReview = user.role === 'admin' || isApprover;
+
     if (body.action === 'approve') {
-      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+      if (!canReview) return res.status(403).json({ error: 'Only an admin or the assigned approver can review this request' });
       const { data, error } = await supabase
         .from('feature_requests')
         .update({ status: 'approved', approved_by_id: user.id, approved_by: user.name, approved_at: new Date().toISOString(), rejection_reason: null })
@@ -128,7 +144,7 @@ export default async function handler(req, res) {
     }
 
     if (body.action === 'reject') {
-      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+      if (!canReview) return res.status(403).json({ error: 'Only an admin or the assigned approver can review this request' });
       const { data, error } = await supabase
         .from('feature_requests')
         .update({ status: 'rejected', approved_by_id: user.id, approved_by: user.name, approved_at: new Date().toISOString(), rejection_reason: body.rejection_reason || null })

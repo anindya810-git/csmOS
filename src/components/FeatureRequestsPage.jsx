@@ -50,6 +50,8 @@ export default function FeatureRequestsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const isAdmin = user?.role === 'admin';
+  // An admin or the request's assigned approver may review (approve / reject).
+  const canReview = (fr) => isAdmin || (fr?.approver_id != null && String(fr.approver_id) === String(user?.id));
 
   const [frs, setFrs]           = useState([]);
   const [loading, setLoading]   = useState(true);
@@ -212,6 +214,7 @@ export default function FeatureRequestsPage() {
                 <span className={`font-bold px-2 py-0.5 rounded-full ${PRIORITY_COLORS[fr.priority] || 'bg-gray-100 text-gray-600'}`}>{fr.priority}</span>
                 {fr.related_to && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{fr.related_to}</span>}
                 <span className="text-gray-400">by {fr.created_by || '—'}</span>
+                {fr.approver_name && fr.status === 'pending' && <span className="text-gray-400">· approver {fr.approver_name}</span>}
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-3 text-xs text-gray-500">
                 {stats.escalations > 0 && <span>{stats.escalations} escalation{stats.escalations > 1 ? 's' : ''}</span>}
@@ -220,7 +223,7 @@ export default function FeatureRequestsPage() {
                 {fr.expected_rollout_date && <span>Rollout: {fmtDate(fr.expected_rollout_date)}</span>}
               </div>
               <div className="mt-3 flex items-center gap-2">
-                {isAdmin && fr.status === 'pending' && (
+                {canReview(fr) && fr.status === 'pending' && (
                   <button onClick={() => { setReviewFr(fr); setRejectReason(''); }} className="px-3 py-1.5 text-xs font-medium bg-brand-50 text-brand-700 rounded-lg">Review</button>
                 )}
                 {canEdit && (
@@ -278,7 +281,12 @@ export default function FeatureRequestsPage() {
                         <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${PRIORITY_COLORS[fr.priority] || 'bg-gray-100 text-gray-600'}`}>{fr.priority}</span>
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-xs">{fr.related_to || '—'}</td>
-                      <td className="px-4 py-3 text-gray-500 text-xs">{fr.created_by || '—'}</td>
+                      <td className="px-4 py-3 text-gray-500 text-xs">
+                        {fr.created_by || '—'}
+                        {fr.approver_name && fr.status === 'pending' && (
+                          <span className="block text-gray-400 mt-0.5">Approver: {fr.approver_name}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2 text-xs text-gray-500">
                           {stats.escalations > 0 && (
@@ -301,7 +309,7 @@ export default function FeatureRequestsPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">
-                          {isAdmin && fr.status === 'pending' && (
+                          {canReview(fr) && fr.status === 'pending' && (
                             <button onClick={() => { setReviewFr(fr); setRejectReason(''); }} className="px-2 py-1 text-xs font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-md transition">
                               Review
                             </button>
