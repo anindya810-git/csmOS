@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../context/PermissionsContext';
@@ -18,6 +20,8 @@ const STATUS_COLORS = {
   rejected: 'bg-red-100 text-red-700',
 };
 
+const RAG_DOT = { Green: 'bg-green-500', Amber: 'bg-amber-400', Red: 'bg-red-500' };
+
 function fmtDate(s) {
   if (!s) return '—';
   try {
@@ -26,8 +30,14 @@ function fmtDate(s) {
   } catch { return s; }
 }
 
-// Combined MRR is deduped per account (an account may surface via several
-// linked escalations/issues, but its MRR is counted once).
+function fmtMRR(v) {
+  if (!v) return '—';
+  if (v >= 10000000) return `₹${(v / 10000000).toFixed(1)}Cr`;
+  if (v >= 100000)   return `₹${(v / 100000).toFixed(1)}L`;
+  if (v >= 1000)     return `₹${(v / 1000).toFixed(0)}K`;
+  return `₹${v}`;
+}
+
 function frStats(fr) {
   const links = fr.feature_request_links || [];
   const accountMRR = {};
@@ -44,13 +54,28 @@ function frStats(fr) {
   };
 }
 
+function reqId(fr) {
+  return fr.request_id || `FR-${String(fr.id).padStart(5, '0')}`;
+}
+
+function SectionLabel({ label, count }) {
+  return (
+    <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-gray-100">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
+      {count != null && (
+        <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">{count}</span>
+      )}
+    </div>
+  );
+}
+
 const EMPTY_FORM = { title: '', description: '', related_to: '', priority: 'P2', expected_rollout_date: '' };
 
 export default function FeatureRequestsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
+  const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
-  // An admin or the request's assigned approver may review (approve / reject).
   const canReview = (fr) => isAdmin || (fr?.approver_id != null && String(fr.approver_id) === String(user?.id));
 
   const [frs, setFrs]           = useState([]);
@@ -68,6 +93,12 @@ export default function FeatureRequestsPage() {
   const [reviewFr, setReviewFr]     = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [reviewing, setReviewing]   = useState(false);
+
+  // Resolved data for linked-item sections in the panels (lazy-loaded once)
+  const panelDataLoadedRef = useRef(false);
+  const [allEscalations, setAllEscalations] = useState([]);
+  const [allIssues,       setAllIssues]       = useState([]);
+  const [allAccounts,     setAllAccounts]     = useState([]);
 
   useEffect(() => { load(); loadRelatedOpts(); }, []);
 
@@ -92,6 +123,20 @@ export default function FeatureRequestsPage() {
     } catch {}
   };
 
+  const loadPanelData = () => {
+    if (panelDataLoadedRef.current) return;
+    panelDataLoadedRef.current = true;
+    Promise.all([
+      axios.get('/api/escalations'),
+      axios.get('/api/issues'),
+      axios.get('/api/accounts'),
+    ]).then(([escR, issR, accR]) => {
+      setAllEscalations(escR.data || []);
+      setAllIssues(issR.data || []);
+      setAllAccounts(accR.data || []);
+    }).catch(() => { panelDataLoadedRef.current = false; });
+  };
+
   const openCreate = () => {
     setEditFr(null); setForm(EMPTY_FORM); setFormError(''); setShowForm(true);
   };
@@ -102,6 +147,12 @@ export default function FeatureRequestsPage() {
     setEditFr(fr);
     setForm({ title: fr.title, description: fr.description || '', related_to: fr.related_to || '', priority: fr.priority || 'P2', expected_rollout_date: fr.expected_rollout_date || '' });
     setFormError(''); setShowForm(true);
+    loadPanelData();
+  };
+
+  const openReview = (fr) => {
+    setReviewFr(fr); setRejectReason('');
+    loadPanelData();
   };
 
   const applyFilter = (patch) => {
@@ -123,7 +174,6 @@ export default function FeatureRequestsPage() {
     finally { setSaving(false); }
   };
 
-  // Remove a linked escalation/issue from the request being edited.
   const handleRemoveLink = async (link) => {
     if (!editFr) return;
     const key = `${link.link_type}:${link.linked_id}`;
@@ -167,7 +217,102 @@ export default function FeatureRequestsPage() {
     } catch (e) { alert(e.response?.data?.error || 'Failed'); }
   };
 
-  const editLinks = editFr?.feature_request_links || [];
+  // Resolve links to full records for the active panel (edit or review)
+  const panelFr = showForm ? editFr : reviewFr;
+  const panelLinks = panelFr?.feature_request_links || [];
+  const editLinks  = editFr?.feature_request_links || [];
+
+  const resolvedEscalations = panelLinks
+    .filter(l => l.link_type === 'escalation')
+    .map(l => allEscalations.find(e => String(e.id) === String(l.linked_id))
+      || { id: l.linked_id, account_name: l.account_name, description: '', status: '' });
+
+  const resolvedIssues = panelLinks
+    .filter(l => l.link_type === 'issue')
+    .map(l => allIssues.find(i => String(i.id) === String(l.linked_id))
+      || { id: l.linked_id, account_name: l.account_name, description: '', status: '', priority: '' });
+
+  const resolvedAccounts = (() => {
+    const seen = new Set();
+    const items = [];
+    for (const l of panelLinks) {
+      if (l.account_id == null || seen.has(l.account_id)) continue;
+      seen.add(l.account_id);
+      const full = allAccounts.find(a => String(a.id) === String(l.account_id));
+      items.push(full || { id: l.account_id, account_name: l.account_name, mrr: l.mrr });
+    }
+    return items;
+  })();
+
+  // Shared escalation row renderer
+  const EscRow = ({ e, removable }) => {
+    const link = removable ? editLinks.find(l => l.link_type === 'escalation' && String(l.linked_id) === String(e.id)) : null;
+    const key = `escalation:${e.id}`;
+    return (
+      <div className="flex items-start gap-2 bg-orange-50 rounded-lg px-3 py-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-orange-400 mt-1.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-gray-800 truncate">{e.account_name || `Escalation #${e.id}`}</p>
+          {e.description && <p className="text-xs text-gray-500 truncate">{e.description}</p>}
+          {e.status && (
+            <p className="text-xs text-gray-400">{e.status}{e.date_of_escalation ? ` · ${fmtDate(e.date_of_escalation)}` : ''}</p>
+          )}
+        </div>
+        {link && (
+          <button onClick={() => handleRemoveLink(link)} disabled={unlinking === key}
+            className="shrink-0 p-0.5 text-gray-300 hover:text-red-500 transition disabled:opacity-40">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // Shared issue row renderer
+  const IssRow = ({ i, removable }) => {
+    const link = removable ? editLinks.find(l => l.link_type === 'issue' && String(l.linked_id) === String(i.id)) : null;
+    const key = `issue:${i.id}`;
+    return (
+      <div className="flex items-start gap-2 bg-blue-50 rounded-lg px-3 py-2">
+        <span className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-1.5 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-medium text-gray-800 truncate">{i.account_name || `Issue #${i.id}`}</p>
+          {i.description && <p className="text-xs text-gray-500 truncate">{i.description}</p>}
+          <div className="flex items-center gap-2 mt-0.5">
+            {i.priority && <span className={`text-xs font-bold px-1.5 py-0 rounded ${PRIORITY_COLORS[i.priority] || 'text-gray-500'}`}>{i.priority}</span>}
+            {i.status && <span className="text-xs text-gray-400">{i.status}</span>}
+          </div>
+        </div>
+        {link && (
+          <button onClick={() => handleRemoveLink(link)} disabled={unlinking === key}
+            className="shrink-0 p-0.5 text-gray-300 hover:text-red-500 transition disabled:opacity-40">
+            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  // Shared account row renderer
+  const AccRow = ({ a }) => (
+    <div className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+      {a.rag_status && <span className={`w-2 h-2 rounded-full shrink-0 ${RAG_DOT[a.rag_status] || 'bg-gray-300'}`} />}
+      <div className="flex-1 min-w-0">
+        <p className="text-xs font-medium text-gray-800 truncate">{a.account_name}</p>
+        <p className="text-xs text-gray-400">{[a.industry, a.region, fmtMRR(a.mrr)].filter(Boolean).join(' · ')}</p>
+      </div>
+    </div>
+  );
+
+  const CloseIcon = () => (
+    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+    </svg>
+  );
 
   return (
     <div className="space-y-5">
@@ -206,7 +351,7 @@ export default function FeatureRequestsPage() {
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                   <p className="font-semibold text-gray-900">{fr.title}</p>
-                  <p className="text-xs text-gray-400 font-mono mt-0.5">{fr.request_id || `FR-${String(fr.id).padStart(5, '0')}`}</p>
+                  <p className="text-xs text-gray-400 font-mono mt-0.5">{reqId(fr)}</p>
                 </div>
                 <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[fr.status] || 'bg-gray-100 text-gray-600'}`}>{fr.status}</span>
               </div>
@@ -224,7 +369,7 @@ export default function FeatureRequestsPage() {
               </div>
               <div className="mt-3 flex items-center gap-2">
                 {canReview(fr) && fr.status === 'pending' && (
-                  <button onClick={() => { setReviewFr(fr); setRejectReason(''); }} className="px-3 py-1.5 text-xs font-medium bg-brand-50 text-brand-700 rounded-lg">Review</button>
+                  <button onClick={() => openReview(fr)} className="px-3 py-1.5 text-xs font-medium bg-brand-50 text-brand-700 rounded-lg">Review</button>
                 )}
                 {canEdit && (
                   <button onClick={() => openEdit(fr)} className="px-3 py-1.5 text-xs font-medium bg-gray-50 text-gray-600 border border-gray-200 rounded-lg">Edit</button>
@@ -265,7 +410,7 @@ export default function FeatureRequestsPage() {
                   return (
                     <tr key={fr.id} className="hover:bg-gray-50 transition">
                       <td className="px-4 py-3">
-                        <p className="font-mono text-xs text-gray-400">{fr.request_id || `FR-${String(fr.id).padStart(5, '0')}`}</p>
+                        <p className="font-mono text-xs text-gray-400">{reqId(fr)}</p>
                         <p className="font-medium text-gray-900 max-w-xs truncate">{fr.title}</p>
                         {fr.expected_rollout_date && (
                           <p className="text-xs text-gray-400 mt-0.5">Rollout: {fmtDate(fr.expected_rollout_date)}</p>
@@ -310,7 +455,7 @@ export default function FeatureRequestsPage() {
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1 justify-end">
                           {canReview(fr) && fr.status === 'pending' && (
-                            <button onClick={() => { setReviewFr(fr); setRejectReason(''); }} className="px-2 py-1 text-xs font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-md transition">
+                            <button onClick={() => openReview(fr)} className="px-2 py-1 text-xs font-medium bg-brand-50 text-brand-700 hover:bg-brand-100 rounded-md transition">
                               Review
                             </button>
                           )}
@@ -335,18 +480,22 @@ export default function FeatureRequestsPage() {
         )}
       </div>
 
-      {/* Create / Edit – basic form */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black/40 flex items-start justify-center z-50 p-4 pt-10 overflow-y-auto" onClick={() => setShowForm(false)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg my-4" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-              <h3 className="text-base font-semibold text-gray-900">{editFr ? 'Edit Feature Request' : 'New Feature Request'}</h3>
+      {/* ── Create / Edit slide-over ── */}
+      {showForm && createPortal(
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setShowForm(false)} />
+          <div className="fixed inset-y-0 right-0 w-[560px] max-w-[95vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900">{editFr ? 'Edit Feature Request' : 'New Feature Request'}</h3>
+                {editFr && <p className="text-xs text-gray-400 font-mono mt-0.5">{reqId(editFr)}</p>}
+              </div>
               <button onClick={() => setShowForm(false)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                <CloseIcon />
               </button>
             </div>
 
-            <div className="p-5 space-y-4">
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
               {formError && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{formError}</p>}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Title *</label>
@@ -354,7 +503,7 @@ export default function FeatureRequestsPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Description</label>
-                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the feature and business justification…" rows={5} className="w-full resize-none" />
+                <textarea value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Describe the feature and business justification…" rows={4} className="w-full resize-none" />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -371,74 +520,166 @@ export default function FeatureRequestsPage() {
                 <DatePicker value={form.expected_rollout_date} onChange={v => setForm(f => ({ ...f, expected_rollout_date: v }))} placeholder="Select date" />
               </div>
 
-              {/* Linked items (edit only) — new links are added from the Escalations / Issues pages */}
+              {/* Linked items — edit mode only */}
               {editFr && (
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">Linked items ({editLinks.length})</label>
-                  {editLinks.length === 0 ? (
-                    <p className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2">
-                      None yet. Open an escalation or issue and use the “Add to feature request” button to attach it here.
-                    </p>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {editLinks.map((l, i) => {
-                        const key = `${l.link_type}:${l.linked_id}`;
-                        return (
-                          <span key={i} className={`inline-flex items-center gap-1 text-xs font-medium px-2 py-1 rounded-full ${l.link_type === 'escalation' ? 'bg-orange-50 text-orange-700' : 'bg-blue-50 text-blue-700'}`}>
-                            <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${l.link_type === 'escalation' ? 'bg-orange-400' : 'bg-blue-400'}`}></span>
-                            {l.account_name || `${l.link_type === 'escalation' ? 'Esc' : 'Issue'} #${l.linked_id}`}
-                            <button onClick={() => handleRemoveLink(l)} disabled={unlinking === key} className="ml-0.5 hover:text-red-500 leading-none disabled:opacity-40">✕</button>
-                          </span>
-                        );
-                      })}
+                <>
+                  {/* Escalations */}
+                  <div>
+                    <SectionLabel label="Escalations" count={resolvedEscalations.length} />
+                    {resolvedEscalations.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-1">No escalations linked yet.</p>
+                    ) : (
+                      <div className="space-y-1.5 mb-2">
+                        {resolvedEscalations.map(e => <EscRow key={e.id} e={e} removable />)}
+                      </div>
+                    )}
+                    <button onClick={() => navigate('/escalations')}
+                      className="flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-800 font-medium transition mt-1">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      Add from Escalations page
+                    </button>
+                  </div>
+
+                  {/* Issues */}
+                  <div>
+                    <SectionLabel label="Issues" count={resolvedIssues.length} />
+                    {resolvedIssues.length === 0 ? (
+                      <p className="text-xs text-gray-400 py-1">No issues linked yet.</p>
+                    ) : (
+                      <div className="space-y-1.5 mb-2">
+                        {resolvedIssues.map(i => <IssRow key={i.id} i={i} removable />)}
+                      </div>
+                    )}
+                    <button onClick={() => navigate('/issues')}
+                      className="flex items-center gap-1.5 text-xs text-brand-600 hover:text-brand-800 font-medium transition mt-1">
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                      Add from Issues page
+                    </button>
+                  </div>
+
+                  {/* Accounts */}
+                  {resolvedAccounts.length > 0 && (
+                    <div>
+                      <SectionLabel label="Accounts" count={resolvedAccounts.length} />
+                      <p className="text-xs text-gray-400 mb-2">Auto-added from linked escalations and issues.</p>
+                      <div className="space-y-1.5">
+                        {resolvedAccounts.map(a => <AccRow key={a.id} a={a} />)}
+                      </div>
                     </div>
                   )}
-                </div>
+                </>
               )}
             </div>
 
-            <div className="flex justify-end gap-3 px-5 py-4 border-t border-gray-100">
+            <div className="border-t border-gray-100 px-5 py-4 shrink-0 flex justify-end gap-3">
               <button onClick={() => setShowForm(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
               <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
                 {saving ? 'Saving…' : editFr ? 'Save Changes' : 'Submit Request'}
               </button>
             </div>
           </div>
-        </div>
+        </>,
+        document.body
       )}
 
-      {/* Review modal */}
-      {reviewFr && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
-            <div className="flex items-center justify-between p-5 border-b border-gray-100">
-              <h3 className="text-base font-semibold text-gray-900">Review Feature Request</h3>
-              <button onClick={() => setReviewFr(null)} className="text-gray-400 hover:text-gray-600">✕</button>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="font-medium text-gray-800">{reviewFr.title}</p>
-              {reviewFr.description && <p className="text-sm text-gray-600 line-clamp-3">{reviewFr.description}</p>}
-              <div className="flex gap-2 text-xs flex-wrap">
-                <span className={`font-bold px-2 py-0.5 rounded-full ${PRIORITY_COLORS[reviewFr.priority] || ''}`}>{reviewFr.priority}</span>
-                {reviewFr.related_to && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{reviewFr.related_to}</span>}
-                <span className="text-gray-400">by {reviewFr.created_by}</span>
-              </div>
+      {/* ── Review slide-over ── */}
+      {reviewFr && createPortal(
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => setReviewFr(null)} />
+          <div className="fixed inset-y-0 right-0 w-[560px] max-w-[95vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Rejection reason <span className="text-gray-400">(required to reject)</span></label>
-                <textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} placeholder="Explain why this is being rejected…" rows={3} className="w-full resize-none text-sm" />
+                <h3 className="text-sm font-semibold text-gray-900">Review Feature Request</h3>
+                <p className="text-xs text-gray-400 font-mono mt-0.5">{reqId(reviewFr)}</p>
+              </div>
+              <button onClick={() => setReviewFr(null)} className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
+                <CloseIcon />
+              </button>
+            </div>
+
+            <div className="overflow-y-auto flex-1 p-5 space-y-4">
+              {/* FR summary */}
+              <div className="space-y-2">
+                <p className="font-semibold text-gray-900 text-base">{reviewFr.title}</p>
+                {reviewFr.description && <p className="text-sm text-gray-600 leading-relaxed">{reviewFr.description}</p>}
+                <div className="flex flex-wrap items-center gap-2 text-xs pt-1">
+                  <span className={`font-bold px-2 py-0.5 rounded-full ${PRIORITY_COLORS[reviewFr.priority] || ''}`}>{reviewFr.priority}</span>
+                  {reviewFr.related_to && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{reviewFr.related_to}</span>}
+                  <span className={`px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[reviewFr.status] || ''}`}>{reviewFr.status}</span>
+                </div>
+                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                  <span>By: <span className="text-gray-700">{reviewFr.created_by || '—'}</span></span>
+                  {reviewFr.expected_rollout_date && (
+                    <span>Rollout: <span className="text-gray-700">{fmtDate(reviewFr.expected_rollout_date)}</span></span>
+                  )}
+                </div>
+              </div>
+
+              {/* Escalations */}
+              <div>
+                <SectionLabel label="Escalations" count={resolvedEscalations.length} />
+                {resolvedEscalations.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-1">No escalations linked.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {resolvedEscalations.map(e => <EscRow key={e.id} e={e} removable={false} />)}
+                  </div>
+                )}
+              </div>
+
+              {/* Issues */}
+              <div>
+                <SectionLabel label="Issues" count={resolvedIssues.length} />
+                {resolvedIssues.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-1">No issues linked.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {resolvedIssues.map(i => <IssRow key={i.id} i={i} removable={false} />)}
+                  </div>
+                )}
+              </div>
+
+              {/* Accounts */}
+              <div>
+                <SectionLabel label="Accounts" count={resolvedAccounts.length} />
+                {resolvedAccounts.length === 0 ? (
+                  <p className="text-xs text-gray-400 py-1">No accounts linked.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {resolvedAccounts.map(a => <AccRow key={a.id} a={a} />)}
+                  </div>
+                )}
+              </div>
+
+              {/* Rejection reason */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Rejection reason <span className="text-gray-400 font-normal">(required to reject)</span>
+                </label>
+                <textarea
+                  value={rejectReason}
+                  onChange={e => setRejectReason(e.target.value)}
+                  placeholder="Explain why this is being rejected…"
+                  rows={3}
+                  className="w-full resize-none text-sm"
+                />
               </div>
             </div>
-            <div className="flex justify-end gap-3 px-5 pb-5">
-              <button onClick={() => setReviewFr(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
-              <button onClick={handleReject} disabled={reviewing || !rejectReason.trim()} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+
+            <div className="border-t border-gray-100 px-5 py-4 shrink-0 flex justify-end gap-3">
+              <button onClick={() => setReviewFr(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+              <button onClick={handleReject} disabled={reviewing || !rejectReason.trim()}
+                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
                 {reviewing ? '…' : 'Reject'}
               </button>
-              <button onClick={() => handleApprove(reviewFr)} disabled={reviewing} className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+              <button onClick={() => handleApprove(reviewFr)} disabled={reviewing}
+                className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
                 {reviewing ? '…' : 'Approve'}
               </button>
             </div>
           </div>
-        </div>
+        </>,
+        document.body
       )}
     </div>
   );
