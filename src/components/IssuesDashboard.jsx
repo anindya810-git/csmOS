@@ -260,8 +260,6 @@ export default function IssuesDashboard() {
     setConditions(c => c.filter(cond => cond.id !== id));
 
   const toggleSelectId = (id) => setSelectedIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const allPageSelected = paginated.length > 0 && paginated.every(i => selectedIds.has(i.id));
-  const selectAllPage = () => { allPageSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(paginated.map(i => i.id))); };
 
   const handleBulkApply = async () => {
     setBulkSaving(true);
@@ -350,6 +348,10 @@ export default function IssuesDashboard() {
   });
 
   const paginated = displayed.slice((page - 1) * perPage, page * perPage);
+
+  // Must come after `paginated` is initialized (const TDZ).
+  const allPageSelected = paginated.length > 0 && paginated.every(i => selectedIds.has(i.id));
+  const selectAllPage = () => { allPageSelected ? setSelectedIds(new Set()) : setSelectedIds(new Set(paginated.map(i => i.id))); };
 
   const stats = {
     total:      displayed.length,
