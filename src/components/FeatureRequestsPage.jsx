@@ -202,7 +202,10 @@ export default function FeatureRequestsPage() {
           return (
             <div key={fr.id} className="card">
               <div className="flex items-start justify-between gap-3">
-                <p className="font-semibold text-gray-900 min-w-0">{fr.title}</p>
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900">{fr.title}</p>
+                  <p className="text-xs text-gray-400 font-mono mt-0.5">{fr.request_id || `FR-${String(fr.id).padStart(5, '0')}`}</p>
+                </div>
                 <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[fr.status] || 'bg-gray-100 text-gray-600'}`}>{fr.status}</span>
               </div>
               <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
@@ -259,6 +262,7 @@ export default function FeatureRequestsPage() {
                   return (
                     <tr key={fr.id} className="hover:bg-gray-50 transition">
                       <td className="px-4 py-3">
+                        <p className="font-mono text-xs text-gray-400">{fr.request_id || `FR-${String(fr.id).padStart(5, '0')}`}</p>
                         <p className="font-medium text-gray-900 max-w-xs truncate">{fr.title}</p>
                         {fr.expected_rollout_date && (
                           <p className="text-xs text-gray-400 mt-0.5">Rollout: {fmtDate(fr.expected_rollout_date)}</p>

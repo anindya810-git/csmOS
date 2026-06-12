@@ -89,9 +89,10 @@ export default async function handler(req, res) {
       }
     }
 
-    if (taskId) {
-      await supabase.from('feature_requests').update({ approval_task_id: taskId }).eq('id', fr.id);
-    }
+    const reqId = `FR-${String(fr.id).padStart(5, '0')}`;
+    await supabase.from('feature_requests')
+      .update({ request_id: reqId, ...(taskId ? { approval_task_id: taskId } : {}) })
+      .eq('id', fr.id);
 
     const { data: full } = await supabase
       .from('feature_requests')
