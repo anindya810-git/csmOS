@@ -8,7 +8,7 @@ import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
-import { ISSUE_FIELDS, toFieldDef } from '../fieldCatalog';
+import { ISSUE_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 
@@ -284,26 +284,19 @@ export default function IssuesDashboard() {
 
   const dd = (key, fb = []) => (dropdownConfig[key]?.length ? dropdownConfig[key].map(o => o.value) : fb);
 
-  // Derived from the field catalog (single source of truth) — any field added
-  // to ISSUE_FIELDS automatically appears in the advanced filter list.
-  const dynamicOpts = { csms: allCsms, ownerTeams: allOwnerTeams };
-  const fieldDefs = ISSUE_FIELDS.map(f => toFieldDef(f, ff =>
+  // Both lists are derived from the field catalog (single source of truth) —
+  // any field added to ISSUE_FIELDS automatically appears in advanced filters
+  // and (when tagged with bulkGroup) in bulk update.
+  const dynamicOpts = { csms: allCsms.length ? allCsms : csms, ownerTeams: allOwnerTeams };
+  const resolveOpts = ff =>
     ff.filtersKey ? dynamicOpts[ff.filtersKey]
     : ff.ddKey    ? dd(ff.ddKey, [])
-    : undefined
-  ));
+    : undefined;
+  const fieldDefs = ISSUE_FIELDS.map(f => toFieldDef(f, resolveOpts));
 
   const bulkFieldDefs = [
-    { key: 'account_id',     label: 'Account',        type: 'account', group: 'Account' },
-    { key: 'status',         label: 'Status',         type: 'select', group: 'Status & Priority', opts: ['Open','In Progress','Deferred','Resolved','Closed'] },
-    { key: 'priority',       label: 'Priority',       type: 'select', group: 'Status & Priority', opts: ['P0','P1','P2','P3'] },
-    { key: 'owner_team',     label: 'Owner Team',     type: 'text',   group: 'Assignment' },
-    { key: 'csm',            label: 'CSM',            type: 'select', group: 'Assignment', opts: allCsms.length ? allCsms : csms },
-    { key: 'csm_lead',       label: 'CSM Lead',       type: 'text',   group: 'Assignment' },
-    { key: 'issue_type',     label: 'Issue Type',     type: 'select', group: 'Classification', opts: dd('issue_type', ['Configuration Failures','PS','Reports & Dashboards','Integration Failures','Platform Issue','Misc','Support']) },
-    { key: 'issue_sub_type', label: 'Issue Sub-Type', type: 'text',   group: 'Classification' },
-    { key: 'next_steps',     label: 'Next Steps',     type: 'text',   group: 'Notes' },
-    { key: 'closure_date',   label: 'Closure Date',   type: 'text',   group: 'Notes' },
+    { key: 'account_id', label: 'Account', type: 'account', group: 'Account' },
+    ...toBulkFieldDefs(ISSUE_FIELDS, resolveOpts),
   ];
 
   const clearAll = () => {

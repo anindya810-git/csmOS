@@ -8,7 +8,7 @@ import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
-import { ESCALATION_FIELDS, toFieldDef } from '../fieldCatalog';
+import { ESCALATION_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 
@@ -292,28 +292,17 @@ export default function EscalationsDashboard() {
   const allOwnerships = [...new Set(escalations.map(e => e.ownership).filter(Boolean))].sort();
   const allIssueTypes = [...new Set(escalations.map(e => e.issue_type).filter(Boolean))].sort();
 
-  // Derived from the field catalog (single source of truth) — any field added
-  // to ESCALATION_FIELDS automatically appears in the advanced filter list.
+  // Both lists are derived from the field catalog (single source of truth) —
+  // any field added to ESCALATION_FIELDS automatically appears in advanced
+  // filters and (when tagged with bulkGroup) in bulk update.
   const dynamicOpts = { csms: allCsms };
-  const fieldDefs = ESCALATION_FIELDS.map(f => toFieldDef(f, ff =>
+  const resolveOpts = ff =>
     ff.filtersKey ? dynamicOpts[ff.filtersKey]
     : ff.ddKey    ? (dropdownConfig[ff.ddKey] || []).map(o => o.value)
-    : undefined
-  ));
+    : undefined;
+  const fieldDefs = ESCALATION_FIELDS.map(f => toFieldDef(f, resolveOpts));
 
-  const bulkFieldDefs = [
-    { key: 'status',               label: 'Status',               type: 'select', group: 'Status & Resolution', opts: (dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']) },
-    { key: 'action_taken',         label: 'Action Taken',         type: 'text',   group: 'Status & Resolution' },
-    { key: 'eta',                  label: 'ETA',                  type: 'date',   group: 'Status & Resolution' },
-    { key: 'ownership',            label: 'Ownership',            type: 'select', group: 'Assignment', opts: (dropdownConfig.ownership || []).map(o => o.value) },
-    { key: 'ps_leader',            label: 'PS Leader',            type: 'select', group: 'Assignment', opts: (dropdownConfig.ps_leader || []).map(o => o.value) },
-    { key: 'escalated_by',         label: 'Escalated By',         type: 'select', group: 'Assignment', opts: (dropdownConfig.escalated_by || []).map(o => o.value) },
-    { key: 'trigger_reason',       label: 'Trigger Reason',       type: 'select', group: 'Classification', opts: (dropdownConfig.trigger_reason || []).map(o => o.value) },
-    { key: 'source_of_escalation', label: 'Source of Escalation', type: 'select', group: 'Classification', opts: (dropdownConfig.source_of_escalation || []).map(o => o.value) },
-    { key: 'issue_type',           label: 'Issue Type',           type: 'select', group: 'Classification', opts: (dropdownConfig.issue_type || []).map(o => o.value) },
-    { key: 'issue_sub_type',       label: 'Issue Sub-Type',       type: 'text',   group: 'Classification' },
-    { key: 'month',                label: 'Month',                type: 'select', group: 'Classification', opts: MONTHS },
-  ];
+  const bulkFieldDefs = toBulkFieldDefs(ESCALATION_FIELDS, resolveOpts);
 
   const setFilter = (key, val) => { setFilters(f => ({ ...f, [key]: val })); setPage(1); };
   useEffect(() => { setPage(1); }, [search, conditions]); // eslint-disable-line react-hooks/exhaustive-deps

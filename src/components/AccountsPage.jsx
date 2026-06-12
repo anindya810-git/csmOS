@@ -8,7 +8,7 @@ import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
-import { ACCOUNT_FIELDS, toFieldDef } from '../fieldCatalog';
+import { ACCOUNT_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 
@@ -192,68 +192,26 @@ export default function AccountsPage() {
   const [perPage,          setPerPage]          = useState(100);
 
   // Field definitions with dynamic options from filters
-  // Derived from the field catalog (single source of truth) — any field added
-  // to ACCOUNT_FIELDS automatically appears here. Plus a few virtual fields
-  // (POC across slots, escalation join) that aren't real account columns.
+  // Both lists are derived from the field catalog (single source of truth) —
+  // any field added to ACCOUNT_FIELDS automatically appears as a column, in
+  // advanced filters, and (when tagged with bulkGroup) in bulk update.
+  const resolveOpts = useCallback(ff =>
+    ff.filtersKey ? filters[ff.filtersKey]
+    : ff.ddKey    ? (ddConfig[ff.ddKey] || []).map(o => o.value)
+    : undefined, [filters, ddConfig]);
+
+  // Plus a few virtual filter fields (POC across slots, escalation join)
+  // that aren't real account columns.
   const fieldDefs = useMemo(() => [
-    ...ACCOUNT_FIELDS.map(f => toFieldDef(f, ff =>
-      ff.filtersKey ? filters[ff.filtersKey]
-      : ff.ddKey    ? (ddConfig[ff.ddKey] || []).map(o => o.value)
-      : undefined
-    )),
+    ...ACCOUNT_FIELDS.map(f => toFieldDef(f, resolveOpts)),
     { key: 'poc_name',          label: 'POC Name',           type: 'text' },
     { key: 'poc_email',         label: 'POC Email',          type: 'text' },
     { key: 'escalation_status', label: 'Escalation Status',  type: 'select', opts: ['Open','In Progress','Partly Resolved','Resolved'] },
     { key: 'escalation_date',   label: 'Escalation Date',    type: 'date' },
     { key: 'has_escalation',    label: 'Has Any Escalation', type: 'bool' },
-  ], [filters, ddConfig]);
+  ], [resolveOpts]);
 
-  const bulkFieldDefs = useMemo(() => {
-    const dd = (key, fb) => ddConfig[key]?.length ? ddConfig[key].map(o => o.value) : fb;
-    const yn = ['Yes', 'No'];
-    return [
-      // Account Info
-      { key: 'industry',     label: 'Industry',     type: 'text',   group: 'Account Info' },
-      { key: 'region',       label: 'Region',       type: 'select', group: 'Account Info', opts: filters.regions || [] },
-      { key: 'mrr_tier',     label: 'MRR Tier',     type: 'select', group: 'Account Info', opts: filters.tiers || [] },
-      { key: 'mrr',          label: 'MRR (₹)',      type: 'number', group: 'Account Info' },
-      // Team & Commercial
-      { key: 'csm',              label: 'CSM',              type: 'select', group: 'Team & Commercial', opts: filters.csms || [] },
-      { key: 'csm_lead',         label: 'CSM Lead',         type: 'select', group: 'Team & Commercial', opts: filters.csmLeads || [] },
-      { key: 'cp',               label: 'CP',               type: 'text',   group: 'Team & Commercial' },
-      { key: 'tam_assigned',     label: 'TAM Assigned',     type: 'select', group: 'Team & Commercial', opts: yn },
-      { key: 'sa_status',        label: 'SA Status',        type: 'text',   group: 'Team & Commercial' },
-      { key: 'billing_frequency',label: 'Billing Frequency',type: 'select', group: 'Team & Commercial', opts: dd('billing_frequency', ['Monthly','Quarterly','Half-Yearly','Annually']) },
-      { key: 'renewal_date',     label: 'Renewal Date',     type: 'date',   group: 'Team & Commercial' },
-      { key: 'renewal_status',   label: 'Renewal Status',   type: 'select', group: 'Team & Commercial', opts: dd('renewal_status', ['Renewed','At Risk','Lost','Pending']) },
-      { key: 'closure_eta',      label: 'Closure ETA',      type: 'date',   group: 'Team & Commercial' },
-      // Churn & Risk
-      { key: 'churn_status',     label: 'Churn Status',     type: 'select', group: 'Churn & Risk', opts: dd('churn_status', ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted']) },
-      { key: 'churn_reason',     label: 'Churn Reason',     type: 'text',   group: 'Churn & Risk' },
-      { key: 'contraction_risk', label: 'Contraction Risk', type: 'select', group: 'Churn & Risk', opts: dd('contraction_risk', ['High','Medium','Low','None']) },
-      { key: 'churn_risk',       label: 'Churn Risk',       type: 'select', group: 'Churn & Risk', opts: dd('churn_risk', ['High','Medium','Low','None']) },
-      { key: 'grr',              label: 'GRR (%)',           type: 'number', group: 'Churn & Risk' },
-      { key: 'nps',              label: 'NPS',               type: 'number', group: 'Churn & Risk' },
-      // RAG & Health
-      { key: 'rag_status',       label: 'RAG Status',       type: 'select', group: 'RAG & Health', opts: dd('rag_status', ['Green','Amber','Red']) },
-      { key: 'adoption_score',   label: 'Adoption Score',   type: 'number', group: 'RAG & Health' },
-      { key: 'stickiness_score', label: 'Stickiness Score', type: 'number', group: 'RAG & Health' },
-      { key: 'adoption_rate',    label: 'Adoption Rate (%)', type: 'number',group: 'RAG & Health' },
-      // Implementation
-      { key: 'implementation_status', label: 'Implementation Status', type: 'select', group: 'Implementation', opts: dd('implementation_status', ['Not Started','In Progress','Completed','On Hold']) },
-      { key: 'implementation_type',   label: 'Implementation Type',   type: 'text',   group: 'Implementation' },
-      { key: 'ps_engagement',         label: 'PS Engagement',          type: 'select', group: 'Implementation', opts: yn },
-      // Ring Fence
-      { key: 'account_understanding_session', label: 'Account Understanding Session', type: 'select', group: 'Ring Fence', opts: yn },
-      { key: 'new_csm_intro_done',            label: 'New CSM Intro Done',            type: 'select', group: 'Ring Fence', opts: yn },
-      { key: 'csm_escalation_matrix_shared',  label: 'CSM Escalation Matrix Shared',  type: 'select', group: 'Ring Fence', opts: yn },
-      { key: 'ring_fence_meeting_initiated',  label: 'Ring Fence Meeting Initiated',  type: 'select', group: 'Ring Fence', opts: yn },
-      { key: 'meeting_planned_date',          label: 'Meeting Planned Date',          type: 'date',   group: 'Ring Fence' },
-      { key: 'meeting_done',                  label: 'Meeting Done',                  type: 'select', group: 'Ring Fence', opts: yn },
-      { key: 'issue_mapping_sheet_updated',   label: 'Issue Mapping Sheet Updated',   type: 'select', group: 'Ring Fence', opts: yn },
-      { key: 'review_cadence_alignment',      label: 'Review Cadence Alignment',      type: 'select', group: 'Ring Fence', opts: yn },
-    ];
-  }, [filters, ddConfig]);
+  const bulkFieldDefs = useMemo(() => toBulkFieldDefs(ACCOUNT_FIELDS, resolveOpts), [resolveOpts]);
 
   useEffect(() => {
     axios.get('/api/accounts/filters').then(r => setFilters(r.data));
