@@ -1,0 +1,205 @@
+import supabase from './_utils/supabase.js';
+import { verifyToken } from './_utils/auth.js';
+import { setCors } from './_utils/cors.js';
+
+export default async function handler(req, res) {
+  setCors(res);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+
+  let user;
+  try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+
+  const { id } = req.query;
+
+  if (req.method === 'GET') {
+    const { status, priority, related_to, search } = req.query;
+    let query = supabase
+      .from('feature_requests')
+      .select('*, feature_request_links(*)')
+      .order('created_at', { ascending: false });
+    if (status)     query = query.eq('status', status);
+    if (priority)   query = query.eq('priority', priority);
+    if (related_to) query = query.eq('related_to', related_to);
+    if (search)     query = query.ilike('title', `%${search}%`);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data || []);
+  }
+
+  if (req.method === 'POST') {
+    const { title, description, related_to, priority, expected_rollout_date, link_ids } = req.body;
+    if (!title?.trim()) return res.status(400).json({ error: 'title required' });
+
+    const { data: fr, error: frErr } = await supabase
+      .from('feature_requests')
+      .insert({
+        title: title.trim(),
+        description: description || null,
+        related_to: related_to || null,
+        priority: priority || 'P2',
+        expected_rollout_date: expected_rollout_date || null,
+        status: 'pending',
+        created_by_id: user.id,
+        created_by: user.name,
+      })
+      .select()
+      .single();
+    if (frErr) return res.status(500).json({ error: frErr.message });
+
+    if (Array.isArray(link_ids) && link_ids.length > 0) {
+      const rows = await buildLinkRows(fr.id, link_ids);
+      if (rows.length > 0) await supabase.from('feature_request_links').insert(rows);
+    }
+
+    // Create approval task for configured default approver
+    const { data: config } = await supabase
+      .from('dropdown_config')
+      .select('value, parent_value')
+      .eq('field_name', 'fr_default_approver')
+      .limit(1)
+      .maybeSingle();
+
+    let taskId = null;
+    if (config?.value) {
+      const { data: approver } = await supabase
+        .from('users')
+        .select('id, name')
+        .eq('id', config.value)
+        .maybeSingle();
+      if (approver) {
+        const { data: task } = await supabase.from('tasks').insert({
+          task_subject: `Review Feature Request: ${fr.title}`,
+          task_description: `Priority: ${fr.priority}${fr.related_to ? ` | Related to: ${fr.related_to}` : ''}`,
+          nature_of_task: 'Feature Request',
+          due_date: null,
+          assigned_to_id: approver.id,
+          assigned_to: approver.name,
+          assigned_by_id: user.id,
+          assigned_by: user.name,
+          status: 'Open',
+        }).select('id').single();
+        taskId = task?.id || null;
+      }
+    }
+
+    if (taskId) {
+      await supabase.from('feature_requests').update({ approval_task_id: taskId }).eq('id', fr.id);
+    }
+
+    const { data: full } = await supabase
+      .from('feature_requests')
+      .select('*, feature_request_links(*)')
+      .eq('id', fr.id)
+      .single();
+    return res.status(201).json(full);
+  }
+
+  if (req.method === 'PUT') {
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const { data: existing } = await supabase
+      .from('feature_requests').select('*').eq('id', id).single();
+    if (!existing) return res.status(404).json({ error: 'Not found' });
+
+    const body = req.body;
+
+    if (body.action === 'approve') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+      const { data, error } = await supabase
+        .from('feature_requests')
+        .update({ status: 'approved', approved_by_id: user.id, approved_by: user.name, approved_at: new Date().toISOString(), rejection_reason: null })
+        .eq('id', id)
+        .select('*, feature_request_links(*)')
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      if (existing.approval_task_id) {
+        await supabase.from('tasks')
+          .update({ status: 'Completed', completed_at: new Date().toISOString() })
+          .eq('id', existing.approval_task_id);
+      }
+      return res.json(data);
+    }
+
+    if (body.action === 'reject') {
+      if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+      const { data, error } = await supabase
+        .from('feature_requests')
+        .update({ status: 'rejected', approved_by_id: user.id, approved_by: user.name, approved_at: new Date().toISOString(), rejection_reason: body.rejection_reason || null })
+        .eq('id', id)
+        .select('*, feature_request_links(*)')
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      if (existing.approval_task_id) {
+        await supabase.from('tasks')
+          .update({ status: 'Completed', completed_at: new Date().toISOString() })
+          .eq('id', existing.approval_task_id);
+      }
+      return res.json(data);
+    }
+
+    if (user.role !== 'admin') {
+      if (existing.created_by_id !== user.id) return res.status(403).json({ error: 'Access denied' });
+      if (existing.status !== 'pending') return res.status(403).json({ error: 'Cannot edit non-pending requests' });
+    }
+
+    const EDITABLE = ['title', 'description', 'related_to', 'priority', 'expected_rollout_date'];
+    const updates = { updated_at: new Date().toISOString() };
+    for (const f of EDITABLE) {
+      if (body[f] !== undefined) updates[f] = body[f] === '' ? null : body[f];
+    }
+
+    if (Array.isArray(body.link_ids)) {
+      await supabase.from('feature_request_links').delete().eq('feature_request_id', id);
+      if (body.link_ids.length > 0) {
+        const rows = await buildLinkRows(parseInt(id), body.link_ids);
+        if (rows.length > 0) await supabase.from('feature_request_links').insert(rows);
+      }
+    }
+
+    const { data, error } = await supabase
+      .from('feature_requests')
+      .update(updates)
+      .eq('id', id)
+      .select('*, feature_request_links(*)')
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
+  }
+
+  if (req.method === 'DELETE') {
+    if (!id) return res.status(400).json({ error: 'id required' });
+    if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    const { error } = await supabase.from('feature_requests').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ deleted: true });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+async function buildLinkRows(frId, linkIds) {
+  const rows = [];
+  for (const link of linkIds) {
+    if (link.type === 'escalation') {
+      const { data } = await supabase
+        .from('escalations').select('id, account_id, account_name').eq('id', link.id).maybeSingle();
+      if (!data) continue;
+      let mrr = null;
+      if (data.account_id) {
+        const { data: acct } = await supabase.from('accounts').select('mrr').eq('id', data.account_id).maybeSingle();
+        mrr = acct?.mrr ?? null;
+      }
+      rows.push({ feature_request_id: frId, link_type: 'escalation', linked_id: data.id, account_id: data.account_id, account_name: data.account_name, mrr });
+    } else if (link.type === 'issue') {
+      const { data } = await supabase
+        .from('issues').select('id, account_id, account_name').eq('id', link.id).maybeSingle();
+      if (!data) continue;
+      let mrr = null;
+      if (data.account_id) {
+        const { data: acct } = await supabase.from('accounts').select('mrr').eq('id', data.account_id).maybeSingle();
+        mrr = acct?.mrr ?? null;
+      }
+      rows.push({ feature_request_id: frId, link_type: 'issue', linked_id: data.id, account_id: data.account_id, account_name: data.account_name, mrr });
+    }
+  }
+  return rows;
+}
