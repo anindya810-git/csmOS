@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import axios from 'axios';
-import { createPortal } from 'react-dom';
+import DrillModal from './DrillModal';
+import AccountListModal from './AccountListModal';
 
 const PRIORITY_COLORS = {
   P0: 'bg-red-100 text-red-700',
@@ -15,6 +16,8 @@ const STATUS_COLORS = {
   rejected: 'bg-red-100 text-red-700',
 };
 
+// Combined MRR is deduped per account (an account may surface via several
+// linked escalations/issues, but its MRR is counted once).
 function frStats(fr) {
   const links = fr.feature_request_links || [];
   const accountMRR = {};
@@ -29,19 +32,6 @@ function frStats(fr) {
     escalations: links.filter(l => l.link_type === 'escalation').length,
     issues: links.filter(l => l.link_type === 'issue').length,
   };
-}
-
-function buildAccountRows(fr) {
-  const links = fr.feature_request_links || [];
-  const map = {};
-  links.forEach(l => {
-    if (!l.account_id) return;
-    if (!map[l.account_id]) map[l.account_id] = { name: l.account_name, mrr: 0, escalations: 0, issues: 0 };
-    map[l.account_id].mrr = Math.max(map[l.account_id].mrr, Number(l.mrr) || 0);
-    if (l.link_type === 'escalation') map[l.account_id].escalations++;
-    else if (l.link_type === 'issue') map[l.account_id].issues++;
-  });
-  return Object.values(map).sort((a, b) => b.mrr - a.mrr);
 }
 
 function fmtMRR(v) {
@@ -70,20 +60,60 @@ const TABS = [
   { key: 'rejected', label: 'Rejected' },
 ];
 
-const MODAL_TITLE = { accounts: 'Accounts', escalations: 'Escalations', issues: 'Issues' };
-
 export default function FeatureRequestReport() {
-  const [frs, setFrs]               = useState([]);
-  const [loading, setLoading]       = useState(true);
-  const [tab, setTab]               = useState('all');
-  const [detailModal, setDetailModal] = useState(null); // { fr, type: 'accounts'|'escalations'|'issues' }
+  const [frs, setFrs]                 = useState([]);
+  const [accounts, setAccounts]       = useState([]);
+  const [escalations, setEscalations] = useState([]);
+  const [issues, setIssues]           = useState([]);
+  const [loading, setLoading]         = useState(true);
+  const [tab, setTab]                 = useState('all');
+  const [drill, setDrill]             = useState(null);     // escalations / issues (Weekly-View style)
+  const [acctModal, setAcctModal]     = useState(null);     // accounts (Account-Mapping style)
 
   useEffect(() => {
-    axios.get('/api/feature-requests')
-      .then(r => setFrs(r.data || []))
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.all([
+      axios.get('/api/feature-requests'),
+      axios.get('/api/accounts'),
+      axios.get('/api/escalations'),
+      axios.get('/api/issues'),
+    ]).then(([frR, accR, escR, issR]) => {
+      setFrs(frR.data || []);
+      setAccounts(accR.data || []);
+      setEscalations(escR.data || []);
+      setIssues(issR.data || []);
+    }).catch(() => {}).finally(() => setLoading(false));
   }, []);
+
+  // Resolve a request's links into the full escalation / issue / account
+  // records so the drill-downs show the same detail as the source reports.
+  // Falls back to the link row if a record was since deleted.
+  const openEscalations = (fr) => {
+    const items = (fr.feature_request_links || [])
+      .filter(l => l.link_type === 'escalation')
+      .map(l => escalations.find(e => String(e.id) === String(l.linked_id))
+        || { id: l.linked_id, account_id: l.account_id, account_name: l.account_name, description: '', status: '' });
+    setDrill({ title: `Escalations — ${reqId(fr)}`, kind: 'escalation', items });
+  };
+
+  const openIssues = (fr) => {
+    const items = (fr.feature_request_links || [])
+      .filter(l => l.link_type === 'issue')
+      .map(l => issues.find(i => String(i.id) === String(l.linked_id))
+        || { id: l.linked_id, account_id: l.account_id, account_name: l.account_name, description: '', status: '' });
+    setDrill({ title: `Issues — ${reqId(fr)}`, kind: 'issue', items });
+  };
+
+  const openAccounts = (fr) => {
+    const seen = new Set();
+    const items = [];
+    for (const l of (fr.feature_request_links || [])) {
+      if (l.account_id == null || seen.has(l.account_id)) continue;
+      seen.add(l.account_id);
+      items.push(accounts.find(a => String(a.id) === String(l.account_id))
+        || { id: l.account_id, account_name: l.account_name, mrr: l.mrr });
+    }
+    setAcctModal({ title: `Accounts — ${reqId(fr)}`, accounts: items });
+  };
 
   const summary  = frs.reduce((acc, fr) => { acc[fr.status] = (acc[fr.status] || 0) + 1; return acc; }, {});
   const filtered = tab === 'all' ? frs : frs.filter(f => f.status === tab);
@@ -154,18 +184,18 @@ export default function FeatureRequestReport() {
                       <td className="px-4 py-3 text-gray-600 text-xs">{fr.related_to || '—'}</td>
                       <td className="px-4 py-3 text-right">
                         {s.accounts > 0
-                          ? <button onClick={() => setDetailModal({ fr, type: 'accounts' })} className="font-medium text-brand-600 hover:text-brand-800 hover:underline transition">{s.accounts}</button>
+                          ? <button onClick={() => openAccounts(fr)} className="font-medium text-brand-600 hover:text-brand-800 hover:underline transition">{s.accounts}</button>
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-gray-800">{fmtMRR(s.mrr)}</td>
                       <td className="px-4 py-3 text-right">
                         {s.escalations > 0
-                          ? <button onClick={() => setDetailModal({ fr, type: 'escalations' })} className="font-medium text-orange-600 hover:text-orange-800 hover:underline transition">{s.escalations}</button>
+                          ? <button onClick={() => openEscalations(fr)} className="font-medium text-orange-600 hover:text-orange-800 hover:underline transition">{s.escalations}</button>
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {s.issues > 0
-                          ? <button onClick={() => setDetailModal({ fr, type: 'issues' })} className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition">{s.issues}</button>
+                          ? <button onClick={() => openIssues(fr)} className="font-medium text-blue-600 hover:text-blue-800 hover:underline transition">{s.issues}</button>
                           : <span className="text-gray-300">—</span>}
                       </td>
                       <td className="px-4 py-3 text-gray-600 text-xs">{fmtDate(fr.expected_rollout_date)}</td>
@@ -178,58 +208,8 @@ export default function FeatureRequestReport() {
         </div>
       )}
 
-      {/* Detail modal */}
-      {detailModal && createPortal(
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" onClick={() => setDetailModal(null)}>
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
-              <div className="min-w-0">
-                <h3 className="text-base font-semibold text-gray-900">{MODAL_TITLE[detailModal.type]}</h3>
-                <p className="text-xs text-gray-400 truncate mt-0.5">{reqId(detailModal.fr)} — {detailModal.fr.title}</p>
-              </div>
-              <button onClick={() => setDetailModal(null)} className="shrink-0 ml-3 p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            <div className="overflow-y-auto divide-y divide-gray-50">
-              {(() => {
-                const { fr, type } = detailModal;
-                if (type === 'accounts') {
-                  const rows = buildAccountRows(fr);
-                  if (rows.length === 0) return <p className="px-5 py-8 text-center text-gray-400 text-sm">No accounts linked.</p>;
-                  return rows.map((a, i) => (
-                    <div key={i} className="flex items-center justify-between px-5 py-3">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-gray-900">{a.name || 'Unknown'}</p>
-                        <p className="text-xs text-gray-400">
-                          {[
-                            a.escalations > 0 && `${a.escalations} escalation${a.escalations > 1 ? 's' : ''}`,
-                            a.issues > 0 && `${a.issues} issue${a.issues > 1 ? 's' : ''}`,
-                          ].filter(Boolean).join(' · ')}
-                        </p>
-                      </div>
-                      <p className="text-sm font-semibold text-gray-700 shrink-0 ml-4">{fmtMRR(a.mrr)}</p>
-                    </div>
-                  ));
-                }
-                const linkType = type === 'escalations' ? 'escalation' : 'issue';
-                const rows = (fr.feature_request_links || []).filter(l => l.link_type === linkType);
-                if (rows.length === 0) return <p className="px-5 py-8 text-center text-gray-400 text-sm">None linked.</p>;
-                return rows.map((l, i) => (
-                  <div key={i} className="flex items-center justify-between px-5 py-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-gray-900">#{l.linked_id}</p>
-                      <p className="text-xs text-gray-400">{l.account_name || '—'}</p>
-                    </div>
-                    <p className="text-sm font-semibold text-gray-700 shrink-0 ml-4">{fmtMRR(l.mrr)}</p>
-                  </div>
-                ));
-              })()}
-            </div>
-          </div>
-        </div>,
-        document.body
-      )}
+      <DrillModal drill={drill} onClose={() => setDrill(null)} />
+      {acctModal && <AccountListModal title={acctModal.title} accounts={acctModal.accounts} onClose={() => setAcctModal(null)} />}
     </div>
   );
 }

@@ -15,6 +15,8 @@ import TasksPage from '../src/components/TasksPage';
 import AccountsPage from '../src/components/AccountsPage';
 import FeatureRequestsPage from '../src/components/FeatureRequestsPage';
 import FeatureRequestReport from '../src/components/FeatureRequestReport';
+import WeeklyEscalationsDashboard from '../src/components/WeeklyEscalationsDashboard';
+import AccountMappingReport from '../src/components/AccountMappingReport';
 
 const FIXTURES = {
   '/api/auth/me': { id: 1, email: 'admin@test.com', role: 'admin', name: 'Admin' },
@@ -59,6 +61,10 @@ const FIXTURES = {
   ],
   '/api/dropdown-config': {},
   '/api/users': [{ id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin' }],
+  '/api/admin/users': [
+    { id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin' },
+    { id: 2, email: 'csm@test.com', name: 'CSM One', csm_name: 'CSM One', role: 'csm' },
+  ],
 };
 
 const unknownUrls = [];
@@ -125,6 +131,8 @@ export async function run() {
   failed = (await mountOne('AccountsPage', AccountsPage)) || failed;
   failed = (await mountOne('FeatureRequestsPage', FeatureRequestsPage)) || failed;
   failed = (await mountOne('FeatureRequestReport', FeatureRequestReport)) || failed;
+  failed = (await mountOne('WeeklyEscalationsDashboard', WeeklyEscalationsDashboard)) || failed;
+  failed = (await mountOne('AccountMappingReport', AccountMappingReport)) || failed;
   if (unknownUrls.length) console.log('\nUnmocked URLs:', [...new Set(unknownUrls)].join(', '));
   return failed;
 }
