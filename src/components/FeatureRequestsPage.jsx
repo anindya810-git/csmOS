@@ -61,13 +61,26 @@ function reqId(fr) {
   return fr.request_id || `FR-${String(fr.id).padStart(5, '0')}`;
 }
 
-function SectionLabel({ label, count }) {
+function CollapsibleSection({ label, count, defaultOpen = false, children }) {
+  const [open, setOpen] = useState(defaultOpen);
   return (
-    <div className="flex items-center gap-2 mb-2 pb-1.5 border-b border-gray-100">
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</p>
-      {count != null && (
-        <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">{count}</span>
-      )}
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between gap-2 mb-2 pb-1.5 border-b border-gray-100 group"
+      >
+        <span className="flex items-center gap-2">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide group-hover:text-gray-700 transition">{label}</span>
+          {count != null && (
+            <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full font-medium">{count}</span>
+          )}
+        </span>
+        <svg className={`w-3.5 h-3.5 text-gray-400 transition-transform ${open ? '' : '-rotate-90'}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && children}
     </div>
   );
 }
@@ -574,8 +587,7 @@ export default function FeatureRequestsPage() {
               {editFr && (
                 <>
                   {/* Escalations */}
-                  <div>
-                    <SectionLabel label="Escalations" count={resolvedEscalations.length} />
+                  <CollapsibleSection label="Escalations" count={resolvedEscalations.length}>
                     {resolvedEscalations.length === 0 ? (
                       <p className="text-xs text-gray-400 py-1">No escalations linked yet.</p>
                     ) : (
@@ -588,11 +600,10 @@ export default function FeatureRequestsPage() {
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                       Add from Escalations page
                     </button>
-                  </div>
+                  </CollapsibleSection>
 
                   {/* Issues */}
-                  <div>
-                    <SectionLabel label="Issues" count={resolvedIssues.length} />
+                  <CollapsibleSection label="Issues" count={resolvedIssues.length}>
                     {resolvedIssues.length === 0 ? (
                       <p className="text-xs text-gray-400 py-1">No issues linked yet.</p>
                     ) : (
@@ -605,17 +616,16 @@ export default function FeatureRequestsPage() {
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                       Add from Issues page
                     </button>
-                  </div>
+                  </CollapsibleSection>
 
                   {/* Accounts */}
                   {resolvedAccounts.length > 0 && (
-                    <div>
-                      <SectionLabel label="Accounts" count={resolvedAccounts.length} />
+                    <CollapsibleSection label="Accounts" count={resolvedAccounts.length}>
                       <p className="text-xs text-gray-400 mb-2">Auto-added from linked escalations and issues.</p>
                       <div className="space-y-1.5">
                         {resolvedAccounts.map(a => <AccRow key={a.id} a={a} />)}
                       </div>
-                    </div>
+                    </CollapsibleSection>
                   )}
                 </>
               )}
@@ -666,8 +676,7 @@ export default function FeatureRequestsPage() {
               </div>
 
               {/* Escalations */}
-              <div>
-                <SectionLabel label="Escalations" count={resolvedEscalations.length} />
+              <CollapsibleSection label="Escalations" count={resolvedEscalations.length}>
                 {resolvedEscalations.length === 0 ? (
                   <p className="text-xs text-gray-400 py-1">No escalations linked.</p>
                 ) : (
@@ -675,11 +684,10 @@ export default function FeatureRequestsPage() {
                     {resolvedEscalations.map(e => <EscRow key={e.id} e={e} removable={false} />)}
                   </div>
                 )}
-              </div>
+              </CollapsibleSection>
 
               {/* Issues */}
-              <div>
-                <SectionLabel label="Issues" count={resolvedIssues.length} />
+              <CollapsibleSection label="Issues" count={resolvedIssues.length}>
                 {resolvedIssues.length === 0 ? (
                   <p className="text-xs text-gray-400 py-1">No issues linked.</p>
                 ) : (
@@ -687,11 +695,10 @@ export default function FeatureRequestsPage() {
                     {resolvedIssues.map(i => <IssRow key={i.id} i={i} removable={false} />)}
                   </div>
                 )}
-              </div>
+              </CollapsibleSection>
 
               {/* Accounts */}
-              <div>
-                <SectionLabel label="Accounts" count={resolvedAccounts.length} />
+              <CollapsibleSection label="Accounts" count={resolvedAccounts.length}>
                 {resolvedAccounts.length === 0 ? (
                   <p className="text-xs text-gray-400 py-1">No accounts linked.</p>
                 ) : (
@@ -699,7 +706,7 @@ export default function FeatureRequestsPage() {
                     {resolvedAccounts.map(a => <AccRow key={a.id} a={a} />)}
                   </div>
                 )}
-              </div>
+              </CollapsibleSection>
 
               {/* AI recommendation */}
               <AiPanel
