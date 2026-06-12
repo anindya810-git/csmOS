@@ -11,6 +11,7 @@ import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import LastEdited from './LastEdited';
+import AiPanel from './AiPanel';
 import { ISSUE_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
@@ -682,6 +683,16 @@ export default function IssuesDashboard() {
         </div>
       )}
 
+      {/* AI summary of the issues currently in view (post-filter) */}
+      {!loading && displayed.length > 0 && (
+        <AiPanel
+          section="issues_overview"
+          title="AI Issues Summary (in view)"
+          getPayload={() => ({ issues: displayed })}
+          hint="Summarizes the issues currently in view, after filters. Click Generate."
+        />
+      )}
+
       {/* Table */}
       {loading ? (
         <div className="flex items-center justify-center h-40">
@@ -796,6 +807,17 @@ export default function IssuesDashboard() {
                                     <LastEdited by={issue.updated_by} at={issue.updated_at} />
                                   </div>
                                 )}
+                                <div className="sm:col-span-2">
+                                  <AiPanel
+                                    section="next_steps"
+                                    title="AI Recommended Next Steps"
+                                    compact
+                                    getPayload={() => ({ kind: 'issue', item: issue })}
+                                    initialText={issue.ai_next_steps}
+                                    initialAt={issue.ai_next_steps_at}
+                                    onGenerated={(t, at) => setIssues(prev => prev.map(x => x.id === issue.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
+                                  />
+                                </div>
                               </div>
                             </td>
                           </tr>

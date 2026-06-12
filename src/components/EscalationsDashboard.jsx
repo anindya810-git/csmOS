@@ -10,6 +10,7 @@ import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
 import LastEdited from './LastEdited';
+import AiPanel from './AiPanel';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { ESCALATION_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
@@ -736,6 +737,16 @@ export default function EscalationsDashboard() {
         </div>
       )}
 
+      {/* AI summary of the escalations currently in view (post-filter) */}
+      {!loading && displayed.length > 0 && (
+        <AiPanel
+          section="issues_overview"
+          title="AI Escalations Summary (in view)"
+          getPayload={() => ({ escalations: displayed })}
+          hint="Summarizes the escalations currently in view, after filters. Click Generate."
+        />
+      )}
+
       {/* Table */}
       {loading ? (
         <div className="flex items-center justify-center h-40">
@@ -865,6 +876,17 @@ export default function EscalationsDashboard() {
                                   <LastEdited by={e.updated_by} at={e.updated_at} />
                                 </div>
                               )}
+                              <div className="sm:col-span-2">
+                                <AiPanel
+                                  section="next_steps"
+                                  title="AI Recommended Next Steps"
+                                  compact
+                                  getPayload={() => ({ kind: 'escalation', item: e })}
+                                  initialText={e.ai_next_steps}
+                                  initialAt={e.ai_next_steps_at}
+                                  onGenerated={(t, at) => setEscalations(prev => prev.map(x => x.id === e.id ? { ...x, ai_next_steps: t, ai_next_steps_at: at } : x))}
+                                />
+                              </div>
                             </div>
                           </td>
                         </tr>

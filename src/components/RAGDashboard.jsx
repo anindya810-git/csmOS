@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import AiPanel from './AiPanel';
 
 const RAG_ORDER  = ['Red', 'Amber', 'Green'];
 const RAG_CONFIG = {
@@ -136,6 +137,17 @@ export default function RAGDashboard() {
                 <span className={`w-3 h-3 rounded-full ${cfg.dot}`} />
                 <h2 className="text-sm font-bold text-gray-700 uppercase tracking-wide">{rag}</h2>
                 <span className="text-xs text-gray-400">({items.length})</span>
+              </div>
+
+              {/* AI analysis for this RAG band */}
+              <div className="mb-3">
+                <AiPanel
+                  section="rag"
+                  title={`AI Analysis — ${rag}`}
+                  compact
+                  getPayload={() => ({ rag })}
+                  hint={`Analyzes the ${rag} accounts (drivers, MRR concentration, recommended plays). Click Generate.`}
+                />
               </div>
 
               <div className="space-y-2">

@@ -8,6 +8,7 @@ import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import DrillModal from './DrillModal';
 import AccountListModal from './AccountListModal';
+import AiPanel from './AiPanel';
 
 const PRIORITY_COLORS = {
   P0: 'bg-red-100 text-red-700',
@@ -699,6 +700,20 @@ export default function FeatureRequestsPage() {
                   </div>
                 )}
               </div>
+
+              {/* AI recommendation */}
+              <AiPanel
+                section="feature_request"
+                title="AI Recommendation"
+                getPayload={() => ({ feature_request_id: reviewFr.id })}
+                initialText={reviewFr.ai_recommendation}
+                initialAt={reviewFr.ai_recommendation_at}
+                onGenerated={(t, at) => {
+                  setReviewFr(prev => prev ? { ...prev, ai_recommendation: t, ai_recommendation_at: at } : prev);
+                  setFrs(prev => prev.map(x => x.id === reviewFr.id ? { ...x, ai_recommendation: t, ai_recommendation_at: at } : x));
+                }}
+                hint="Recommends whether to take this up, a priority and a suggested ETA from the linked accounts, escalations and issues."
+              />
 
               {/* Rejection reason */}
               <div>
