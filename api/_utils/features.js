@@ -29,3 +29,20 @@ export async function getOrgFeatures(orgId) {
 export function featureEnabled(features, key) {
   return !features || features[key] !== false;
 }
+
+// Org metadata for the app shell (features + branding) in a single round-trip.
+// select('*') so a not-yet-migrated column (features / logo_url) never errors
+// the whole query — missing fields simply come back undefined.
+export async function getOrgMeta(orgId) {
+  if (!orgId) return { features: {}, logo_url: null, org_name: null };
+  const { data } = await supabase
+    .from('organizations')
+    .select('*')
+    .eq('id', orgId)
+    .maybeSingle();
+  return {
+    features: (data && data.features) || {},
+    logo_url: (data && data.logo_url) || null,
+    org_name: (data && data.name) || null,
+  };
+}

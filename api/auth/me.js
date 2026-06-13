@@ -1,7 +1,7 @@
 import supabase from '../_utils/supabase.js';
 import { verifyToken } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
-import { getOrgFeatures } from '../_utils/features.js';
+import { getOrgMeta } from '../_utils/features.js';
 
 export default async function handler(req, res) {
   setCors(res);
@@ -13,11 +13,12 @@ export default async function handler(req, res) {
 
   // Impersonation tokens are fully self-contained — no DB lookup needed.
   if (decoded.impersonated) {
+    const meta = await getOrgMeta(decoded.org_id);
     return res.json({
       id: decoded.id, name: decoded.name, email: decoded.email,
       role: decoded.role, csm_name: decoded.csm_name,
       org_id: decoded.org_id, impersonated_by: decoded.impersonated_by,
-      features: await getOrgFeatures(decoded.org_id),
+      features: meta.features, org_logo_url: meta.logo_url, org_name: meta.org_name,
     });
   }
 
@@ -56,6 +57,9 @@ export default async function handler(req, res) {
   if (!user) return res.status(401).json({ error: 'User not found' });
   // Deactivated mid-session → end the session (AuthContext drops the token on 403).
   if (user.is_active === false) return res.status(403).json({ error: 'Account deactivated' });
-  user.features = await getOrgFeatures(user.org_id);
+  const meta = await getOrgMeta(user.org_id);
+  user.features = meta.features;
+  user.org_logo_url = meta.logo_url;
+  user.org_name = meta.org_name;
   res.json(user);
 }

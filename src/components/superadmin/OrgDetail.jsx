@@ -21,6 +21,8 @@ export default function OrgDetail() {
   const [error, setError]   = useState('');
   const [featForm, setFeatForm] = useState({});
   const [featSaving, setFeatSaving] = useState(false);
+  const [logoBusy, setLogoBusy] = useState(false);
+  const [logoError, setLogoError] = useState('');
 
   useEffect(() => { fetchOrg(); }, [id]);
 
@@ -47,6 +49,34 @@ export default function OrgDetail() {
       setFeatForm(data.features || featForm);
     } catch (err) { setError(err?.response?.data?.error || 'Failed to save features'); }
     finally { setFeatSaving(false); }
+  }
+
+  function onLogoFile(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // allow re-selecting the same file
+    if (!file) return;
+    setLogoError('');
+    if (!file.type.startsWith('image/')) { setLogoError('Choose an image file (PNG, JPG or SVG).'); return; }
+    if (file.size > 512 * 1024) { setLogoError('Logo must be under 512 KB.'); return; }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      setLogoBusy(true);
+      try {
+        const { data } = await api.post(`/api/superadmin?resource=orgs&id=${id}&action=logo`, { logo_data: reader.result });
+        setOrg(o => ({ ...o, ...data }));
+      } catch (err) { setLogoError(err?.response?.data?.error || 'Upload failed'); }
+      finally { setLogoBusy(false); }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  async function removeLogo() {
+    setLogoBusy(true); setLogoError('');
+    try {
+      const { data } = await api.delete(`/api/superadmin?resource=orgs&id=${id}&action=logo`);
+      setOrg(o => ({ ...o, ...data }));
+    } catch (err) { setLogoError(err?.response?.data?.error || 'Failed to remove'); }
+    finally { setLogoBusy(false); }
   }
 
   async function save() {
@@ -126,6 +156,33 @@ export default function OrgDetail() {
             {sub && <p className="text-xs text-gray-600">{sub}</p>}
           </div>
         ))}
+      </div>
+
+      {/* Branding / logo */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Branding</h2>
+            <p className="text-xs text-gray-500 mt-0.5">This logo replaces the Custally logo in the app header for this org. PNG/JPG/SVG, under 512 KB.</p>
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-4 flex-wrap">
+          <div className="h-14 w-44 rounded-xl bg-white border border-gray-700 flex items-center justify-center overflow-hidden shrink-0">
+            {org.logo_url
+              ? <img src={org.logo_url} alt={`${org.name} logo`} className="max-h-10 max-w-[150px] object-contain" />
+              : <span className="text-xs text-gray-400">No logo</span>}
+          </div>
+          <label className={`px-4 py-2 rounded-xl text-sm font-semibold transition cursor-pointer ${logoBusy ? 'bg-gray-700 text-gray-400' : 'bg-brand-600 hover:bg-brand-700 text-white'}`}>
+            {logoBusy ? 'Working…' : (org.logo_url ? 'Replace logo' : 'Upload logo')}
+            <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" disabled={logoBusy} onChange={onLogoFile} />
+          </label>
+          {org.logo_url && (
+            <button onClick={removeLogo} disabled={logoBusy} className="px-4 py-2 rounded-xl text-sm font-medium text-red-300 border border-red-800 bg-red-900/40 hover:bg-red-900 transition disabled:opacity-50">
+              Remove
+            </button>
+          )}
+        </div>
+        {logoError && <p className="text-xs text-red-400 mt-3">{logoError}</p>}
       </div>
 
       {/* Edit form */}

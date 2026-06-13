@@ -22,10 +22,58 @@ export default async function handler(req, res) {
 
   const { resource } = req.query;
 
+  if (resource === 'orgs' && req.query.action === 'logo') return handleOrgLogo(req, res, admin);
   if (resource === 'orgs') return handleOrgs(req, res, admin);
   if (resource === 'stats') return handleStats(req, res);
 
   return res.status(404).json({ error: 'Not found' });
+}
+
+// Upload (or remove) an org's logo. POST takes a base64 data URL; we push the
+// bytes to the public `org-logos` Storage bucket and save the public URL.
+async function handleOrgLogo(req, res, admin) {
+  const { id } = req.query;
+  if (!id) return res.status(400).json({ error: 'id required' });
+
+  if (req.method === 'DELETE') {
+    const { data, error } = await supabase
+      .from('organizations')
+      .update({ logo_url: null, updated_at: new Date().toISOString() })
+      .eq('id', id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
+  }
+
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { logo_data } = req.body || {};
+  const match = typeof logo_data === 'string' && logo_data.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+  if (!match) return res.status(400).json({ error: 'A valid image is required' });
+
+  const contentType = match[1];
+  const buffer = Buffer.from(match[2], 'base64');
+  if (buffer.length > 1024 * 1024) return res.status(413).json({ error: 'Image too large (max 1 MB)' });
+
+  const ext = contentType.split('/')[1].replace('svg+xml', 'svg').replace('jpeg', 'jpg');
+  const path = `org-${id}/logo-${Date.now()}.${ext}`;
+
+  // Create the bucket on first use (idempotent — a second call just errors,
+  // which we ignore) and upload.
+  await supabase.storage.createBucket('org-logos', { public: true });
+  const { error: upErr } = await supabase.storage
+    .from('org-logos')
+    .upload(path, buffer, { contentType, upsert: true });
+  if (upErr) return res.status(500).json({ error: `Upload failed: ${upErr.message}` });
+
+  const { data: pub } = supabase.storage.from('org-logos').getPublicUrl(path);
+  const logo_url = pub?.publicUrl || null;
+
+  const { data, error } = await supabase
+    .from('organizations')
+    .update({ logo_url, updated_at: new Date().toISOString() })
+    .eq('id', id).select().single();
+  if (error) return res.status(500).json({ error: error.message });
+  return res.json(data);
 }
 
 async function handleLogin(req, res) {

@@ -55,17 +55,23 @@ export default function Layout() {
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
           <div className="flex items-center gap-6">
             <a href="/accounts" className="flex items-center gap-2 text-decoration-none no-underline">
-              <svg viewBox="0 0 64 64" className="w-7 h-7">
-                <defs>
-                  <linearGradient id="nav-logo-g" x1="0" y1="0" x2="1" y2="1">
-                    <stop offset="0" stopColor="#0EA47E" />
-                    <stop offset="1" stopColor="#2DD4A7" />
-                  </linearGradient>
-                </defs>
-                <path d="M47 20 A18 18 0 1 0 47 44" fill="none" stroke="url(#nav-logo-g)" strokeWidth="10" strokeLinecap="round" />
-                <polygon points="49,24.5 51.55,29.45 56.5,32 51.55,34.55 49,39.5 46.45,34.55 41.5,32 46.45,29.45" fill="#2DD4A7" />
-              </svg>
-              <span className="font-bold text-gray-900 text-lg tracking-tight">Cust<span className="text-brand-600">ally</span></span>
+              {user?.org_logo_url ? (
+                <img src={user.org_logo_url} alt={user.org_name || 'Logo'} className="h-8 w-auto max-w-[170px] object-contain" />
+              ) : (
+                <>
+                  <svg viewBox="0 0 64 64" className="w-7 h-7">
+                    <defs>
+                      <linearGradient id="nav-logo-g" x1="0" y1="0" x2="1" y2="1">
+                        <stop offset="0" stopColor="#0EA47E" />
+                        <stop offset="1" stopColor="#2DD4A7" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M47 20 A18 18 0 1 0 47 44" fill="none" stroke="url(#nav-logo-g)" strokeWidth="10" strokeLinecap="round" />
+                    <polygon points="49,24.5 51.55,29.45 56.5,32 51.55,34.55 49,39.5 46.45,34.55 41.5,32 46.45,29.45" fill="#2DD4A7" />
+                  </svg>
+                  <span className="font-bold text-gray-900 text-lg tracking-tight">Cust<span className="text-brand-600">ally</span></span>
+                </>
+              )}
             </a>
             <nav className="hidden sm:flex items-center gap-1">
               {NAV_ITEMS.map(item => (

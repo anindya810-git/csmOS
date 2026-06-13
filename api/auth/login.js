@@ -30,23 +30,22 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Your account has been deactivated. Contact your administrator.' });
 
   const orgId = user.org_id || 1;
-  let orgName = null;
-  let features = {};
 
-  // organizations table may not exist yet (pre-migration) — when it does,
-  // check for suspension and read feature entitlements. maybeSingle returns
-  // data:null on error, which is safe.
+  // organizations table may not exist yet (pre-migration) — when it does, read
+  // suspension, features and branding. select('*') so a not-yet-migrated column
+  // never errors the query; maybeSingle returns data:null on error, which is safe.
   const { data: org } = await supabase
     .from('organizations')
-    .select('billing_status, name, features')
+    .select('*')
     .eq('id', orgId)
     .maybeSingle();
 
   if (org?.billing_status === 'suspended') {
     return res.status(403).json({ error: 'Account suspended. Contact your administrator.' });
   }
-  orgName = org?.name || null;
-  features = org?.features || {};
+  const orgName = org?.name || null;
+  const features = org?.features || {};
+  const logoUrl = org?.logo_url || null;
 
   const token = signToken({
     id: user.id, email: user.email, role: user.role,
@@ -54,6 +53,6 @@ export default async function handler(req, res) {
   });
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role, csm_name: user.csm_name, org_id: orgId, org_name: orgName, features },
+    user: { id: user.id, name: user.name, email: user.email, role: user.role, csm_name: user.csm_name, org_id: orgId, org_name: orgName, org_logo_url: logoUrl, features },
   });
 }
