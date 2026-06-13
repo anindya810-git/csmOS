@@ -112,20 +112,28 @@ async function handleOrgs(req, res, admin) {
     const orgIds = (orgs || []).map(o => o.id);
     if (!orgIds.length) return res.json([]);
 
-    const [{ data: userRows }, { data: acctRows }] = await Promise.all([
+    const [{ data: userRows }, { data: acctRows }, { data: issueRows }] = await Promise.all([
       supabase.from('users').select('org_id').in('org_id', orgIds),
       supabase.from('accounts').select('org_id').in('org_id', orgIds),
+      supabase.from('issues').select('org_id').in('org_id', orgIds),
     ]);
 
     const userMap = {};
     const acctMap = {};
+    const issueMap = {};
     (userRows || []).forEach(u => { userMap[u.org_id] = (userMap[u.org_id] || 0) + 1; });
     (acctRows || []).forEach(a => { acctMap[a.org_id] = (acctMap[a.org_id] || 0) + 1; });
+    (issueRows || []).forEach(i => { issueMap[i.org_id] = (issueMap[i.org_id] || 0) + 1; });
 
     return res.json((orgs || []).map(o => ({
       ...o,
       user_count: userMap[o.id] || 0,
       account_count: acctMap[o.id] || 0,
+      _stats: {
+        users: userMap[o.id] || 0,
+        accounts: acctMap[o.id] || 0,
+        issues: issueMap[o.id] || 0,
+      },
     })));
   }
 
