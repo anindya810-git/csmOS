@@ -9,7 +9,7 @@ const icon = (d) => (
 );
 
 const NAV_ITEMS = [
-  { to: '/',            end: true,  label: 'Dashboard',   d: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
+  { to: '/dashboard',   end: true,  label: 'Dashboard',   d: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6' },
   { to: '/accounts',   end: false, label: 'Accounts',    d: 'M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4' },
   { to: '/escalations',end: false, label: 'Escalations', d: 'M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z' },
   { to: '/issues',      end: false, label: 'Issues',      d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01' },
@@ -54,7 +54,19 @@ export default function Layout() {
       <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
           <div className="flex items-center gap-6">
-            <span className="font-bold text-brand-700 text-lg tracking-tight">csmOS</span>
+            <a href="/accounts" className="flex items-center gap-2 text-decoration-none no-underline">
+              <svg viewBox="0 0 64 64" className="w-7 h-7">
+                <defs>
+                  <linearGradient id="nav-logo-g" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#0EA47E" />
+                    <stop offset="1" stopColor="#2DD4A7" />
+                  </linearGradient>
+                </defs>
+                <path d="M47 20 A18 18 0 1 0 47 44" fill="none" stroke="url(#nav-logo-g)" strokeWidth="10" strokeLinecap="round" />
+                <polygon points="49,24.5 51.55,29.45 56.5,32 51.55,34.55 49,39.5 46.45,34.55 41.5,32 46.45,29.45" fill="#2DD4A7" />
+              </svg>
+              <span className="font-bold text-gray-900 text-lg tracking-tight">Cust<span className="text-brand-600">ally</span></span>
+            </a>
             <nav className="hidden sm:flex items-center gap-1">
               {NAV_ITEMS.map(item => (
                 <NavLink key={item.to} to={item.to} end={item.end} className={topNavClass}>

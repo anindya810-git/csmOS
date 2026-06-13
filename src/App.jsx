@@ -8,6 +8,7 @@ import { SuperadminAuthProvider, useSuperadminAuth } from './context/SuperadminA
 import Login from './components/Login';
 import Layout from './components/Layout';
 import ReportsPage from './components/ReportsPage';
+import LandingPage from './components/LandingPage';
 
 // Route-level code splitting: each page chunk loads on demand so the initial
 // bundle stays small (e.g. recharts only ships with the pages that chart).
@@ -46,6 +47,16 @@ function ProtectedRoute({ children }) {
     </div>
   );
   return user ? children : <Navigate to="/login" replace />;
+}
+
+function PublicRootRoute() {
+  const { user, loading } = useAuth();
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+  return user ? <Navigate to="/accounts" replace /> : <LandingPage />;
 }
 
 function AdminRoute({ children }) {
@@ -90,7 +101,10 @@ function AppRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
-      <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      {/* Public landing page at root */}
+      <Route path="/" element={<PublicRootRoute />} />
+
+      <Route path="/login" element={user ? <Navigate to="/accounts" replace /> : <Login />} />
 
       {/* Impersonation entry point — stores the short-lived token then redirects to / */}
       <Route path="/superadmin/enter" element={<ImpersonationEntry />} />
@@ -104,7 +118,7 @@ function AppRoutes() {
       </Route>
 
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-        <Route index element={<Dashboard />} />
+        <Route path="dashboard" element={<Dashboard />} />
         <Route path="accounts" element={<AccountsPage />} />
         <Route path="accounts/:id" element={<AccountDetail />} />
         <Route path="accounts/:id/edit" element={<AccountEdit />} />

@@ -2,7 +2,48 @@
 @tailwind components;
 @tailwind utilities;
 
-body { font-family: 'Inter', sans-serif; background: #f8fafc; -webkit-tap-highlight-color: transparent; }
+/* Custally brand CSS variables — used by the landing page and globally */
+:root {
+  --brand:        #0EA47E;
+  --brand-deep:   #0A7C5E;
+  --brand-bright: #2DD4A7;
+  --brand-ink:    #06251D;
+  --brand-tint:   #ECFBF5;
+  --brand-tint-2: #D6F5E9;
+  --ink:          #0C1A16;
+  --slate-800:    #1B2A24;
+  --slate-700:    #33433D;
+  --slate-600:    #4C5B54;
+  --slate-500:    #647168;
+  --slate-400:    #8A958E;
+  --line:         #E5EBE7;
+  --line-soft:    #EEF3F0;
+  --paper:        #FFFFFF;
+  --paper-2:      #F5F8F6;
+  --paper-3:      #EFF4F1;
+  --r-sm: 8px; --r-md: 14px; --r-lg: 20px; --r-xl: 28px; --r-pill: 999px;
+  --sh-sm:    0 1px 2px rgba(12,26,22,.06), 0 1px 1px rgba(12,26,22,.04);
+  --sh-md:    0 8px 24px -10px rgba(12,26,22,.18), 0 2px 6px -2px rgba(12,26,22,.08);
+  --sh-lg:    0 30px 60px -28px rgba(8,40,30,.34), 0 8px 22px -12px rgba(8,40,30,.16);
+  --sh-brand: 0 18px 40px -16px rgba(14,164,126,.45);
+  --font: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --acc-bg:#DBEAFE; --acc-fg:#1D4ED8; --acc-dot:#3B82F6;
+  --iss-bg:#FFE4E6; --iss-fg:#BE123C; --iss-dot:#F43F5E;
+  --esc-bg:#FEF3C7; --esc-fg:#B45309; --esc-dot:#F59E0B;
+  --tsk-bg:#D1FAE5; --tsk-fg:#047857; --tsk-dot:#10B981;
+  --cmp-bg:#EDE9FE; --cmp-fg:#6D28D9; --cmp-dot:#8B5CF6;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--font);
+  background: #f8fafc;
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  -webkit-tap-highlight-color: transparent;
+}
 
 /* Respect iOS safe-area (notch / home indicator) for fixed bottom nav */
 .pb-safe { padding-bottom: env(safe-area-inset-bottom); }
@@ -15,8 +56,8 @@ body { font-family: 'Inter', sans-serif; background: #f8fafc; -webkit-tap-highli
 
 @keyframes flash-card {
   0%   { box-shadow: inset 0 0 0 0px transparent; }
-  15%  { box-shadow: inset 0 0 0 3px #6366f1; background-color: #e0e7ff !important; }
-  85%  { box-shadow: inset 0 0 0 3px #6366f1; background-color: #e0e7ff !important; }
+  15%  { box-shadow: inset 0 0 0 3px #0EA47E; background-color: #ECFBF5 !important; }
+  85%  { box-shadow: inset 0 0 0 3px #0EA47E; background-color: #ECFBF5 !important; }
   100% { box-shadow: inset 0 0 0 0px transparent; }
 }
 .flash-card { animation: flash-card 2s ease-in-out forwards; }
@@ -36,19 +77,9 @@ select {
   padding-right: 2rem;
 }
 
-input[type="date"] {
-  color-scheme: light;
-  cursor: pointer;
-}
+input[type="date"] { color-scheme: light; cursor: pointer; }
+input[type="date"]::-webkit-calendar-picker-indicator { opacity: 0.4; cursor: pointer; }
 
-input[type="date"]::-webkit-calendar-picker-indicator {
-  opacity: 0.4;
-  cursor: pointer;
-}
-
-/* Prevent iOS Safari from auto-zooming when a field is focused (needs >=16px).
-   !important is required to beat Tailwind's text-sm utility on form fields.
-   Applied only on small screens; desktop keeps the compact 14px sizing. */
 @media (max-width: 640px) {
   input, select, textarea { font-size: 16px !important; }
 }
