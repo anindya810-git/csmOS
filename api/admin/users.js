@@ -63,6 +63,57 @@ async function handleApiKeys(req, res, caller) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
+// Reassign every object owned by / tagged with `old_user_id` to `new_user_id`,
+// then (optionally) deactivate the old user. Accounts/issues/escalations
+// reference a CSM by display name (csm_name); tasks/feature_requests also carry
+// a stable *_id we can match on. We update both so legacy rows are covered.
+async function handleReplaceUser(req, res, caller, orgId) {
+  const { old_user_id, new_user_id, deactivate_old = true } = req.body || {};
+  if (!old_user_id || !new_user_id) return res.status(400).json({ error: 'old_user_id and new_user_id required' });
+  if (String(old_user_id) === String(new_user_id)) return res.status(400).json({ error: 'Pick two different users' });
+
+  const { data: pair } = await supabase
+    .from('users').select('id, name, csm_name').in('id', [old_user_id, new_user_id]).eq('org_id', orgId);
+  const oldU = (pair || []).find(u => String(u.id) === String(old_user_id));
+  const newU = (pair || []).find(u => String(u.id) === String(new_user_id));
+  if (!oldU || !newU) return res.status(404).json({ error: 'User not found in this organisation' });
+
+  const oldName = oldU.name;
+  const newName = newU.name;
+  const oldCsm  = oldU.csm_name;
+  // If the new user has no CSM display name, fall back to their plain name so
+  // the objects still point at a real person.
+  const newCsm  = newU.csm_name || newU.name;
+
+  const ops = [];
+
+  // CSM-name keyed objects (no stable user_id column on these tables).
+  if (oldCsm) {
+    ops.push(supabase.from('accounts').update({ csm: newCsm }).eq('csm', oldCsm).eq('org_id', orgId));
+    ops.push(supabase.from('accounts').update({ csm_lead: newCsm }).eq('csm_lead', oldCsm).eq('org_id', orgId));
+    ops.push(supabase.from('escalations').update({ csm: newCsm }).eq('csm', oldCsm).eq('org_id', orgId));
+    ops.push(supabase.from('issues').update({ csm: newCsm }).eq('csm', oldCsm).eq('org_id', orgId));
+    ops.push(supabase.from('issues').update({ csm_lead: newCsm }).eq('csm_lead', oldCsm).eq('org_id', orgId));
+    ops.push(supabase.from('tasks').update({ assigned_to: newCsm }).eq('assigned_to', oldCsm).eq('org_id', orgId));
+  }
+
+  // id-keyed objects — the reliable path.
+  ops.push(supabase.from('tasks').update({ assigned_to_id: new_user_id, assigned_to: newCsm }).eq('assigned_to_id', old_user_id).eq('org_id', orgId));
+  ops.push(supabase.from('tasks').update({ assigned_by_id: new_user_id, assigned_by: newName }).eq('assigned_by_id', old_user_id).eq('org_id', orgId));
+  ops.push(supabase.from('feature_requests').update({ created_by_id: new_user_id, created_by: newName }).eq('created_by_id', old_user_id).eq('org_id', orgId));
+  ops.push(supabase.from('feature_requests').update({ approved_by_id: new_user_id, approved_by: newName }).eq('approved_by_id', old_user_id).eq('org_id', orgId));
+
+  // Supabase returns { error } rather than throwing, so a table that doesn't
+  // exist yet (pre-migration) is skipped without aborting the rest.
+  await Promise.all(ops);
+
+  if (deactivate_old) {
+    await supabase.from('users').update({ is_active: false }).eq('id', old_user_id).eq('org_id', orgId);
+  }
+
+  return res.json({ success: true, from: oldName, to: newName, deactivated: !!deactivate_old });
+}
+
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -77,12 +128,17 @@ export default async function handler(req, res) {
     return handleApiKeys(req, res, caller);
   }
 
+  // Replace one user with another across every object they own/are tagged on.
+  if (req.query.resource === 'replace' && req.method === 'POST') {
+    return handleReplaceUser(req, res, caller, orgId);
+  }
+
   const { id } = req.query;
 
   if (req.method === 'GET') {
     let { data, error } = await supabase
       .from('users')
-      .select('id, name, email, role, csm_name, csm_lead, team, last_active_at')
+      .select('id, name, email, role, csm_name, csm_lead, team, last_active_at, is_active')
       .eq('org_id', orgId)
       .order('name');
     if (error) {
@@ -114,9 +170,11 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     if (!id) return res.status(400).json({ error: 'id required' });
-    const { name, email, role, csm_name, csm_lead, team, password } = req.body;
+    const { name, email, role, csm_name, csm_lead, team, password, is_active } = req.body;
     if (role && !ALLOWED_ROLES.includes(role))
       return res.status(400).json({ error: `Invalid role. Must be one of: ${ALLOWED_ROLES.join(', ')}` });
+    if (is_active === false && String(id) === String(caller.id))
+      return res.status(400).json({ error: 'You cannot deactivate your own account' });
     const updates = {};
     if (name !== undefined) updates.name = name;
     if (email !== undefined) updates.email = email.toLowerCase().trim();
@@ -124,6 +182,7 @@ export default async function handler(req, res) {
     if (csm_name !== undefined) updates.csm_name = csm_name || null;
     if (csm_lead !== undefined) updates.csm_lead = csm_lead || null;
     if (team !== undefined) updates.team = team || null;
+    if (is_active !== undefined) updates.is_active = !!is_active;
     if (password) updates.password_hash = bcrypt.hashSync(password, 10);
 
     let oldCsmName = null;
@@ -137,7 +196,7 @@ export default async function handler(req, res) {
       .update(updates)
       .eq('id', id)
       .eq('org_id', orgId)
-      .select('id, name, email, role, csm_name, csm_lead, team')
+      .select('id, name, email, role, csm_name, csm_lead, team, is_active')
       .single();
     if (error) return res.status(500).json({ error: error.message });
 

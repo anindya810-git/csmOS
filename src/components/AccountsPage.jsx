@@ -12,6 +12,7 @@ import { ACCOUNT_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
+import { evalConditions } from '../utils/conditions';
 
 // Every account field is available as a column; only these start visible.
 const DEFAULT_ON = ['account_name', 'industry', 'mrr', 'csm', 'rag_status', 'renewal_date', 'churn_status', 'region'];
@@ -180,7 +181,6 @@ export default function AccountsPage() {
   const [sortDir,          setSortDir]          = useState('asc');
   const [advancedOpen,     setAdvancedOpen]     = useState(false);
   const [conditions,       setConditions]       = useState([]);
-  const [conditionLogic,   setConditionLogic]   = useState('AND');
   const [escalationMap,    setEscalationMap]    = useState({});
   const [escalationsReady, setEscalationsReady] = useState(false);
   const [ddConfig,         setDdConfig]         = useState({});
@@ -266,12 +266,11 @@ export default function AccountsPage() {
       if (!blob.includes(q)) return false;
     }
     if (activeConditions.length === 0) return true;
-    const results = activeConditions.map(c => matchesCondition(a, c, escalationMap, fieldDefs));
-    return conditionLogic === 'OR' ? results.some(Boolean) : results.every(Boolean);
+    return evalConditions(activeConditions, c => matchesCondition(a, c, escalationMap, fieldDefs));
   });
 
   const addCondition = () =>
-    setConditions(c => [...c, { id: Date.now(), field: 'account_name', operator: 'contains', value: '' }]);
+    setConditions(c => [...c, { id: Date.now(), field: 'account_name', operator: 'contains', value: '', connector: 'AND' }]);
 
   const updateCondition = (id, updates) =>
     setConditions(c => c.map(cond => cond.id === id ? { ...cond, ...updates } : cond));
@@ -402,21 +401,11 @@ export default function AccountsPage() {
         {/* Advanced conditions panel */}
         {advancedOpen && (
           <div className="border-t border-gray-100 pt-3 space-y-2">
-            {/* AND / OR toggle */}
+            {/* Mixed AND / OR — per-row connectors */}
             <div className="flex items-center gap-2 mb-3">
-              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Match</span>
-              <div className="inline-flex rounded-lg border border-gray-200 overflow-hidden text-sm font-medium">
-                <button
-                  onClick={() => setConditionLogic('AND')}
-                  className={`px-3 py-1 transition ${conditionLogic === 'AND' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                >AND</button>
-                <button
-                  onClick={() => setConditionLogic('OR')}
-                  className={`px-3 py-1 border-l border-gray-200 transition ${conditionLogic === 'OR' ? 'bg-brand-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
-                >OR</button>
-              </div>
+              <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Conditions</span>
               <span className="text-xs text-gray-400">
-                {conditionLogic === 'AND' ? 'all conditions must match' : 'any condition must match'}
+                Joined by <b className="text-brand-700">AND</b>; switch a join to <b className="text-amber-600">OR</b> to start a new group — e.g. (A and B) or C.
               </span>
             </div>
 
@@ -432,9 +421,12 @@ export default function AccountsPage() {
                   {idx > 0 && (
                     <div className="flex items-center gap-2 py-0.5">
                       <div className="flex-1 border-t border-dashed border-gray-200" />
-                      <span className={`text-xs font-bold px-2 py-0.5 rounded ${conditionLogic === 'AND' ? 'text-brand-700 bg-brand-50' : 'text-amber-700 bg-amber-50'}`}>
-                        {conditionLogic}
-                      </span>
+                      <div className="inline-flex rounded-md border border-gray-200 overflow-hidden text-[11px] font-bold">
+                        <button onClick={() => updateCondition(cond.id, { connector: 'AND' })}
+                          className={`px-2 py-0.5 transition ${(cond.connector || 'AND') === 'AND' ? 'bg-brand-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>AND</button>
+                        <button onClick={() => updateCondition(cond.id, { connector: 'OR' })}
+                          className={`px-2 py-0.5 border-l border-gray-200 transition ${cond.connector === 'OR' ? 'bg-amber-500 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}>OR</button>
+                      </div>
                       <div className="flex-1 border-t border-dashed border-gray-200" />
                     </div>
                   )}

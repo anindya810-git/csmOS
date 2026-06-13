@@ -300,6 +300,12 @@ export default function SettingsPage() {
   const [error,     setError]     = useState('');
   const [deleting,  setDeleting]  = useState(null);
 
+  // Replace-user modal
+  const [replaceFor,        setReplaceFor]        = useState(null);
+  const [replaceWith,       setReplaceWith]       = useState('');
+  const [replaceDeactivate, setReplaceDeactivate] = useState(true);
+  const [replacing,         setReplacing]         = useState(false);
+
   // Dropdown config state
   const [ddData,      setDdData]      = useState({});
   const [ddLoading,   setDdLoading]   = useState(true);
@@ -503,6 +509,29 @@ export default function SettingsPage() {
     try { await axios.delete(`/api/admin/users?id=${u.id}`); loadUsers(); }
     catch (e) { alert(e.response?.data?.error || 'Failed to delete'); }
     finally { setDeleting(null); }
+  };
+
+  const toggleActive = async (u) => {
+    const active = u.is_active !== false;
+    try {
+      const { data } = await axios.put(`/api/admin/users?id=${u.id}`, { is_active: !active });
+      setUsers(list => list.map(x => x.id === u.id ? { ...x, is_active: data.is_active } : x));
+    } catch (e) { alert(e.response?.data?.error || 'Failed to update'); }
+  };
+
+  const handleReplace = async () => {
+    if (!replaceFor || !replaceWith) return;
+    setReplacing(true);
+    try {
+      await axios.post('/api/admin/users?resource=replace', {
+        old_user_id: replaceFor.id,
+        new_user_id: Number(replaceWith),
+        deactivate_old: replaceDeactivate,
+      });
+      setReplaceFor(null); setReplaceWith(''); setReplaceDeactivate(true);
+      loadUsers();
+    } catch (e) { alert(e.response?.data?.error || 'Failed to replace user'); }
+    finally { setReplacing(false); }
   };
 
   const handleDdAdd = async () => {
@@ -739,15 +768,18 @@ export default function SettingsPage() {
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Role</th>
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Team</th>
                       <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">CSM Display Name</th>
-                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Active</th>
-                      <th className="px-5 py-3 w-20"></th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Last Seen</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Status</th>
+                      <th className="px-5 py-3 w-28"></th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {users.map(u => (
-                      <tr key={u.id} className="hover:bg-gray-50 transition">
+                    {users.map(u => {
+                      const active = u.is_active !== false;
+                      return (
+                      <tr key={u.id} className={`hover:bg-gray-50 transition ${active ? '' : 'bg-gray-50/60'}`}>
                         <td className="px-5 py-3 font-medium text-gray-900">
-                          {u.name}{u.id === user?.id && <span className="ml-2 text-xs text-gray-400">(you)</span>}
+                          <span className={active ? '' : 'text-gray-400'}>{u.name}</span>{u.id === user?.id && <span className="ml-2 text-xs text-gray-400">(you)</span>}
                         </td>
                         <td className="px-5 py-3 text-gray-600">{u.email}</td>
                         <td className="px-5 py-3">
@@ -757,10 +789,28 @@ export default function SettingsPage() {
                         <td className="px-5 py-3 text-gray-600">{u.csm_name || <span className="text-gray-300">—</span>}</td>
                         <td className="px-5 py-3"><ActiveStatus at={u.last_active_at} /></td>
                         <td className="px-5 py-3">
+                          <button
+                            onClick={() => u.id !== user?.id && toggleActive(u)}
+                            disabled={u.id === user?.id}
+                            title={u.id === user?.id ? "You can't deactivate yourself" : (active ? 'Click to deactivate' : 'Click to activate')}
+                            className="inline-flex items-center gap-2 disabled:cursor-not-allowed"
+                          >
+                            <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition ${active ? 'bg-brand-600' : 'bg-gray-300'} ${u.id === user?.id ? 'opacity-50' : ''}`}>
+                              <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${active ? 'left-[18px]' : 'left-0.5'}`} />
+                            </span>
+                            <span className={`text-xs font-medium ${active ? 'text-brand-700' : 'text-gray-400'}`}>{active ? 'Active' : 'Inactive'}</span>
+                          </button>
+                        </td>
+                        <td className="px-5 py-3">
                           <div className="flex items-center gap-1">
                             <button onClick={() => openEdit(u)} className="p-1.5 text-gray-400 hover:text-brand-600 hover:bg-gray-100 rounded-md transition" title="Edit user">
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
                             </button>
+                            {u.id !== user?.id && (
+                              <button onClick={() => { setReplaceFor(u); setReplaceWith(''); setReplaceDeactivate(true); }} className="p-1.5 text-gray-400 hover:text-violet-600 hover:bg-violet-50 rounded-md transition" title="Replace user (reassign everything to someone else)">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m4 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                              </button>
+                            )}
                             {u.id !== user?.id && (
                               <button onClick={() => handleDelete(u)} disabled={deleting === u.id} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition disabled:opacity-50" title="Delete user">
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -769,7 +819,8 @@ export default function SettingsPage() {
                           </div>
                         </td>
                       </tr>
-                    ))}
+                      );
+                    })}
                   </tbody>
                 </table>
                 </div>
@@ -1329,6 +1380,47 @@ export default function SettingsPage() {
           </>
         )}
       </div>
+
+      {/* ── Replace User Modal ────────────────────────────────────────── */}
+      {replaceFor && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md">
+            <div className="flex items-center justify-between p-5 border-b border-gray-100">
+              <h3 className="text-base font-semibold text-gray-900">Replace user</h3>
+              <button onClick={() => setReplaceFor(null)} className="text-gray-400 hover:text-gray-600 transition">✕</button>
+            </div>
+            <div className="p-5 space-y-4">
+              <p className="text-sm text-gray-600">
+                Reassign every account, issue, escalation, task and feature request owned by{' '}
+                <b className="text-gray-900">{replaceFor.name}</b> to another user.
+              </p>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Reassign everything to *</label>
+                <select value={replaceWith} onChange={e => setReplaceWith(e.target.value)}>
+                  <option value="">Select a user…</option>
+                  {users.filter(u => u.id !== replaceFor.id).map(u => (
+                    <option key={u.id} value={u.id}>{u.name}{u.csm_name ? ` (${u.csm_name})` : ''}{u.is_active === false ? ' — inactive' : ''}</option>
+                  ))}
+                </select>
+              </div>
+              <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                <input type="checkbox" checked={replaceDeactivate} onChange={e => setReplaceDeactivate(e.target.checked)} className="!w-4 !h-4" />
+                <span className="text-sm text-gray-700">Deactivate <b>{replaceFor.name}</b> after reassigning</span>
+              </label>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800">
+                This rewrites ownership across all objects and can't be automatically undone. CSM-tagged
+                records move by display name; tasks &amp; feature requests move by their stored owner.
+              </div>
+            </div>
+            <div className="flex justify-end gap-2 p-5 border-t border-gray-100">
+              <button onClick={() => setReplaceFor(null)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 rounded-lg transition">Cancel</button>
+              <button onClick={handleReplace} disabled={!replaceWith || replacing} className="px-4 py-2 text-sm font-semibold text-white bg-violet-600 hover:bg-violet-700 rounded-lg transition disabled:opacity-50">
+                {replacing ? 'Replacing…' : 'Replace user'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Add/Edit User Modal ───────────────────────────────────────── */}
       {showModal && (

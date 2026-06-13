@@ -29,13 +29,13 @@ export default async function handler(req, res) {
     .from('users')
     .update({ last_active_at: new Date().toISOString() })
     .eq('id', decoded.id)
-    .select('id, name, email, role, csm_name, org_id')
+    .select('id, name, email, role, csm_name, org_id, is_active')
     .maybeSingle();
 
   if (stamped) {
     user = stamped;
   } else {
-    // org_id or last_active_at may not be migrated yet — try progressively simpler selects
+    // org_id / last_active_at / is_active may not be migrated yet — try progressively simpler selects
     const { data: withOrgId } = await supabase
       .from('users')
       .select('id, name, email, role, csm_name, org_id')
@@ -54,6 +54,8 @@ export default async function handler(req, res) {
   }
 
   if (!user) return res.status(401).json({ error: 'User not found' });
+  // Deactivated mid-session → end the session (AuthContext drops the token on 403).
+  if (user.is_active === false) return res.status(403).json({ error: 'Account deactivated' });
   user.features = await getOrgFeatures(user.org_id);
   res.json(user);
 }

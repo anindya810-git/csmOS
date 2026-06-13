@@ -25,6 +25,10 @@ export default async function handler(req, res) {
   const valid = bcrypt.compareSync(password, user.password_hash);
   if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
+  // Deactivated users cannot log in. (is_active is undefined pre-migration → allowed.)
+  if (user.is_active === false)
+    return res.status(403).json({ error: 'Your account has been deactivated. Contact your administrator.' });
+
   const orgId = user.org_id || 1;
   let orgName = null;
   let features = {};
