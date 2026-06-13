@@ -100,7 +100,7 @@ export default function AccountEdit() {
   const [ddConfig, setDdConfig] = useState({});
 
   useEffect(() => {
-    axios.get('/api/accounts/filters')
+    axios.get('/api/accounts?mode=filters')
       .then(r => {
         setCsms(r.data.csms || []);
         setCsmLeads(r.data.csmLeads || []);

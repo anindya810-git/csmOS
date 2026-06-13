@@ -168,7 +168,7 @@ export default function IssuesDashboard() {
     axios.get('/api/accounts').then(r => {
       setAccounts((r.data || []).sort((a, b) => a.account_name.localeCompare(b.account_name)));
     }).catch(() => {});
-    axios.get('/api/accounts/filters').then(r => setCsms(r.data.csms || [])).catch(() => {});
+    axios.get('/api/accounts?mode=filters').then(r => setCsms(r.data.csms || [])).catch(() => {});
     axios.get('/api/dropdown-config').then(r => setDropdownConfig(r.data || {})).catch(() => {});
   }, []);
 

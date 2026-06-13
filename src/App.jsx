@@ -1,9 +1,10 @@
-import React, { lazy } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import React, { lazy, useEffect } from 'react';
+import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FieldLabelsProvider } from './context/FieldLabelsContext';
 import { PermissionsProvider } from './context/PermissionsContext';
 import { AiConfigProvider } from './context/AiConfigContext';
+import { SuperadminAuthProvider, useSuperadminAuth } from './context/SuperadminAuthContext';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import ReportsPage from './components/ReportsPage';
@@ -30,6 +31,13 @@ const FeatureRequestReport      = lazy(() => import('./components/FeatureRequest
 const CustomReportsPage         = lazy(() => import('./components/CustomReportsPage'));
 const CustomReportBuilder       = lazy(() => import('./components/CustomReportBuilder'));
 
+// Superadmin — separate auth context and layout
+const SuperadminLogin    = lazy(() => import('./components/superadmin/SuperadminLogin'));
+const SuperadminLayout   = lazy(() => import('./components/superadmin/SuperadminLayout'));
+const SuperadminDashboard = lazy(() => import('./components/superadmin/SuperadminDashboard'));
+const OrgList            = lazy(() => import('./components/superadmin/OrgList'));
+const OrgDetail          = lazy(() => import('./components/superadmin/OrgDetail'));
+
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
   if (loading) return (
@@ -52,11 +60,49 @@ function AdminOrCxRoute({ children }) {
   return (user?.role === 'admin' || user?.role === 'cx_strategy') ? children : <Navigate to="/" replace />;
 }
 
+function SuperadminRoute({ children }) {
+  const { admin, loading } = useSuperadminAuth();
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-950">
+      <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+  return admin ? children : <Navigate to="/superadmin/login" replace />;
+}
+
+// Impersonation entry: reads ?token= from URL, stores it, redirects to /
+function ImpersonationEntry() {
+  const [params] = useSearchParams();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const token = params.get('token');
+    if (token) {
+      localStorage.setItem('token', token);
+    }
+    navigate('/', { replace: true });
+  }, []);
+
+  return null;
+}
+
 function AppRoutes() {
   const { user } = useAuth();
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+
+      {/* Impersonation entry point — stores the short-lived token then redirects to / */}
+      <Route path="/superadmin/enter" element={<ImpersonationEntry />} />
+
+      {/* Superadmin section — completely separate auth */}
+      <Route path="/superadmin/login" element={<SuperadminLogin />} />
+      <Route path="/superadmin" element={<SuperadminRoute><SuperadminLayout /></SuperadminRoute>}>
+        <Route index element={<SuperadminDashboard />} />
+        <Route path="orgs" element={<OrgList />} />
+        <Route path="orgs/:id" element={<OrgDetail />} />
+      </Route>
+
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
         <Route path="accounts" element={<AccountsPage />} />
@@ -90,5 +136,17 @@ function AppRoutes() {
 }
 
 export default function App() {
-  return <AuthProvider><FieldLabelsProvider><PermissionsProvider><AiConfigProvider><AppRoutes /></AiConfigProvider></PermissionsProvider></FieldLabelsProvider></AuthProvider>;
+  return (
+    <SuperadminAuthProvider>
+      <AuthProvider>
+        <FieldLabelsProvider>
+          <PermissionsProvider>
+            <AiConfigProvider>
+              <AppRoutes />
+            </AiConfigProvider>
+          </PermissionsProvider>
+        </FieldLabelsProvider>
+      </AuthProvider>
+    </SuperadminAuthProvider>
+  );
 }

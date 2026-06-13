@@ -214,7 +214,7 @@ export default function AccountsPage() {
   const bulkFieldDefs = useMemo(() => toBulkFieldDefs(ACCOUNT_FIELDS, resolveOpts), [resolveOpts]);
 
   useEffect(() => {
-    axios.get('/api/accounts/filters').then(r => setFilters(r.data));
+    axios.get('/api/accounts?mode=filters').then(r => setFilters(r.data));
     axios.get('/api/dropdown-config').then(r => setDdConfig(r.data || {})).catch(() => {});
   }, []);
 

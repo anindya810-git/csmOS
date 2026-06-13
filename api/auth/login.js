@@ -25,6 +25,26 @@ export default async function handler(req, res) {
   const valid = bcrypt.compareSync(password, user.password_hash);
   if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
 
-  const token = signToken({ id: user.id, email: user.email, role: user.role, name: user.name, csm_name: user.csm_name });
-  res.json({ token, user: { id: user.id, name: user.name, email: user.email, role: user.role, csm_name: user.csm_name } });
+  const orgId = user.org_id || 1;
+  let orgName = null;
+
+  const { data: org } = await supabase
+    .from('organizations')
+    .select('billing_status, name')
+    .eq('id', orgId)
+    .maybeSingle();
+
+  if (org?.billing_status === 'suspended') {
+    return res.status(403).json({ error: 'Account suspended. Contact your administrator.' });
+  }
+  orgName = org?.name || null;
+
+  const token = signToken({
+    id: user.id, email: user.email, role: user.role,
+    name: user.name, csm_name: user.csm_name, org_id: orgId,
+  });
+  res.json({
+    token,
+    user: { id: user.id, name: user.name, email: user.email, role: user.role, csm_name: user.csm_name, org_id: orgId, org_name: orgName },
+  });
 }

@@ -1,5 +1,5 @@
 import supabase from './_utils/supabase.js';
-import { verifyToken } from './_utils/auth.js';
+import { verifyAuth } from './_utils/auth.js';
 import { setCors } from './_utils/cors.js';
 
 const PRIORITIES = ['P0', 'P1', 'P2', 'P3'];
@@ -11,15 +11,17 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   let user;
-  try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
+  try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
   const { id } = req.query;
+  const orgId = user.org_id || 1;
 
   if (req.method === 'GET') {
     const { status, priority, related_to, search } = req.query;
     let query = supabase
       .from('feature_requests')
       .select('*, feature_request_links(*)')
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false });
     if (status)     query = query.eq('status', status);
     if (priority)   query = query.eq('priority', priority);
@@ -40,6 +42,7 @@ export default async function handler(req, res) {
     const { data: fr, error: frErr } = await supabase
       .from('feature_requests')
       .insert({
+        org_id: orgId,
         title: title.trim(),
         description: description || null,
         related_to: related_to || null,
@@ -54,7 +57,7 @@ export default async function handler(req, res) {
     if (frErr) return res.status(500).json({ error: frErr.message });
 
     if (Array.isArray(link_ids) && link_ids.length > 0) {
-      const rows = await buildLinkRows(fr.id, link_ids);
+      const rows = await buildLinkRows(fr.id, link_ids, orgId);
       if (rows.length > 0) await supabase.from('feature_request_links').insert(rows);
     }
 
@@ -63,6 +66,7 @@ export default async function handler(req, res) {
       .from('dropdown_config')
       .select('value, parent_value')
       .eq('field_name', 'fr_default_approver')
+      .eq('org_id', orgId)
       .limit(1)
       .maybeSingle();
 
@@ -75,13 +79,14 @@ export default async function handler(req, res) {
         .from('users')
         .select('id, name')
         .eq('id', config.value)
+        .eq('org_id', orgId)
         .maybeSingle();
       if (approver) {
         approverId = approver.id;
         approverName = approver.name;
-        // Give the approver two days to action it; surfaces as Overdue after.
         const due = new Date(); due.setDate(due.getDate() + 2);
         const { data: task } = await supabase.from('tasks').insert({
+          org_id: orgId,
           task_subject: `Review Feature Request ${reqId}: ${fr.title}`,
           task_description: `Priority: ${fr.priority}${fr.related_to ? ` | Related to: ${fr.related_to}` : ''}\nApprove or reject this request from the task actions.`,
           nature_of_task: 'Feature Request',
@@ -117,12 +122,11 @@ export default async function handler(req, res) {
   if (req.method === 'PUT') {
     if (!id) return res.status(400).json({ error: 'id required' });
     const { data: existing } = await supabase
-      .from('feature_requests').select('*').eq('id', id).single();
+      .from('feature_requests').select('*').eq('id', id).eq('org_id', orgId).single();
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     const body = req.body;
 
-    // Approve / reject may be performed by an admin OR the assigned approver.
     const isApprover = existing.approver_id != null && String(existing.approver_id) === String(user.id);
     const canReview = user.role === 'admin' || isApprover;
 
@@ -160,9 +164,6 @@ export default async function handler(req, res) {
       return res.json(data);
     }
 
-    // Append links from an escalation/issue (collaborative — any signed-in user).
-    // Does not touch existing links; dedups against them. Account + MRR are
-    // tagged by buildLinkRows so the report stays accurate.
     if (body.action === 'add_links') {
       if (!Array.isArray(body.link_ids) || body.link_ids.length === 0) return res.status(400).json({ error: 'link_ids required' });
       if (body.link_ids.length > 200) return res.status(400).json({ error: 'too many links (max 200)' });
@@ -171,7 +172,7 @@ export default async function handler(req, res) {
       const have = new Set((current || []).map(l => `${l.link_type}:${l.linked_id}`));
       const toAdd = body.link_ids.filter(l => l && l.type && l.id != null && !have.has(`${l.type}:${l.id}`));
       if (toAdd.length > 0) {
-        const rows = await buildLinkRows(parseInt(id), toAdd);
+        const rows = await buildLinkRows(parseInt(id), toAdd, orgId);
         if (rows.length > 0) await supabase.from('feature_request_links').insert(rows);
       }
       const { data } = await supabase.from('feature_requests').select('*, feature_request_links(*)').eq('id', id).single();
@@ -207,7 +208,7 @@ export default async function handler(req, res) {
     if (Array.isArray(body.link_ids)) {
       await supabase.from('feature_request_links').delete().eq('feature_request_id', id);
       if (body.link_ids.length > 0) {
-        const rows = await buildLinkRows(parseInt(id), body.link_ids);
+        const rows = await buildLinkRows(parseInt(id), body.link_ids, orgId);
         if (rows.length > 0) await supabase.from('feature_request_links').insert(rows);
       }
     }
@@ -225,7 +226,7 @@ export default async function handler(req, res) {
   if (req.method === 'DELETE') {
     if (!id) return res.status(400).json({ error: 'id required' });
     if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
-    const { error } = await supabase.from('feature_requests').delete().eq('id', id);
+    const { error } = await supabase.from('feature_requests').delete().eq('id', id).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ deleted: true });
   }
@@ -233,26 +234,26 @@ export default async function handler(req, res) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-async function buildLinkRows(frId, linkIds) {
+async function buildLinkRows(frId, linkIds, orgId) {
   const rows = [];
   for (const link of linkIds) {
     if (link.type === 'escalation') {
       const { data } = await supabase
-        .from('escalations').select('id, account_id, account_name').eq('id', link.id).maybeSingle();
+        .from('escalations').select('id, account_id, account_name').eq('id', link.id).eq('org_id', orgId).maybeSingle();
       if (!data) continue;
       let mrr = null;
       if (data.account_id) {
-        const { data: acct } = await supabase.from('accounts').select('mrr').eq('id', data.account_id).maybeSingle();
+        const { data: acct } = await supabase.from('accounts').select('mrr').eq('id', data.account_id).eq('org_id', orgId).maybeSingle();
         mrr = acct?.mrr ?? null;
       }
       rows.push({ feature_request_id: frId, link_type: 'escalation', linked_id: data.id, account_id: data.account_id, account_name: data.account_name, mrr });
     } else if (link.type === 'issue') {
       const { data } = await supabase
-        .from('issues').select('id, account_id, account_name').eq('id', link.id).maybeSingle();
+        .from('issues').select('id, account_id, account_name').eq('id', link.id).eq('org_id', orgId).maybeSingle();
       if (!data) continue;
       let mrr = null;
       if (data.account_id) {
-        const { data: acct } = await supabase.from('accounts').select('mrr').eq('id', data.account_id).maybeSingle();
+        const { data: acct } = await supabase.from('accounts').select('mrr').eq('id', data.account_id).eq('org_id', orgId).maybeSingle();
         mrr = acct?.mrr ?? null;
       }
       rows.push({ feature_request_id: frId, link_type: 'issue', linked_id: data.id, account_id: data.account_id, account_name: data.account_name, mrr });

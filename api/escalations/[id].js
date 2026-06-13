@@ -17,16 +17,17 @@ export default async function handler(req, res) {
   try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
   const { id } = req.query;
+  const orgId = user.org_id || 1;
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase.from('escalations').select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('escalations').select('*').eq('id', id).eq('org_id', orgId).single();
     if (error || !data) return res.status(404).json({ error: 'Not found' });
     if (user.role === 'csm' && data.csm !== user.csm_name) return res.status(403).json({ error: 'Access denied' });
     return res.json(data);
   }
 
   if (req.method === 'PUT') {
-    const { data: current, error: fetchErr } = await supabase.from('escalations').select('*').eq('id', id).single();
+    const { data: current, error: fetchErr } = await supabase.from('escalations').select('*').eq('id', id).eq('org_id', orgId).single();
     if (fetchErr || !current) return res.status(404).json({ error: 'Not found' });
     if (user.role === 'csm' && current.csm !== user.csm_name) return res.status(403).json({ error: 'Access denied' });
 
@@ -39,14 +40,14 @@ export default async function handler(req, res) {
     updates.updated_at = new Date().toISOString();
     updates.updated_by = user.name || null;
 
-    const { data, error } = await supabase.from('escalations').update(updates).eq('id', id).select().single();
+    const { data, error } = await supabase.from('escalations').update(updates).eq('id', id).eq('org_id', orgId).select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
 
   if (req.method === 'DELETE') {
     if (user.role === 'csm' || user.role === 'api') return res.status(403).json({ error: 'Only admins can delete escalations' });
-    const { error } = await supabase.from('escalations').delete().eq('id', id);
+    const { error } = await supabase.from('escalations').delete().eq('id', id).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ success: true });
   }

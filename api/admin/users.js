@@ -9,11 +9,13 @@ const ALLOWED_ROLES = ['admin', 'csm', 'sales', 'product', 'cx_strategy', 'ps'];
 // (an API key can never create or revoke keys).
 async function handleApiKeys(req, res, caller) {
   const { id } = req.query;
+  const orgId = caller.org_id || 1;
 
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('api_keys')
       .select('id, label, key_prefix, created_by, created_at, revoked_at, last_used_at')
+      .eq('org_id', orgId)
       .order('created_at', { ascending: false });
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data || []);
@@ -25,11 +27,10 @@ async function handleApiKeys(req, res, caller) {
     const key = generateApiKey();
     const { data, error } = await supabase
       .from('api_keys')
-      .insert({ label, key_hash: hashApiKey(key), key_prefix: key.slice(0, 12) + '…', created_by: caller.name || null })
+      .insert({ org_id: orgId, label, key_hash: hashApiKey(key), key_prefix: key.slice(0, 12) + '…', created_by: caller.name || null })
       .select('id, label, key_prefix, created_by, created_at, revoked_at, last_used_at')
       .single();
     if (error) return res.status(500).json({ error: error.message });
-    // The raw key is returned exactly once and never stored.
     return res.status(201).json({ ...data, key });
   }
 
@@ -40,6 +41,7 @@ async function handleApiKeys(req, res, caller) {
       .from('api_keys')
       .update({ revoked_at })
       .eq('id', id)
+      .eq('org_id', orgId)
       .select('id, label, key_prefix, created_by, created_at, revoked_at, last_used_at')
       .single();
     if (error) return res.status(500).json({ error: error.message });
@@ -48,7 +50,7 @@ async function handleApiKeys(req, res, caller) {
 
   if (req.method === 'DELETE') {
     if (!id) return res.status(400).json({ error: 'id required' });
-    const { error } = await supabase.from('api_keys').delete().eq('id', id);
+    const { error } = await supabase.from('api_keys').delete().eq('id', id).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ success: true });
   }
@@ -64,6 +66,8 @@ export default async function handler(req, res) {
   try { caller = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
   if (caller.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
 
+  const orgId = caller.org_id || 1;
+
   if (req.query.resource === 'api_keys' || req.body?.resource === 'api_keys') {
     return handleApiKeys(req, res, caller);
   }
@@ -71,15 +75,16 @@ export default async function handler(req, res) {
   const { id } = req.query;
 
   if (req.method === 'GET') {
-    // Try to include the newer columns; fall back if they aren't migrated.
     let { data, error } = await supabase
       .from('users')
       .select('id, name, email, role, csm_name, csm_lead, team, last_active_at')
+      .eq('org_id', orgId)
       .order('name');
     if (error) {
       ({ data, error } = await supabase
         .from('users')
         .select('id, name, email, role, csm_name, csm_lead')
+        .eq('org_id', orgId)
         .order('name'));
     }
     if (error) return res.status(500).json({ error: error.message });
@@ -95,7 +100,7 @@ export default async function handler(req, res) {
     const password_hash = bcrypt.hashSync(password, 10);
     const { data, error } = await supabase
       .from('users')
-      .insert({ name, email: email.toLowerCase().trim(), password_hash, role: role || 'csm', csm_name: csm_name || null, csm_lead: csm_lead || null, team: team || null })
+      .insert({ org_id: orgId, name, email: email.toLowerCase().trim(), password_hash, role: role || 'csm', csm_name: csm_name || null, csm_lead: csm_lead || null, team: team || null })
       .select('id, name, email, role, csm_name, csm_lead, team')
       .single();
     if (error) return res.status(500).json({ error: error.message });
@@ -118,7 +123,7 @@ export default async function handler(req, res) {
 
     let oldCsmName = null;
     if (csm_name !== undefined) {
-      const { data: existing } = await supabase.from('users').select('csm_name').eq('id', id).single();
+      const { data: existing } = await supabase.from('users').select('csm_name').eq('id', id).eq('org_id', orgId).single();
       oldCsmName = existing?.csm_name || null;
     }
 
@@ -126,6 +131,7 @@ export default async function handler(req, res) {
       .from('users')
       .update(updates)
       .eq('id', id)
+      .eq('org_id', orgId)
       .select('id, name, email, role, csm_name, csm_lead, team')
       .single();
     if (error) return res.status(500).json({ error: error.message });
@@ -133,11 +139,11 @@ export default async function handler(req, res) {
     const newCsmName = csm_name || null;
     if (oldCsmName && newCsmName && oldCsmName !== newCsmName) {
       await Promise.all([
-        supabase.from('accounts').update({ csm: newCsmName }).eq('csm', oldCsmName),
-        supabase.from('accounts').update({ csm_lead: newCsmName }).eq('csm_lead', oldCsmName),
-        supabase.from('escalations').update({ csm: newCsmName }).eq('csm', oldCsmName),
-        supabase.from('issues').update({ csm: newCsmName }).eq('csm', oldCsmName),
-        supabase.from('issues').update({ csm_lead: newCsmName }).eq('csm_lead', oldCsmName),
+        supabase.from('accounts').update({ csm: newCsmName }).eq('csm', oldCsmName).eq('org_id', orgId),
+        supabase.from('accounts').update({ csm_lead: newCsmName }).eq('csm_lead', oldCsmName).eq('org_id', orgId),
+        supabase.from('escalations').update({ csm: newCsmName }).eq('csm', oldCsmName).eq('org_id', orgId),
+        supabase.from('issues').update({ csm: newCsmName }).eq('csm', oldCsmName).eq('org_id', orgId),
+        supabase.from('issues').update({ csm_lead: newCsmName }).eq('csm_lead', oldCsmName).eq('org_id', orgId),
       ]);
     }
     return res.json(data);
@@ -147,7 +153,7 @@ export default async function handler(req, res) {
     if (!id) return res.status(400).json({ error: 'id required' });
     if (String(id) === String(caller.id))
       return res.status(400).json({ error: 'Cannot delete your own account' });
-    const { error } = await supabase.from('users').delete().eq('id', id);
+    const { error } = await supabase.from('users').delete().eq('id', id).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ success: true });
   }

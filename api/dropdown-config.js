@@ -6,8 +6,8 @@ import { callAI, AI_SECTIONS, DEFAULT_MODELS, PROVIDERS } from './_utils/ai.js';
 const PROMPT_KEYS = Object.keys(AI_SECTIONS); // account_summary, account_escalations, account_issues, ...
 
 // ai_config is a flat key/value table: provider, key_<p>, model_<p>, prompt_<section>.
-async function loadAiConfig() {
-  const { data } = await supabase.from('ai_config').select('key, value');
+async function loadAiConfig(orgId = 1) {
+  const { data } = await supabase.from('ai_config').select('key, value').eq('org_id', orgId);
   const map = {};
   (data || []).forEach(r => { map[r.key] = r.value; });
   return map;
@@ -62,15 +62,16 @@ function accountHeader(a) {
 // Gather authoritative context for a section and return the user-prompt text.
 // Returns { user, persist? } where persist describes the write-back target.
 async function buildContext(section, body, user, csmName) {
+  const orgId = user.org_id || 1;
   if (section === 'account_summary' || section === 'account_escalations' || section === 'account_issues') {
     const accountId = body.account_id;
     if (!accountId) throw new Error('account_id required');
-    const { data: account } = await supabase.from('accounts').select('*').eq('id', accountId).maybeSingle();
+    const { data: account } = await supabase.from('accounts').select('*').eq('id', accountId).eq('org_id', orgId).maybeSingle();
     if (!account) throw new Error('Account not found');
     if (user.role === 'csm' && account.csm !== csmName) { const e = new Error('Access denied'); e.code = 403; throw e; }
 
     if (section === 'account_escalations') {
-      const { data: escalations } = await supabase.from('escalations').select('*').eq('account_id', accountId).order('date_of_escalation', { ascending: false }).limit(60);
+      const { data: escalations } = await supabase.from('escalations').select('*').eq('account_id', accountId).eq('org_id', orgId).order('date_of_escalation', { ascending: false }).limit(60);
       const escTxt = (escalations || []).length ? (escalations || []).map(escLine).join('\n') : '(none)';
       return {
         user: `Account: ${account.account_name || '–'}\n\nESCALATIONS (${(escalations || []).length}):\n${escTxt}`,
@@ -79,7 +80,7 @@ async function buildContext(section, body, user, csmName) {
     }
 
     if (section === 'account_issues') {
-      const { data: issues } = await supabase.from('issues').select('*').eq('account_id', accountId).order('reported_date', { ascending: false }).limit(60);
+      const { data: issues } = await supabase.from('issues').select('*').eq('account_id', accountId).eq('org_id', orgId).order('reported_date', { ascending: false }).limit(60);
       const issTxt = (issues || []).length ? (issues || []).map(issueLine).join('\n') : '(none)';
       return {
         user: `Account: ${account.account_name || '–'}\n\nISSUES (${(issues || []).length}):\n${issTxt}`,
@@ -89,9 +90,9 @@ async function buildContext(section, body, user, csmName) {
 
     // account_summary — needs the full picture
     const [{ data: issues }, { data: escalations }, { data: tasks }] = await Promise.all([
-      supabase.from('issues').select('*').eq('account_id', accountId).order('reported_date', { ascending: false }).limit(40),
-      supabase.from('escalations').select('*').eq('account_id', accountId).order('date_of_escalation', { ascending: false }).limit(40),
-      supabase.from('tasks').select('task_subject, status, due_date, nature_of_task').eq('account_id', accountId).order('due_date', { ascending: false }).limit(20),
+      supabase.from('issues').select('*').eq('account_id', accountId).eq('org_id', orgId).order('reported_date', { ascending: false }).limit(40),
+      supabase.from('escalations').select('*').eq('account_id', accountId).eq('org_id', orgId).order('date_of_escalation', { ascending: false }).limit(40),
+      supabase.from('tasks').select('task_subject, status, due_date, nature_of_task').eq('account_id', accountId).eq('org_id', orgId).order('due_date', { ascending: false }).limit(20),
     ]);
     const escTxt = (escalations || []).length ? (escalations || []).map(escLine).join('\n') : '(none)';
     const issTxt = (issues || []).length ? (issues || []).map(issueLine).join('\n') : '(none)';
@@ -127,7 +128,7 @@ async function buildContext(section, body, user, csmName) {
   if (section === 'rag') {
     const band = body.rag;
     if (!['Red', 'Amber', 'Green'].includes(band)) throw new Error('rag band required (Red/Amber/Green)');
-    let q = supabase.from('accounts').select('account_name, mrr, region, industry, csm, rag_reason, renewal_date, renewal_status, churn_risk').eq('rag_status', band).limit(80);
+    let q = supabase.from('accounts').select('account_name, mrr, region, industry, csm, rag_reason, renewal_date, renewal_status, churn_risk').eq('rag_status', band).eq('org_id', orgId).limit(80);
     if (user.role === 'csm') q = q.eq('csm', csmName);
     const { data: accts } = await q;
     const total = (accts || []).reduce((s, a) => s + (a.mrr || 0), 0);
@@ -169,7 +170,8 @@ async function handleGenerate(req, res, user) {
   const def = AI_SECTIONS[section];
   if (!def) return res.status(400).json({ error: 'Unknown AI section' });
 
-  const cfg = await loadAiConfig();
+  const orgId = user.org_id || 1;
+  const cfg = await loadAiConfig(orgId);
   const provider = cfg.provider;
   if (!provider || !PROVIDERS.includes(provider)) return res.status(400).json({ error: 'No AI provider configured' });
   const key = cfg[`key_${provider}`];
@@ -217,6 +219,7 @@ const ALLOWED_FIELDS = {
 async function handleRunReport(req, res, user) {
   const cfg = req.body?.run_config || {};
   const { primaryEntity, columns = [], filters = [], groupBy, aggregation, sortBy, sortDir, limit } = cfg;
+  const orgId = user.org_id || 1;
 
   const TABLE_MAP = { accounts: 'accounts', issues: 'issues', escalations: 'escalations', tasks: 'tasks' };
   if (!TABLE_MAP[primaryEntity]) return res.status(400).json({ error: 'Invalid entity' });
@@ -248,7 +251,7 @@ async function handleRunReport(req, res, user) {
     selectStr = [...new Set([...selectStr.split(','), groupBy.field])].join(',');
   }
 
-  let q = supabase.from(primaryEntity).select(selectStr);
+  let q = supabase.from(primaryEntity).select(selectStr).eq('org_id', orgId);
 
   // Apply primary-entity filters server-side
   const serverFilters = filters.filter(f => f.entity === primaryEntity && primaryAllowed.has(f.field));
@@ -305,7 +308,7 @@ async function handleRunReport(req, res, user) {
     const countQueries = [];
 
     if (needs('issues_count') || needs('open_issues_count')) {
-      countQueries.push(supabase.from('issues').select('account_id,status').in('account_id', accountIds).then(({ data: d }) => {
+      countQueries.push(supabase.from('issues').select('account_id,status').eq('org_id', orgId).in('account_id', accountIds).then(({ data: d }) => {
         (d||[]).forEach(r => {
           if (!cd[r.account_id]) cd[r.account_id] = {};
           cd[r.account_id].issues_count = (cd[r.account_id].issues_count || 0) + 1;
@@ -314,7 +317,7 @@ async function handleRunReport(req, res, user) {
       }));
     }
     if (needs('escalations_count') || needs('open_escalations_count')) {
-      countQueries.push(supabase.from('escalations').select('account_id,status').in('account_id', accountIds).then(({ data: d }) => {
+      countQueries.push(supabase.from('escalations').select('account_id,status').eq('org_id', orgId).in('account_id', accountIds).then(({ data: d }) => {
         (d||[]).forEach(r => {
           if (!cd[r.account_id]) cd[r.account_id] = {};
           cd[r.account_id].escalations_count = (cd[r.account_id].escalations_count || 0) + 1;
@@ -323,7 +326,7 @@ async function handleRunReport(req, res, user) {
       }));
     }
     if (needs('tasks_count') || needs('open_tasks_count')) {
-      countQueries.push(supabase.from('tasks').select('account_id,status').in('account_id', accountIds).then(({ data: d }) => {
+      countQueries.push(supabase.from('tasks').select('account_id,status').eq('org_id', orgId).in('account_id', accountIds).then(({ data: d }) => {
         (d||[]).forEach(r => {
           if (!cd[r.account_id]) cd[r.account_id] = {};
           cd[r.account_id].tasks_count = (cd[r.account_id].tasks_count || 0) + 1;
@@ -370,8 +373,10 @@ async function handleRunReport(req, res, user) {
 }
 
 async function handleCustomReports(req, res, user) {
+  const orgId = user.org_id || 1;
+
   if (req.method === 'GET') {
-    let q = supabase.from('custom_reports').select('*').order('updated_at', { ascending: false });
+    let q = supabase.from('custom_reports').select('*').eq('org_id', orgId).order('updated_at', { ascending: false });
     if (user.role !== 'admin') q = q.or(`created_by_id.eq.${user.id},is_public.eq.true`);
     const { data, error } = await q;
     if (error) return res.status(500).json({ error: error.message });
@@ -387,7 +392,7 @@ async function handleCustomReports(req, res, user) {
     if (!name || !config) return res.status(400).json({ error: 'name and config required' });
     const { data, error } = await supabase
       .from('custom_reports')
-      .insert({ name, description: description || '', config, is_public: !!is_public, created_by: user.name || user.email || '', created_by_id: user.id || null })
+      .insert({ org_id: orgId, name, description: description || '', config, is_public: !!is_public, created_by: user.name || user.email || '', created_by_id: user.id || null })
       .select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json(data);
@@ -396,7 +401,7 @@ async function handleCustomReports(req, res, user) {
   const id = req.query.id || req.body?.id;
   if (!id) return res.status(400).json({ error: 'id required' });
 
-  const { data: existing } = await supabase.from('custom_reports').select('created_by_id').eq('id', id).maybeSingle();
+  const { data: existing } = await supabase.from('custom_reports').select('created_by_id').eq('id', id).eq('org_id', orgId).maybeSingle();
   if (!existing) return res.status(404).json({ error: 'Not found' });
   if (user.role !== 'admin' && existing.created_by_id !== user.id) return res.status(403).json({ error: 'Forbidden' });
 
@@ -407,13 +412,13 @@ async function handleCustomReports(req, res, user) {
     if (description !== undefined) updates.description = description;
     if (config !== undefined) updates.config = config;
     if (is_public !== undefined) updates.is_public = !!is_public;
-    const { data, error } = await supabase.from('custom_reports').update(updates).eq('id', id).select().single();
+    const { data, error } = await supabase.from('custom_reports').update(updates).eq('id', id).eq('org_id', orgId).select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
 
   if (req.method === 'DELETE') {
-    const { error } = await supabase.from('custom_reports').delete().eq('id', id);
+    const { error } = await supabase.from('custom_reports').delete().eq('id', id).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ success: true });
   }
@@ -421,29 +426,30 @@ async function handleCustomReports(req, res, user) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
-async function handleAiSave(req, res) {
+async function handleAiSave(req, res, user) {
+  const orgId = user.org_id || 1;
   const { provider, keys, clear, models, prompts } = req.body || {};
   const rows = [];
-  if (provider !== undefined) rows.push({ key: 'provider', value: provider || '' });
+  if (provider !== undefined) rows.push({ org_id: orgId, key: 'provider', value: provider || '' });
   if (keys && typeof keys === 'object') {
-    for (const p of PROVIDERS) if (keys[p]) rows.push({ key: `key_${p}`, value: String(keys[p]) });
+    for (const p of PROVIDERS) if (keys[p]) rows.push({ org_id: orgId, key: `key_${p}`, value: String(keys[p]) });
   }
   if (models && typeof models === 'object') {
-    for (const p of PROVIDERS) if (models[p] !== undefined) rows.push({ key: `model_${p}`, value: String(models[p] || '') });
+    for (const p of PROVIDERS) if (models[p] !== undefined) rows.push({ org_id: orgId, key: `model_${p}`, value: String(models[p] || '') });
   }
   if (prompts && typeof prompts === 'object') {
-    for (const k of PROMPT_KEYS) if (prompts[k] !== undefined) rows.push({ key: `prompt_${k}`, value: String(prompts[k] || '') });
+    for (const k of PROMPT_KEYS) if (prompts[k] !== undefined) rows.push({ org_id: orgId, key: `prompt_${k}`, value: String(prompts[k] || '') });
   }
   if (rows.length) {
-    const { error } = await supabase.from('ai_config').upsert(rows, { onConflict: 'key' });
+    const { error } = await supabase.from('ai_config').upsert(rows, { onConflict: 'org_id,key' });
     if (error) return res.status(500).json({ error: error.message });
   }
   // Explicitly clear listed provider keys.
   if (Array.isArray(clear) && clear.length) {
     const keysToClear = clear.filter(p => PROVIDERS.includes(p)).map(p => `key_${p}`);
-    if (keysToClear.length) await supabase.from('ai_config').delete().in('key', keysToClear);
+    if (keysToClear.length) await supabase.from('ai_config').delete().in('key', keysToClear).eq('org_id', orgId);
   }
-  const map = await loadAiConfig();
+  const map = await loadAiConfig(orgId);
   return res.json({ ai: publicAiConfig(map) });
 }
 
@@ -454,10 +460,13 @@ export default async function handler(req, res) {
   let user;
   try { user = verifyToken(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
+  const orgId = user.org_id || 1;
+
   if (req.method === 'GET') {
     const { data, error } = await supabase
       .from('dropdown_config')
       .select('*')
+      .eq('org_id', orgId)
       .order('sort_order')
       .order('value');
     if (error) return res.status(500).json({ error: error.message });
@@ -467,7 +476,7 @@ export default async function handler(req, res) {
       grouped[row.field_name].push(row);
     });
     // Attach sanitized AI config (no raw keys) so the UI can enable/grey AI.
-    try { grouped.__ai = publicAiConfig(await loadAiConfig()); } catch { grouped.__ai = publicAiConfig({}); }
+    try { grouped.__ai = publicAiConfig(await loadAiConfig(orgId)); } catch { grouped.__ai = publicAiConfig({}); }
     return res.json(grouped);
   }
 
@@ -489,7 +498,7 @@ export default async function handler(req, res) {
   // Saving AI provider/keys/prompts is admin-only.
   if (req.method === 'POST' && req.body?.action === 'ai_save') {
     if (!isAdmin) return res.status(403).json({ error: 'Admin only' });
-    return handleAiSave(req, res);
+    return handleAiSave(req, res, user);
   }
 
   const CX_ALLOWED = new Set([
@@ -505,7 +514,7 @@ export default async function handler(req, res) {
     if (isCxStrategy && !CX_ALLOWED.has(field_name)) return res.status(403).json({ error: 'Not permitted' });
     const { data, error } = await supabase
       .from('dropdown_config')
-      .insert({ field_name, value, parent_value: parent_value || null, sort_order: sort_order || 0 })
+      .insert({ org_id: orgId, field_name, value, parent_value: parent_value || null, sort_order: sort_order || 0 })
       .select()
       .single();
     if (error) return res.status(500).json({ error: error.message });
@@ -517,7 +526,7 @@ export default async function handler(req, res) {
 
   if (isCxStrategy) {
     const { data: row } = await supabase
-      .from('dropdown_config').select('field_name').eq('id', id).maybeSingle();
+      .from('dropdown_config').select('field_name').eq('id', id).eq('org_id', orgId).maybeSingle();
     if (!row || !CX_ALLOWED.has(row.field_name))
       return res.status(403).json({ error: 'Not permitted' });
   }
@@ -532,6 +541,7 @@ export default async function handler(req, res) {
       .from('dropdown_config')
       .update(updates)
       .eq('id', id)
+      .eq('org_id', orgId)
       .select()
       .single();
     if (error) return res.status(500).json({ error: error.message });
@@ -539,7 +549,7 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'DELETE') {
-    const { error } = await supabase.from('dropdown_config').delete().eq('id', id);
+    const { error } = await supabase.from('dropdown_config').delete().eq('id', id).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ success: true });
   }

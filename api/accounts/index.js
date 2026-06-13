@@ -10,6 +10,8 @@ export default async function handler(req, res) {
   let user;
   try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
+  const orgId = user.org_id || 1;
+
   // Always resolve csm_name fresh from DB so stale JWTs don't cause empty results
   let csmName = null;
   if (user.role === 'csm') {
@@ -17,8 +19,36 @@ export default async function handler(req, res) {
     csmName = u?.csm_name ?? null;
   }
 
+  // ?mode=filters — dropdown values for the accounts filter bar
+  if (req.method === 'GET' && req.query.mode === 'filters') {
+    let filtersQuery = supabase.from('accounts').select('csm, csm_lead, industry, region, mrr_tier').eq('org_id', orgId);
+    if (user.role === 'csm') filtersQuery = filtersQuery.eq('csm', csmName);
+
+    const [{ data, error }, { data: tierData }, { data: adminUsers }] = await Promise.all([
+      filtersQuery,
+      supabase.from('dropdown_config').select('value').eq('field_name', 'mrr_tier').eq('org_id', orgId).order('sort_order').order('value'),
+      supabase.from('users').select('name').eq('role', 'admin').eq('org_id', orgId).order('name'),
+    ]);
+    if (error) return res.status(500).json({ error: error.message });
+
+    const csms     = [...new Set((data || []).map(a => a.csm).filter(Boolean))].sort();
+    const csmLeads = (adminUsers || []).map(u => u.name).filter(Boolean).sort();
+    const industries = [...new Set((data || []).map(a => a.industry).filter(Boolean))].sort();
+    const regions    = [...new Set((data || []).map(a => a.region).filter(Boolean))].sort();
+    const tiers      = tierData?.length
+      ? tierData.map(d => d.value)
+      : [...new Set((data || []).map(a => a.mrr_tier).filter(Boolean))].sort();
+
+    const csmLeadMap = {};
+    (data || []).forEach(a => {
+      if (a.csm && a.csm_lead && !csmLeadMap[a.csm]) csmLeadMap[a.csm] = a.csm_lead;
+    });
+
+    return res.json({ csms, csmLeads, csmLeadMap, industries, regions, tiers });
+  }
+
   if (req.method === 'GET' && req.query.stats) {
-    let statsQuery = supabase.from('accounts').select('id, rag_status, industry, csm, mrr, churn_status, churn_risk, renewal_status');
+    let statsQuery = supabase.from('accounts').select('id, rag_status, industry, csm, mrr, churn_status, churn_risk, renewal_status').eq('org_id', orgId);
     if (user.role === 'csm') {
       if (!csmName) return res.json({ total: { count: 0, total_mrr: 0 }, byRag: [], byIndustry: [], byChurn: [], byCsm: [], renewalPending: { count: 0 }, churnRisk: { count: 0 } });
       statsQuery = statsQuery.eq('csm', csmName);
@@ -55,7 +85,7 @@ export default async function handler(req, res) {
   if (req.method === 'GET') {
     const { csm, industry, region, rag_status, churn_status, mrr_tier, search } = req.query;
 
-    let query = supabase.from('accounts').select('*').order('account_name');
+    let query = supabase.from('accounts').select('*').eq('org_id', orgId).order('account_name');
 
     if (user.role === 'csm') {
       if (!csmName) return res.json([]);
@@ -77,9 +107,7 @@ export default async function handler(req, res) {
     const { account_name } = req.body;
     if (!account_name) return res.status(400).json({ error: 'account_name required' });
 
-    // Accept any editable account field on create (UI sends a subset; the
-    // open API can send the full record in one call).
-    const row = { account_name };
+    const row = { account_name, org_id: orgId };
     for (const field of ACCOUNT_EDITABLE_FIELDS) {
       const v = req.body[field];
       if (v !== undefined) row[field] = v === '' ? null : v;
@@ -122,7 +150,8 @@ export default async function handler(req, res) {
     const { error } = await supabase
       .from('accounts')
       .update({ [field]: coerced, updated_at: new Date().toISOString() })
-      .in('id', ids);
+      .in('id', ids)
+      .eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ updated: ids.length });
   }

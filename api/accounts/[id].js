@@ -11,6 +11,7 @@ export default async function handler(req, res) {
   try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
   const { id } = req.query;
+  const orgId = user.org_id || 1;
 
   // Resolve fresh csm_name so stale JWTs don't block access
   let csmName = null;
@@ -21,7 +22,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     const { data: account, error } = await supabase
-      .from('accounts').select('*').eq('id', id).single();
+      .from('accounts').select('*').eq('id', id).eq('org_id', orgId).single();
 
     if (error || !account) return res.status(404).json({ error: 'Not found' });
     if (user.role === 'csm' && account.csm !== csmName) return res.status(403).json({ error: 'Access denied' });
@@ -41,7 +42,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'PUT') {
     const { data: current, error: fetchErr } = await supabase
-      .from('accounts').select('*').eq('id', id).single();
+      .from('accounts').select('*').eq('id', id).eq('org_id', orgId).single();
 
     if (fetchErr || !current) return res.status(404).json({ error: 'Not found' });
     if (user.role === 'csm' && current.csm !== csmName) return res.status(403).json({ error: 'Access denied' });
@@ -63,7 +64,7 @@ export default async function handler(req, res) {
     updates.updated_by = user.name || null;
 
     const { data: updated, error } = await supabase
-      .from('accounts').update(updates).eq('id', id).select().single();
+      .from('accounts').update(updates).eq('id', id).eq('org_id', orgId).select().single();
 
     if (error) return res.status(500).json({ error: error.message });
 
@@ -72,6 +73,7 @@ export default async function handler(req, res) {
       await supabase.from('activity_log').insert({
         account_id: Number(id),
         user_id: user.id,
+        org_id: orgId,
         action: 'update',
         changes
       });

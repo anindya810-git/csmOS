@@ -9,6 +9,8 @@ export default async function handler(req, res) {
   let user;
   try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
+  const orgId = user.org_id || 1;
+
   let csmName = null;
   if (user.role === 'csm') {
     const { data: u } = await supabase.from('users').select('csm_name').eq('id', user.id).single();
@@ -21,6 +23,7 @@ export default async function handler(req, res) {
     let query = supabase
       .from('escalations')
       .select('*, accounts(id, rag_status)')
+      .eq('org_id', orgId)
       .order('date_of_escalation', { ascending: false });
 
     if (user.role === 'csm') {
@@ -50,11 +53,12 @@ export default async function handler(req, res) {
     if (!description) return res.status(400).json({ error: 'description required' });
 
     if (user.role === 'csm' && account_id) {
-      const { data: acct } = await supabase.from('accounts').select('csm').eq('id', account_id).single();
+      const { data: acct } = await supabase.from('accounts').select('csm').eq('id', account_id).eq('org_id', orgId).single();
       if (acct && acct.csm !== csmName) return res.status(403).json({ error: 'Access denied' });
     }
 
     const { data, error } = await supabase.from('escalations').insert({
+      org_id: orgId,
       account_id: account_id || null,
       tenant_id: tenant_id || null,
       account_name: account_name || null,
@@ -95,7 +99,8 @@ export default async function handler(req, res) {
     const { error } = await supabase
       .from('escalations')
       .update({ [field]: coerced, updated_at: new Date().toISOString(), updated_by: user.name || null })
-      .in('id', ids);
+      .in('id', ids)
+      .eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ updated: ids.length });
   }

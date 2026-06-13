@@ -147,7 +147,7 @@ export default function AccountDetail() {
       .then(r => setIssues(r.data || []))
       .catch(() => {});
     axios.get('/api/dropdown-config').then(r => setDdConfig(r.data || {})).catch(() => {});
-    axios.get('/api/accounts/filters').then(r => setCsms(r.data.csms || [])).catch(() => {});
+    axios.get('/api/accounts?mode=filters').then(r => setCsms(r.data.csms || [])).catch(() => {});
     axios.get(`/api/tasks?account_id=${id}`)
       .then(r => setTasks(r.data || []))
       .catch(() => {});

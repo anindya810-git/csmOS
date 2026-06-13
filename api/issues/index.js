@@ -10,6 +10,7 @@ export default async function handler(req, res) {
   try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
   const { id } = req.query;
+  const orgId = user.org_id || 1;
 
   let csmName = null;
   if (user.role === 'csm') {
@@ -23,6 +24,7 @@ export default async function handler(req, res) {
     let query = supabase
       .from('issues')
       .select('*')
+      .eq('org_id', orgId)
       .order('reported_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
 
@@ -50,6 +52,7 @@ export default async function handler(req, res) {
     if (!description) return res.status(400).json({ error: 'description required' });
 
     const { data, error } = await supabase.from('issues').insert({
+      org_id: orgId,
       account_id: account_id || null,
       account_name: account_name || null,
       tenant_id: tenant_id || null,
@@ -102,7 +105,7 @@ export default async function handler(req, res) {
       next_steps: next_steps || null,
       updated_by: user.name || null,
       updated_at: new Date().toISOString(),
-    }).eq('id', id).select().single();
+    }).eq('id', id).eq('org_id', orgId).select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data);
   }
@@ -111,7 +114,7 @@ export default async function handler(req, res) {
   if (req.method === 'DELETE') {
     if (!id) return res.status(400).json({ error: 'id required' });
     if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
-    const { error } = await supabase.from('issues').delete().eq('id', id);
+    const { error } = await supabase.from('issues').delete().eq('id', id).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ deleted: true });
   }
@@ -132,14 +135,14 @@ export default async function handler(req, res) {
     if (field === 'account_id') {
       updateObj.account_id = coerced ? parseInt(coerced) : null;
       if (coerced) {
-        const { data: acct } = await supabase.from('accounts').select('account_name').eq('id', parseInt(coerced)).single();
+        const { data: acct } = await supabase.from('accounts').select('account_name').eq('id', parseInt(coerced)).eq('org_id', orgId).single();
         if (acct) updateObj.account_name = acct.account_name;
       }
     } else {
       updateObj[field] = coerced;
     }
 
-    const { error } = await supabase.from('issues').update(updateObj).in('id', ids);
+    const { error } = await supabase.from('issues').update(updateObj).in('id', ids).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ updated: ids.length });
   }

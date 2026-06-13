@@ -15,6 +15,8 @@ export default async function handler(req, res) {
   let user;
   try { user = await verifyAuth(req); } catch { return res.status(401).json({ error: 'Unauthorized' }); }
 
+  const orgId = user.org_id || 1;
+
   // Resolve fresh identity for CSMs
   let freshUser = null;
   if (user.role === 'csm') {
@@ -28,7 +30,7 @@ export default async function handler(req, res) {
   // ── GET — list tasks ─────────────────────────────────────────
   if (req.method === 'GET') {
     const { account_id } = req.query;
-    let query = supabase.from('tasks').select('*').order('due_date', { ascending: true });
+    let query = supabase.from('tasks').select('*').eq('org_id', orgId).order('due_date', { ascending: true });
 
     if (user.role === 'csm') {
       if (!myName) return res.json([]);
@@ -49,11 +51,11 @@ export default async function handler(req, res) {
     if (!task_subject?.trim()) return res.status(400).json({ error: 'task_subject required' });
     if (!due_date) return res.status(400).json({ error: 'due_date required' });
 
-    // CSMs can only self-assign
     const finalTo   = user.role === 'csm' ? myName : (assigned_to || null);
     const finalToId = user.role === 'csm' ? user.id : (assigned_to_id || null);
 
     const { data, error } = await supabase.from('tasks').insert({
+      org_id: orgId,
       task_subject: task_subject.trim(),
       task_description: task_description || null,
       nature_of_task:   nature_of_task   || null,
@@ -75,7 +77,7 @@ export default async function handler(req, res) {
   if (req.method === 'PUT') {
     if (!id) return res.status(400).json({ error: 'id required' });
 
-    const { data: existing } = await supabase.from('tasks').select('*').eq('id', id).single();
+    const { data: existing } = await supabase.from('tasks').select('*').eq('id', id).eq('org_id', orgId).single();
     if (!existing) return res.status(404).json({ error: 'Not found' });
 
     if (user.role === 'csm' && existing.assigned_to !== myName) {
@@ -96,7 +98,7 @@ export default async function handler(req, res) {
       updates.completed_at = null;
     }
 
-    const { data, error } = await supabase.from('tasks').update(updates).eq('id', id).select().single();
+    const { data, error } = await supabase.from('tasks').update(updates).eq('id', id).eq('org_id', orgId).select().single();
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ ...data, derived_status: deriveStatus(data) });
   }
@@ -116,7 +118,7 @@ export default async function handler(req, res) {
       updateObj.completed_at = null;
     }
 
-    const { error } = await supabase.from('tasks').update(updateObj).in('id', ids);
+    const { error } = await supabase.from('tasks').update(updateObj).in('id', ids).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ updated: ids.length });
   }
@@ -125,7 +127,7 @@ export default async function handler(req, res) {
   if (req.method === 'DELETE') {
     if (!id) return res.status(400).json({ error: 'id required' });
     if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
-    const { error } = await supabase.from('tasks').delete().eq('id', id);
+    const { error } = await supabase.from('tasks').delete().eq('id', id).eq('org_id', orgId);
     if (error) return res.status(500).json({ error: error.message });
     return res.json({ deleted: true });
   }
