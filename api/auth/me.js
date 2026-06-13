@@ -19,24 +19,36 @@ export default async function handler(req, res) {
     });
   }
 
-  // Stamp activity and read the profile in one round-trip. If last_active_at
-  // hasn't been migrated yet, fall back to a plain select so auth keeps working.
+  // Stamp activity and read the profile in one round-trip.
+  // Falls back progressively when columns aren't migrated yet.
   let user = null;
+
   const { data: stamped } = await supabase
     .from('users')
     .update({ last_active_at: new Date().toISOString() })
     .eq('id', decoded.id)
     .select('id, name, email, role, csm_name, org_id')
     .maybeSingle();
+
   if (stamped) {
     user = stamped;
   } else {
-    const { data: rows } = await supabase
+    // org_id or last_active_at may not be migrated yet — try progressively simpler selects
+    const { data: withOrgId } = await supabase
       .from('users')
       .select('id, name, email, role, csm_name, org_id')
       .eq('id', decoded.id)
       .limit(1);
-    user = rows?.[0] || null;
+    if (withOrgId?.length) {
+      user = withOrgId[0];
+    } else {
+      const { data: plain } = await supabase
+        .from('users')
+        .select('id, name, email, role, csm_name')
+        .eq('id', decoded.id)
+        .limit(1);
+      user = plain?.[0] || null;
+    }
   }
 
   if (!user) return res.status(401).json({ error: 'User not found' });

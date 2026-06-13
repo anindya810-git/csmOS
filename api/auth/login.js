@@ -28,6 +28,8 @@ export default async function handler(req, res) {
   const orgId = user.org_id || 1;
   let orgName = null;
 
+  // organizations table may not exist yet (pre-migration) — when it does,
+  // check for suspension. maybeSingle returns data:null on error, which is safe.
   const { data: org } = await supabase
     .from('organizations')
     .select('billing_status, name')
