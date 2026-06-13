@@ -61,7 +61,6 @@ const FIELDS = {
   ],
 };
 
-// Account fields available as a join when primary entity ≠ accounts
 const ACCOUNT_JOIN_FIELDS = [
   { key: 'rag_status',       label: 'RAG Status',       options: ['Green','Amber','Red'] },
   { key: 'mrr',              label: 'MRR',              numeric: true },
@@ -74,62 +73,85 @@ const ACCOUNT_JOIN_FIELDS = [
   { key: 'stickiness_score', label: 'Stickiness Score', numeric: true },
 ];
 
-// Computed count columns available when primary entity = accounts
 const COMPUTED_FIELDS = [
-  { key: 'issues_count',           label: 'Total Issues',         numeric: true },
-  { key: 'open_issues_count',      label: 'Open Issues',          numeric: true },
-  { key: 'escalations_count',      label: 'Total Escalations',    numeric: true },
-  { key: 'open_escalations_count', label: 'Open Escalations',     numeric: true },
-  { key: 'tasks_count',            label: 'Total Tasks',          numeric: true },
-  { key: 'open_tasks_count',       label: 'Open Tasks',           numeric: true },
+  { key: 'issues_count',           label: 'Total Issues',      numeric: true },
+  { key: 'open_issues_count',      label: 'Open Issues',       numeric: true },
+  { key: 'escalations_count',      label: 'Total Escalations', numeric: true },
+  { key: 'open_escalations_count', label: 'Open Escalations',  numeric: true },
+  { key: 'tasks_count',            label: 'Total Tasks',       numeric: true },
+  { key: 'open_tasks_count',       label: 'Open Tasks',        numeric: true },
 ];
 
 /* ─── Style tokens ───────────────────────────────────────────────── */
 
 const EC = {
-  accounts:          { bg: 'bg-blue-100',   text: 'text-blue-800',   dot: 'bg-blue-500',    ring: 'ring-blue-300'   },
-  issues:            { bg: 'bg-rose-100',   text: 'text-rose-800',   dot: 'bg-rose-500',    ring: 'ring-rose-300'   },
-  escalations:       { bg: 'bg-amber-100',  text: 'text-amber-800',  dot: 'bg-amber-500',   ring: 'ring-amber-300'  },
-  tasks:             { bg: 'bg-emerald-100',text: 'text-emerald-800',dot: 'bg-emerald-500', ring: 'ring-emerald-300'},
-  accounts_computed: { bg: 'bg-violet-100', text: 'text-violet-800', dot: 'bg-violet-500',  ring: 'ring-violet-300' },
+  accounts:          { bg: 'bg-blue-100',    text: 'text-blue-800',    dot: 'bg-blue-500',    ring: 'ring-blue-300'    },
+  issues:            { bg: 'bg-rose-100',    text: 'text-rose-800',    dot: 'bg-rose-500',    ring: 'ring-rose-300'    },
+  escalations:       { bg: 'bg-amber-100',   text: 'text-amber-800',   dot: 'bg-amber-500',   ring: 'ring-amber-300'   },
+  tasks:             { bg: 'bg-emerald-100', text: 'text-emerald-800', dot: 'bg-emerald-500', ring: 'ring-emerald-300' },
+  accounts_computed: { bg: 'bg-violet-100',  text: 'text-violet-800',  dot: 'bg-violet-500',  ring: 'ring-violet-300'  },
 };
 
-const ENTITY_LABELS = { accounts: 'Accounts', issues: 'Issues', escalations: 'Escalations', tasks: 'Tasks' };
+const ENTITY_LABELS = { accounts: 'Accounts', issues: 'Issues', escalations: 'Escalations', tasks: 'Tasks', accounts_computed: 'Computed Metrics' };
 const ENTITY_ORDER  = ['accounts', 'issues', 'escalations', 'tasks'];
 const VIZ_OPTIONS   = [
-  { value: 'table', label: 'Table' },
-  { value: 'bar',   label: 'Bar Chart' },
+  { value: 'table', label: 'Table'      },
+  { value: 'bar',   label: 'Bar Chart'  },
   { value: 'line',  label: 'Line Chart' },
-  { value: 'kpi',   label: 'KPI Cards' },
+  { value: 'kpi',   label: 'KPI Cards'  },
 ];
 const AGG_OPTIONS = [
-  { value: 'count', label: 'Count' },
+  { value: 'count', label: 'Count'  },
   { value: 'sum',   label: 'Sum of' },
   { value: 'avg',   label: 'Avg of' },
 ];
 
 /* ─── Helpers ────────────────────────────────────────────────────── */
 
-// Stable unique key for a column object
 const colId = c => `${c.entity}__${c.field}`;
 
-// Result-row key for a column (how it appears in API response data)
 function flatKey(col, primaryEntity) {
   if (col.entity === primaryEntity || col.entity === 'accounts_computed') return col.field;
   return 'account__' + col.field;
 }
 
-// Collect all browseable fields for filters / groupBy / sortBy pickers
-function allFields(primaryEntity) {
-  return [
-    ...(FIELDS[primaryEntity] || []).map(f => ({ entity: primaryEntity, field: f.key, label: f.label, flatKey: f.key, options: f.options, numeric: f.numeric })),
-    ...(primaryEntity !== 'accounts'
-      ? ACCOUNT_JOIN_FIELDS.map(f => ({ entity: 'accounts', field: f.key, label: f.label, flatKey: 'account__' + f.key, options: f.options, numeric: f.numeric }))
-      : []),
-    ...(primaryEntity === 'accounts'
-      ? COMPUTED_FIELDS.map(f => ({ entity: 'accounts_computed', field: f.key, label: f.label, flatKey: f.key, numeric: true }))
-      : []),
-  ];
+function derivePrimary(selected = []) {
+  if (!selected.length) return 'accounts';
+  if (selected.length === 1) return selected[0];
+  const nonAcct = selected.filter(s => s !== 'accounts');
+  if (nonAcct.length === 1) return nonAcct[0];
+  return 'accounts';
+}
+
+function allFields(selectedEntities = ['accounts']) {
+  const primary          = derivePrimary(selectedEntities);
+  const includesAccounts = selectedEntities.includes('accounts');
+  const nonAcctEntities  = selectedEntities.filter(e => e !== 'accounts');
+  const result = [];
+
+  (FIELDS[primary] || []).forEach(f => {
+    result.push({ entity: primary, field: f.key, label: f.label, flatKey: f.key, options: f.options, numeric: f.numeric });
+  });
+
+  if (primary !== 'accounts' && includesAccounts) {
+    ACCOUNT_JOIN_FIELDS.forEach(f => {
+      result.push({ entity: 'accounts', field: f.key, label: f.label, flatKey: 'account__' + f.key, options: f.options, numeric: f.numeric });
+    });
+  }
+
+  if (primary === 'accounts') {
+    COMPUTED_FIELDS.filter(f => {
+      if (!nonAcctEntities.length) return true;
+      if (f.key.includes('issue')      && nonAcctEntities.includes('issues'))      return true;
+      if (f.key.includes('escalation') && nonAcctEntities.includes('escalations')) return true;
+      if (f.key.includes('task')       && nonAcctEntities.includes('tasks'))       return true;
+      return false;
+    }).forEach(f => {
+      result.push({ entity: 'accounts_computed', field: f.key, label: f.label, flatKey: f.key, numeric: true });
+    });
+  }
+
+  return result;
 }
 
 function formatCell(val) {
@@ -145,9 +167,12 @@ function formatCell(val) {
 
 /* ─── Column picker popover ──────────────────────────────────────── */
 
-function ColumnPicker({ primaryEntity, selectedCols, onToggle, onClose }) {
+function ColumnPicker({ selectedEntities, selectedCols, onToggle, onClose }) {
   const [q, setQ] = useState('');
   const ref = useRef();
+  const primary          = derivePrimary(selectedEntities);
+  const includesAccounts = selectedEntities.includes('accounts');
+  const nonAcctEntities  = selectedEntities.filter(e => e !== 'accounts');
 
   useEffect(() => {
     const handler = e => { if (ref.current && !ref.current.contains(e.target)) onClose(); };
@@ -156,30 +181,29 @@ function ColumnPicker({ primaryEntity, selectedCols, onToggle, onClose }) {
   }, [onClose]);
 
   const lq = q.toLowerCase();
-
   const groups = [];
 
-  // Primary entity fields
-  const primaryFs = (FIELDS[primaryEntity] || []).filter(f => !lq || f.label.toLowerCase().includes(lq));
-  if (primaryFs.length) groups.push({ entity: primaryEntity, sectionLabel: `From ${ENTITY_LABELS[primaryEntity]}`, fields: primaryFs });
+  const primaryFs = (FIELDS[primary] || []).filter(f => !lq || f.label.toLowerCase().includes(lq));
+  if (primaryFs.length) groups.push({ entity: primary, sectionLabel: `From ${ENTITY_LABELS[primary]}`, fields: primaryFs });
 
-  // Joined account fields (when primary ≠ accounts)
-  if (primaryEntity !== 'accounts') {
+  if (primary !== 'accounts' && includesAccounts) {
     const accFs = ACCOUNT_JOIN_FIELDS.filter(f => !lq || f.label.toLowerCase().includes(lq));
     if (accFs.length) groups.push({ entity: 'accounts', sectionLabel: 'From Accounts (joined)', fields: accFs });
   }
 
-  // Computed metrics (when primary = accounts)
-  if (primaryEntity === 'accounts') {
-    const compFs = COMPUTED_FIELDS.filter(f => !lq || f.label.toLowerCase().includes(lq));
+  if (primary === 'accounts') {
+    const compFs = COMPUTED_FIELDS.filter(f => {
+      const match = !nonAcctEntities.length
+        || (f.key.includes('issue')      && nonAcctEntities.includes('issues'))
+        || (f.key.includes('escalation') && nonAcctEntities.includes('escalations'))
+        || (f.key.includes('task')       && nonAcctEntities.includes('tasks'));
+      return match && (!lq || f.label.toLowerCase().includes(lq));
+    });
     if (compFs.length) groups.push({ entity: 'accounts_computed', sectionLabel: 'Computed Metrics', fields: compFs });
   }
 
   return (
-    <div
-      ref={ref}
-      className="absolute z-50 top-full right-0 mt-1.5 w-72 bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden"
-    >
+    <div ref={ref} className="absolute z-50 top-full right-0 mt-1.5 w-72 bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
       <div className="p-2 border-b border-gray-100">
         <input
           autoFocus
@@ -189,13 +213,12 @@ function ColumnPicker({ primaryEntity, selectedCols, onToggle, onClose }) {
           className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
         />
       </div>
-
       <div className="max-h-72 overflow-y-auto">
         {groups.map(grp => {
           const colors = EC[grp.entity] || EC.accounts;
           return (
             <div key={grp.entity}>
-              <div className={`flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 bg-gray-50 sticky top-0`}>
+              <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 bg-gray-50 sticky top-0">
                 <span className={`w-2 h-2 rounded-full ${colors.dot}`} />
                 {grp.sectionLabel}
               </div>
@@ -222,10 +245,122 @@ function ColumnPicker({ primaryEntity, selectedCols, onToggle, onClose }) {
             </div>
           );
         })}
-        {groups.length === 0 && (
-          <p className="text-sm text-gray-400 text-center py-8">No fields found</p>
-        )}
+        {groups.length === 0 && <p className="text-sm text-gray-400 text-center py-8">No fields found</p>}
       </div>
+    </div>
+  );
+}
+
+/* ─── Themed field dropdown (replaces native <select> for sort/filter/chart) */
+
+function FieldDropdown({ value, onChange, options, placeholder = 'Select a field…', includeNone = false, noneLabel = 'None', className = '' }) {
+  const [open, setOpen] = useState(false);
+  const [q, setQ]       = useState('');
+  const ref = useRef();
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) { setOpen(false); setQ(''); } };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  const lq = q.toLowerCase();
+
+  // Build groups in the order fields appear in options (primary entity first)
+  const groupOrder = [];
+  const groupMap   = {};
+  options.filter(af => !lq || af.label.toLowerCase().includes(lq)).forEach(af => {
+    if (!groupMap[af.entity]) { groupMap[af.entity] = []; groupOrder.push(af.entity); }
+    groupMap[af.entity].push(af);
+  });
+  const groups = groupOrder.map(ent => ({ entity: ent, fields: groupMap[ent] }));
+
+  const selected = value ? options.find(af => `${af.entity}__${af.field}` === value) : null;
+  const sc       = selected ? (EC[selected.entity] || EC.accounts) : null;
+
+  return (
+    <div ref={ref} className={`relative ${className}`}>
+      <button
+        type="button"
+        onClick={() => { setOpen(v => !v); setQ(''); }}
+        className={`w-full flex items-center justify-between gap-2 px-3 py-2 text-sm border rounded-xl bg-white transition focus:outline-none ${
+          open ? 'border-brand-500 ring-2 ring-brand-500/20' : 'border-gray-300 hover:border-gray-400'
+        }`}
+      >
+        <span className="flex items-center gap-2 truncate min-w-0">
+          {selected ? (
+            <>
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${sc.dot}`} />
+              <span className={`${sc.text} truncate font-medium`}>{selected.label}</span>
+            </>
+          ) : (
+            <span className="text-gray-400 truncate">{placeholder}</span>
+          )}
+        </span>
+        <svg className={`w-4 h-4 text-gray-400 flex-shrink-0 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="absolute z-50 top-full left-0 right-0 mt-1.5 bg-white rounded-xl border border-gray-200 shadow-2xl overflow-hidden">
+          {options.length > 5 && (
+            <div className="p-2 border-b border-gray-100">
+              <input
+                autoFocus
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                placeholder="Search fields…"
+                className="w-full px-3 py-1.5 text-sm bg-gray-50 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent"
+              />
+            </div>
+          )}
+          <div className="max-h-60 overflow-y-auto">
+            {includeNone && (
+              <button
+                onClick={() => { onChange(null); setOpen(false); setQ(''); }}
+                className={`w-full flex items-center gap-2.5 px-4 py-2 text-sm transition ${!value ? 'bg-gray-100 text-gray-700 font-medium' : 'text-gray-500 hover:bg-gray-50'}`}
+              >
+                <span className="w-2 h-2 rounded-full bg-gray-300 flex-shrink-0" />
+                {noneLabel}
+              </button>
+            )}
+            {groups.map(grp => {
+              const gc = EC[grp.entity] || EC.accounts;
+              return (
+                <div key={grp.entity}>
+                  <div className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold uppercase tracking-wider text-gray-500 bg-gray-50 sticky top-0">
+                    <span className={`w-2 h-2 rounded-full ${gc.dot}`} />
+                    {ENTITY_LABELS[grp.entity] || grp.entity}
+                  </div>
+                  {grp.fields.map(af => {
+                    const id    = `${af.entity}__${af.field}`;
+                    const isSel = value === id;
+                    return (
+                      <button
+                        key={id}
+                        onClick={() => { onChange(af); setOpen(false); setQ(''); }}
+                        className={`w-full flex items-center justify-between gap-2 px-4 py-2 text-sm transition ${
+                          isSel ? `${gc.bg} ${gc.text} font-medium` : 'text-gray-700 hover:bg-gray-50'
+                        }`}
+                      >
+                        <span>{af.label}</span>
+                        {isSel && (
+                          <svg className="w-3.5 h-3.5 flex-shrink-0 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })}
+            {groups.length === 0 && <p className="text-sm text-gray-400 text-center py-8">No fields found</p>}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -266,10 +401,7 @@ function PreviewPanel({ vizType, columns, groupBy, primaryEntity, data }) {
   );
 
   if (vizType === 'table') {
-    const displayCols = columns.filter(c => {
-      const fk = flatKey(c, primaryEntity);
-      return fk in (data[0] || {});
-    });
+    const displayCols = columns.filter(c => flatKey(c, primaryEntity) in (data[0] || {}));
     return (
       <div className="overflow-auto rounded-xl border border-gray-200 text-sm">
         <table className="w-full">
@@ -360,21 +492,21 @@ function PreviewPanel({ vizType, columns, groupBy, primaryEntity, data }) {
 /* ─── Main builder ───────────────────────────────────────────────── */
 
 const DEFAULT_CONFIG = {
-  vizType: 'table',
-  primaryEntity: 'accounts',
+  vizType:          'table',
+  selectedEntities: ['accounts'],
   columns: [
-    { entity: 'accounts', field: 'account_name',   label: 'Account Name' },
-    { entity: 'accounts', field: 'rag_status',     label: 'RAG Status'   },
-    { entity: 'accounts', field: 'mrr',            label: 'MRR'          },
-    { entity: 'accounts', field: 'csm',            label: 'CSM'          },
+    { entity: 'accounts', field: 'account_name', label: 'Account Name' },
+    { entity: 'accounts', field: 'rag_status',   label: 'RAG Status'   },
+    { entity: 'accounts', field: 'mrr',          label: 'MRR'          },
+    { entity: 'accounts', field: 'csm',          label: 'CSM'          },
   ],
-  filters: [],
-  groupBy: null,
+  filters:     [],
+  groupBy:     null,
   aggregation: { type: 'count', entity: '', field: '' },
-  sortBy: null,
-  sortDir: 'desc',
-  limit: 200,
-  isPublic: false,
+  sortBy:      null,
+  sortDir:     'desc',
+  limit:       200,
+  isPublic:    false,
 };
 
 export default function CustomReportBuilder() {
@@ -382,21 +514,30 @@ export default function CustomReportBuilder() {
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('id');
 
-  const [name, setName]               = useState('');
-  const [description, setDescription] = useState('');
-  const [config, setConfig]           = useState(DEFAULT_CONFIG);
-  const [showPicker, setShowPicker]   = useState(false);
-  const [preview, setPreview]         = useState(null);
-  const [previewTotal, setPreviewTotal] = useState(null);
-  const [running, setRunning]         = useState(false);
-  const [saving, setSaving]           = useState(false);
-  const [error, setError]             = useState('');
+  const [name, setName]                   = useState('');
+  const [description, setDescription]     = useState('');
+  const [config, setConfig]               = useState(DEFAULT_CONFIG);
+  const [showPicker, setShowPicker]       = useState(false);
+  const [preview, setPreview]             = useState(null);
+  const [previewTotal, setPreviewTotal]   = useState(null);
+  const [running, setRunning]             = useState(false);
+  const [saving, setSaving]               = useState(false);
+  const [error, setError]                 = useState('');
 
-  const isChart = config.vizType !== 'table';
-  const available = allFields(config.primaryEntity);
+  // Normalize: old saved reports may have primaryEntity instead of selectedEntities
+  const selectedEntities = config.selectedEntities
+    || (config.primaryEntity ? [config.primaryEntity] : ['accounts']);
+  const primaryEntity    = derivePrimary(selectedEntities);
+
+  const isChart          = config.vizType !== 'table';
+  const available        = allFields(selectedEntities);
   const numericAvailable = available.filter(f => f.numeric);
 
-  // Load saved report when ?id= present
+  const sortByValue  = config.sortBy       ? `${config.sortBy.entity}__${config.sortBy.field}`             : '';
+  const groupByValue = config.groupBy      ? `${config.groupBy.entity}__${config.groupBy.field}`           : '';
+  const aggFldValue  = config.aggregation.field ? `${config.aggregation.entity}__${config.aggregation.field}` : '';
+
+  // Load saved report
   useEffect(() => {
     if (!editId) return;
     axios.get('/api/dropdown-config?resource=custom_reports').then(({ data }) => {
@@ -404,16 +545,22 @@ export default function CustomReportBuilder() {
       if (report) {
         setName(report.name || '');
         setDescription(report.description || '');
-        if (report.config) setConfig(c => ({ ...DEFAULT_CONFIG, ...report.config }));
+        if (report.config) {
+          const cfg = { ...report.config };
+          if (!cfg.selectedEntities && cfg.primaryEntity) cfg.selectedEntities = [cfg.primaryEntity];
+          setConfig({ ...DEFAULT_CONFIG, ...cfg });
+        }
       }
     }).catch(() => {});
   }, [editId]);
 
-  function changePrimary(entity) {
-    const defaultCols = (FIELDS[entity] || []).slice(0, 4).map(f => ({
-      entity, field: f.key, label: f.label,
-    }));
-    setConfig(c => ({ ...c, primaryEntity: entity, columns: defaultCols, filters: [], groupBy: null, sortBy: null }));
+  function toggleEntity(entity) {
+    const current = selectedEntities;
+    if (current.includes(entity) && current.length === 1) return;
+    const next       = current.includes(entity) ? current.filter(e => e !== entity) : [...current, entity];
+    const newPrimary = derivePrimary(next);
+    const defaultCols = (FIELDS[newPrimary] || []).slice(0, 4).map(f => ({ entity: newPrimary, field: f.key, label: f.label }));
+    setConfig(c => ({ ...c, selectedEntities: next, columns: defaultCols, filters: [], groupBy: null, sortBy: null }));
     setPreview(null);
     setPreviewTotal(null);
   }
@@ -421,25 +568,18 @@ export default function CustomReportBuilder() {
   function toggleCol(col) {
     setConfig(c => {
       const id = colId(col);
-      const already = c.columns.some(x => colId(x) === id);
-      return {
-        ...c,
-        columns: already ? c.columns.filter(x => colId(x) !== id) : [...c.columns, col],
-      };
+      return { ...c, columns: c.columns.some(x => colId(x) === id)
+        ? c.columns.filter(x => colId(x) !== id)
+        : [...c.columns, col] };
     });
   }
 
-  function removeCol(id) {
-    setConfig(c => ({ ...c, columns: c.columns.filter(x => colId(x) !== id) }));
-  }
+  function removeCol(id) { setConfig(c => ({ ...c, columns: c.columns.filter(x => colId(x) !== id) })); }
 
   function addFilter() {
     const f = available[0];
     if (!f) return;
-    setConfig(c => ({
-      ...c,
-      filters: [...c.filters, { entity: f.entity, field: f.field, label: f.label, flatKey: f.flatKey, values: [] }],
-    }));
+    setConfig(c => ({ ...c, filters: [...c.filters, { entity: f.entity, field: f.field, label: f.label, flatKey: f.flatKey, values: [] }] }));
   }
 
   function updateFilter(idx, patch) {
@@ -455,32 +595,29 @@ export default function CustomReportBuilder() {
     }));
   }
 
-  function removeFilter(idx) {
-    setConfig(c => ({ ...c, filters: c.filters.filter((_, i) => i !== idx) }));
-  }
+  function removeFilter(idx) { setConfig(c => ({ ...c, filters: c.filters.filter((_, i) => i !== idx) })); }
 
   function getFilterOptions(f) {
     if (f.options) return f.options;
     const src = f.entity === 'accounts_computed' ? COMPUTED_FIELDS
-      : f.entity === 'accounts' && config.primaryEntity !== 'accounts' ? ACCOUNT_JOIN_FIELDS
+      : f.entity === 'accounts' && primaryEntity !== 'accounts' ? ACCOUNT_JOIN_FIELDS
       : (FIELDS[f.entity] || []);
     return src.find(x => x.key === f.field)?.options || null;
   }
 
   async function runPreview() {
-    setRunning(true);
-    setError('');
+    setRunning(true); setError('');
     try {
       const { data } = await axios.post('/api/dropdown-config?resource=custom_reports', {
         run_config: {
-          primaryEntity: config.primaryEntity,
-          columns: config.columns,
-          filters: config.filters.filter(f => f.values?.length > 0),
-          groupBy: isChart ? config.groupBy : null,
+          primaryEntity,
+          columns:     config.columns,
+          filters:     config.filters.filter(f => f.values?.length > 0),
+          groupBy:     isChart ? config.groupBy : null,
           aggregation: isChart ? config.aggregation : null,
-          sortBy: !isChart ? config.sortBy : null,
-          sortDir: config.sortDir,
-          limit: config.limit,
+          sortBy:      !isChart ? config.sortBy : null,
+          sortDir:     config.sortDir,
+          limit:       config.limit,
         },
       });
       setPreview(data.rows || []);
@@ -494,8 +631,7 @@ export default function CustomReportBuilder() {
 
   async function save() {
     if (!name.trim()) { setError('Report name is required'); return; }
-    setSaving(true);
-    setError('');
+    setSaving(true); setError('');
     const { isPublic, ...cfgRest } = config;
     const payload = { name: name.trim(), description: description.trim(), config: cfgRest, is_public: isPublic };
     try {
@@ -508,8 +644,7 @@ export default function CustomReportBuilder() {
     }
   }
 
-  /* ── Chip colors for column tags ── */
-  function chipColors(entity) { return EC[entity] || EC.accounts; }
+  const nonAcctSelected = selectedEntities.filter(e => e !== 'accounts');
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
@@ -519,10 +654,7 @@ export default function CustomReportBuilder() {
 
         {/* ── Header / name ── */}
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => navigate('/reports/custom')}
-            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition flex-shrink-0"
-          >
+          <button onClick={() => navigate('/reports/custom')} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition flex-shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
@@ -551,9 +683,7 @@ export default function CustomReportBuilder() {
                 key={opt.value}
                 onClick={() => { setConfig(c => ({ ...c, vizType: opt.value })); setPreview(null); }}
                 className={`py-2 rounded-xl text-xs font-semibold border-2 transition ${
-                  config.vizType === opt.value
-                    ? 'border-brand-500 bg-brand-50 text-brand-700'
-                    : 'border-gray-200 text-gray-500 hover:border-gray-300'
+                  config.vizType === opt.value ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-gray-200 text-gray-500 hover:border-gray-300'
                 }`}
               >
                 {opt.label}
@@ -562,34 +692,47 @@ export default function CustomReportBuilder() {
           </div>
         </Card>
 
-        {/* ── Data source ── */}
-        <Card title="Data Source">
+        {/* ── Data sources (multi-select) ── */}
+        <Card title="Data Sources">
           <div className="grid grid-cols-2 gap-2">
             {ENTITY_ORDER.map(key => {
-              const colors = EC[key];
-              const active = config.primaryEntity === key;
+              const colors   = EC[key];
+              const active   = selectedEntities.includes(key);
+              const isPrimary = active && key === primaryEntity && selectedEntities.length > 1;
               return (
                 <button
                   key={key}
-                  onClick={() => changePrimary(key)}
-                  className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition ${
+                  onClick={() => toggleEntity(key)}
+                  className={`relative flex items-center gap-2.5 px-3 py-2.5 rounded-xl border-2 text-sm font-medium transition text-left ${
                     active ? `${colors.bg} ${colors.text} border-current` : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
                   <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${active ? colors.dot : 'bg-gray-300'}`} />
-                  {ENTITY_LABELS[key]}
+                  <span className="flex-1">{ENTITY_LABELS[key]}</span>
+                  {isPrimary && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-white/70 leading-tight">
+                      Primary
+                    </span>
+                  )}
                 </button>
               );
             })}
           </div>
-          {config.primaryEntity !== 'accounts' && (
+          {nonAcctSelected.length > 1 ? (
             <p className="mt-3 text-xs text-gray-400 flex items-center gap-1.5">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Multiple types — rows grouped by Account with counts per type
+            </p>
+          ) : primaryEntity !== 'accounts' && selectedEntities.includes('accounts') ? (
+            <p className="mt-3 text-xs text-gray-400 flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
               </svg>
-              Account fields can be included as joined columns below
+              Account fields available as joined columns
             </p>
-          )}
+          ) : null}
         </Card>
 
         {/* ── Columns ── */}
@@ -608,7 +751,7 @@ export default function CustomReportBuilder() {
               </button>
               {showPicker && (
                 <ColumnPicker
-                  primaryEntity={config.primaryEntity}
+                  selectedEntities={selectedEntities}
                   selectedCols={config.columns}
                   onToggle={col => toggleCol(col)}
                   onClose={() => setShowPicker(false)}
@@ -624,15 +767,12 @@ export default function CustomReportBuilder() {
           ) : (
             <div className="flex flex-wrap gap-2">
               {config.columns.map(col => {
-                const c = chipColors(col.entity);
+                const c = EC[col.entity] || EC.accounts;
                 return (
                   <span key={colId(col)} className={`inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-1 rounded-full text-xs font-medium ${c.bg} ${c.text}`}>
                     <span className={`w-1.5 h-1.5 rounded-full ${c.dot} opacity-60`} />
                     {col.label}
-                    <button
-                      onClick={() => removeCol(colId(col))}
-                      className="rounded-full p-0.5 hover:bg-black/10 transition"
-                    >
+                    <button onClick={() => removeCol(colId(col))} className="rounded-full p-0.5 hover:bg-black/10 transition">
                       <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
                       </svg>
@@ -648,10 +788,7 @@ export default function CustomReportBuilder() {
         <Card
           title="Filters"
           action={
-            <button
-              onClick={addFilter}
-              className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition"
-            >
+            <button onClick={addFilter} className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg transition">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
@@ -667,22 +804,15 @@ export default function CustomReportBuilder() {
                 const opts = getFilterOptions(f);
                 return (
                   <div key={idx} className="bg-gray-50 rounded-xl p-3 space-y-2.5">
-                    <div className="flex gap-2">
-                      <select
+                    <div className="flex gap-2 items-center">
+                      <FieldDropdown
                         value={`${f.entity}__${f.field}`}
-                        onChange={e => {
-                          const found = available.find(af => `${af.entity}__${af.field}` === e.target.value);
-                          if (found) changeFilterField(idx, found);
-                        }}
-                        className="flex-1 border border-gray-200 bg-white rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                      >
-                        {available.map(af => (
-                          <option key={`${af.entity}__${af.field}`} value={`${af.entity}__${af.field}`}>
-                            {af.entity !== config.primaryEntity ? `[Account] ${af.label}` : af.label}
-                          </option>
-                        ))}
-                      </select>
-                      <button onClick={() => removeFilter(idx)} className="p-1.5 text-gray-400 hover:text-red-500 transition">
+                        onChange={af => { if (af) changeFilterField(idx, af); }}
+                        options={available}
+                        placeholder="Pick a field…"
+                        className="flex-1"
+                      />
+                      <button onClick={() => removeFilter(idx)} className="p-1.5 text-gray-400 hover:text-red-500 transition flex-shrink-0">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -707,9 +837,7 @@ export default function CustomReportBuilder() {
                     ) : (
                       <input
                         value={f.values.join(', ')}
-                        onChange={e => updateFilter(idx, {
-                          values: e.target.value.split(',').map(v => v.trim()).filter(Boolean),
-                        })}
+                        onChange={e => updateFilter(idx, { values: e.target.value.split(',').map(v => v.trim()).filter(Boolean) })}
                         placeholder="Comma-separated values…"
                         className="w-full border border-gray-200 bg-white rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                       />
@@ -727,22 +855,14 @@ export default function CustomReportBuilder() {
             <div className="space-y-3">
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Group by</label>
-                <select
-                  value={config.groupBy ? `${config.groupBy.entity}__${config.groupBy.field}` : ''}
-                  onChange={e => {
-                    const found = available.find(af => `${af.entity}__${af.field}` === e.target.value);
-                    setConfig(c => ({ ...c, groupBy: found || null }));
-                    setPreview(null);
-                  }}
-                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                >
-                  <option value="">Select a field…</option>
-                  {available.map(af => (
-                    <option key={`${af.entity}__${af.field}`} value={`${af.entity}__${af.field}`}>
-                      {af.entity !== config.primaryEntity ? `[Account] ${af.label}` : af.label}
-                    </option>
-                  ))}
-                </select>
+                <FieldDropdown
+                  value={groupByValue}
+                  onChange={af => { setConfig(c => ({ ...c, groupBy: af || null })); setPreview(null); }}
+                  options={available}
+                  placeholder="Select a field…"
+                  includeNone
+                  noneLabel="No grouping"
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Metric</label>
@@ -755,21 +875,13 @@ export default function CustomReportBuilder() {
                     {AGG_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                   {config.aggregation.type !== 'count' && (
-                    <select
-                      value={config.aggregation.field ? `${config.aggregation.entity}__${config.aggregation.field}` : ''}
-                      onChange={e => {
-                        const found = numericAvailable.find(af => `${af.entity}__${af.field}` === e.target.value);
-                        if (found) setConfig(c => ({ ...c, aggregation: { ...c.aggregation, entity: found.entity, field: found.field, flatKey: found.flatKey } }));
-                      }}
-                      className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                    >
-                      <option value="">Select field…</option>
-                      {numericAvailable.map(af => (
-                        <option key={`${af.entity}__${af.field}`} value={`${af.entity}__${af.field}`}>
-                          {af.entity !== config.primaryEntity ? `[Account] ${af.label}` : af.label}
-                        </option>
-                      ))}
-                    </select>
+                    <FieldDropdown
+                      value={aggFldValue}
+                      onChange={af => { if (af) setConfig(c => ({ ...c, aggregation: { ...c.aggregation, entity: af.entity, field: af.field, flatKey: af.flatKey } })); }}
+                      options={numericAvailable}
+                      placeholder="Select field…"
+                      className="flex-1"
+                    />
                   )}
                 </div>
               </div>
@@ -781,25 +893,18 @@ export default function CustomReportBuilder() {
         {!isChart && (
           <Card title="Sort & Limit">
             <div className="space-y-5">
-              {/* Sort by */}
               <div>
                 <label className="block text-xs font-medium text-gray-500 mb-1.5">Sort by column</label>
                 <div className="flex gap-2">
-                  <select
-                    value={config.sortBy ? `${config.sortBy.entity}__${config.sortBy.field}` : ''}
-                    onChange={e => {
-                      const found = available.find(af => `${af.entity}__${af.field}` === e.target.value);
-                      setConfig(c => ({ ...c, sortBy: found || null }));
-                    }}
-                    className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
-                  >
-                    <option value="">None (default order)</option>
-                    {available.map(af => (
-                      <option key={`${af.entity}__${af.field}`} value={`${af.entity}__${af.field}`}>
-                        {af.entity !== config.primaryEntity ? `[Account] ${af.label}` : af.label}
-                      </option>
-                    ))}
-                  </select>
+                  <FieldDropdown
+                    value={sortByValue}
+                    onChange={af => setConfig(c => ({ ...c, sortBy: af || null }))}
+                    options={available}
+                    placeholder="None (default order)"
+                    includeNone
+                    noneLabel="None (default order)"
+                    className="flex-1"
+                  />
                   <div className="flex rounded-xl border border-gray-300 overflow-hidden flex-shrink-0 text-xs font-semibold">
                     {[{ v: 'asc', icon: '↑', label: 'Asc' }, { v: 'desc', icon: '↓', label: 'Desc' }].map(({ v, icon, label }) => (
                       <button
@@ -813,7 +918,6 @@ export default function CustomReportBuilder() {
                   </div>
                 </div>
               </div>
-              {/* Row limit */}
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-sm font-medium text-gray-700">Row limit</p>
@@ -885,7 +989,7 @@ export default function CustomReportBuilder() {
               vizType={config.vizType}
               columns={config.columns}
               groupBy={config.groupBy}
-              primaryEntity={config.primaryEntity}
+              primaryEntity={primaryEntity}
               data={preview}
             />
           </div>
