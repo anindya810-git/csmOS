@@ -40,13 +40,23 @@ export const AI_SECTIONS = {
     maxTokens: 700,
   },
   issues_overview: {
-    label: 'Issues & Escalations Overview',
-    system: 'You are a Customer Success analyst. Summarize the issues and escalations currently in view (already filtered by the user): dominant themes, priority/severity distribution, notable accounts, and the top 3 recommended focus areas. Be concise.',
+    label: 'Issues Overview',
+    system: 'You are a Customer Success analyst. Summarize the issues currently in view (already filtered by the user): dominant themes, priority/severity distribution, notable accounts, and the top 3 recommended focus areas. Be concise.',
     maxTokens: 700,
   },
-  next_steps: {
-    label: 'Recommended Next Steps',
-    system: 'You are a Customer Success analyst. Given this single issue or escalation, recommend concrete next steps as 3–5 short bullets, suggest who should own it, and flag any risk. Be specific and concise.',
+  escalations_overview: {
+    label: 'Escalations Overview',
+    system: 'You are a Customer Success analyst. Summarize the escalations currently in view (already filtered by the user): dominant themes, status/severity distribution, notable accounts, ageing and ETA concerns, and the top 3 recommended focus areas. Be concise.',
+    maxTokens: 700,
+  },
+  issue_next_steps: {
+    label: 'Issue Next Steps',
+    system: 'You are a Customer Success analyst. Given this single issue, recommend concrete next steps as 3–5 short bullets, suggest who should own it, and flag any risk. Be specific and concise.',
+    maxTokens: 400,
+  },
+  escalation_next_steps: {
+    label: 'Escalation Next Steps',
+    system: 'You are a Customer Success analyst. Given this single escalation, recommend concrete next steps as 3–5 short bullets, suggest who should own it, and flag any risk. Be specific and concise.',
     maxTokens: 400,
   },
 };

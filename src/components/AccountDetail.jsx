@@ -397,7 +397,7 @@ export default function AccountDetail() {
                           </div>
                           <div className="pt-2 border-t border-gray-100">
                             <AiPanel
-                              section="next_steps"
+                              section="escalation_next_steps"
                               title="AI Recommended Next Steps"
                               compact
                               getPayload={() => ({ kind: 'escalation', item: e })}
@@ -526,7 +526,7 @@ export default function AccountDetail() {
                           )}
                           <div className="pt-2 border-t border-gray-100">
                             <AiPanel
-                              section="next_steps"
+                              section="issue_next_steps"
                               title="AI Recommended Next Steps"
                               compact
                               getPayload={() => ({ kind: 'issue', item: issue })}

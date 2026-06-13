@@ -740,7 +740,7 @@ export default function EscalationsDashboard() {
       {/* AI summary of the escalations currently in view (post-filter) */}
       {!loading && displayed.length > 0 && (
         <AiPanel
-          section="issues_overview"
+          section="escalations_overview"
           title="AI Escalations Summary (in view)"
           getPayload={() => ({ escalations: displayed })}
           hint="Summarizes the escalations currently in view, after filters. Click Generate."
@@ -879,7 +879,7 @@ export default function EscalationsDashboard() {
                             </div>
                             <div className="mt-4 pt-4 border-t border-blue-100">
                               <AiPanel
-                                section="next_steps"
+                                section="escalation_next_steps"
                                 title="AI Recommended Next Steps"
                                 compact
                                 getPayload={() => ({ kind: 'escalation', item: e })}
@@ -1127,7 +1127,7 @@ export default function EscalationsDashboard() {
                     )}
                     <div className="pt-2 border-t border-gray-100">
                       <AiPanel
-                        section="next_steps"
+                        section="escalation_next_steps"
                         title="AI Recommended Next Steps"
                         compact
                         getPayload={() => ({ kind: 'escalation', item: e })}

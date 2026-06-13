@@ -215,8 +215,10 @@ const AI_PROMPT_FIELDS = [
   ['account_issues',      'Account — Issues', 'How to summarize an account\'s issues.'],
   ['feature_request', 'Feature Request Recommendation', 'How to recommend take-up, priority and ETA from linked data.'],
   ['rag',             'RAG Report Analysis', 'How to analyze each RAG band (Red/Amber/Green).'],
-  ['issues_overview', 'Issues & Escalations Overview', 'How to summarize the filtered issues & escalations in view.'],
-  ['next_steps',      'Issue / Escalation Next Steps', 'How to recommend next steps for a single issue or escalation.'],
+  ['issues_overview',       'Issues Overview', 'How to summarize the filtered issues in view.'],
+  ['escalations_overview',  'Escalations Overview', 'How to summarize the filtered escalations in view.'],
+  ['issue_next_steps',      'Issue Next Steps', 'How to recommend next steps for a single issue.'],
+  ['escalation_next_steps', 'Escalation Next Steps', 'How to recommend next steps for a single escalation.'],
 ];
 
 const API_METHOD_BADGE = {

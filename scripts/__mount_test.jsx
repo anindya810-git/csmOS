@@ -67,7 +67,7 @@ const FIXTURES = {
       provider: 'anthropic', enabled: true,
       providers: { anthropic: true, openai: false, gemini: false },
       models: { anthropic: 'claude-3-5-haiku-latest', openai: 'gpt-4o-mini', gemini: 'gemini-1.5-flash' },
-      prompts: { account_summary: '', account_escalations: '', account_issues: '', feature_request: '', rag: '', issues_overview: '', next_steps: '' },
+      prompts: { account_summary: '', account_escalations: '', account_issues: '', feature_request: '', rag: '', issues_overview: '', escalations_overview: '', issue_next_steps: '', escalation_next_steps: '' },
     },
   },
   '/api/users': [{ id: 1, email: 'admin@test.com', name: 'Admin', role: 'admin' }],

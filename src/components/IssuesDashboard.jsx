@@ -810,7 +810,7 @@ export default function IssuesDashboard() {
                               </div>
                               <div className="mt-4 pt-4 border-t border-blue-100">
                                 <AiPanel
-                                  section="next_steps"
+                                  section="issue_next_steps"
                                   title="AI Recommended Next Steps"
                                   compact
                                   getPayload={() => ({ kind: 'issue', item: issue })}
@@ -895,7 +895,7 @@ export default function IssuesDashboard() {
                       </div>
                       <div className="pt-2 border-t border-gray-100">
                         <AiPanel
-                          section="next_steps"
+                          section="issue_next_steps"
                           title="AI Recommended Next Steps"
                           compact
                           getPayload={() => ({ kind: 'issue', item: issue })}

@@ -137,22 +137,26 @@ async function buildContext(section, body, user, csmName) {
 
   if (section === 'issues_overview') {
     const issues = Array.isArray(body.issues) ? body.issues.slice(0, 80) : [];
-    const escalations = Array.isArray(body.escalations) ? body.escalations.slice(0, 80) : [];
-    if (!issues.length && !escalations.length) throw new Error('No issues or escalations in view');
-    return {
-      user: `ISSUES IN VIEW (${issues.length}):\n${issues.map(issueLine).join('\n') || '(none)'}\n\nESCALATIONS IN VIEW (${escalations.length}):\n${escalations.map(escLine).join('\n') || '(none)'}`,
-    };
+    if (!issues.length) throw new Error('No issues in view');
+    return { user: `ISSUES IN VIEW (${issues.length}):\n${issues.map(issueLine).join('\n')}` };
   }
 
-  if (section === 'next_steps') {
-    const { kind, item } = body;
-    if (!item || !['issue', 'escalation'].includes(kind)) throw new Error('item and kind required');
+  if (section === 'escalations_overview') {
+    const escalations = Array.isArray(body.escalations) ? body.escalations.slice(0, 80) : [];
+    if (!escalations.length) throw new Error('No escalations in view');
+    return { user: `ESCALATIONS IN VIEW (${escalations.length}):\n${escalations.map(escLine).join('\n')}` };
+  }
+
+  if (section === 'issue_next_steps' || section === 'escalation_next_steps') {
+    const isIssue = section === 'issue_next_steps';
+    const item = body.item;
+    if (!item) throw new Error('item required');
     if (user.role === 'csm' && item.csm && item.csm !== csmName) { const e = new Error('Access denied'); e.code = 403; throw e; }
-    const text = kind === 'issue' ? issueLine(item) : escLine(item);
+    const text = isIssue ? issueLine(item) : escLine(item);
     const acct = item.account_name ? `Account: ${item.account_name}\n` : '';
     return {
-      user: `${acct}${kind.toUpperCase()}:\n${text}`,
-      persist: item.id ? { table: kind === 'issue' ? 'issues' : 'escalations', id: item.id, col: 'ai_next_steps' } : null,
+      user: `${acct}${isIssue ? 'ISSUE' : 'ESCALATION'}:\n${text}`,
+      persist: item.id ? { table: isIssue ? 'issues' : 'escalations', id: item.id, col: 'ai_next_steps' } : null,
     };
   }
 
