@@ -475,6 +475,20 @@ export default async function handler(req, res) {
 
   const orgId = user.org_id || 1;
 
+  // Custom reports CRUD + run — available to any authenticated user.
+  // Must be routed BEFORE the generic GET handler below, otherwise a
+  // GET ?resource=custom_reports falls into the dropdown_config branch and
+  // returns the wrong payload (so saved reports never show up).
+  if (req.query.resource === 'custom_reports') {
+    return handleCustomReports(req, res, user);
+  }
+
+  // AI generation is available to any authenticated user (they can already
+  // see the underlying data); it runs before the admin gate.
+  if (req.method === 'POST' && req.body?.action === 'ai_generate') {
+    return handleGenerate(req, res, user);
+  }
+
   if (req.method === 'GET') {
     let { data, error } = await supabase
       .from('dropdown_config')
@@ -499,17 +513,6 @@ export default async function handler(req, res) {
     // Attach sanitized AI config (no raw keys) so the UI can enable/grey AI.
     try { grouped.__ai = publicAiConfig(await loadAiConfig(orgId)); } catch { grouped.__ai = publicAiConfig({}); }
     return res.json(grouped);
-  }
-
-  // AI generation is available to any authenticated user (they can already
-  // see the underlying data); it runs before the admin gate.
-  if (req.method === 'POST' && req.body?.action === 'ai_generate') {
-    return handleGenerate(req, res, user);
-  }
-
-  // Custom reports CRUD + run — available to any authenticated user.
-  if (req.query.resource === 'custom_reports') {
-    return handleCustomReports(req, res, user);
   }
 
   const isAdmin = user.role === 'admin';

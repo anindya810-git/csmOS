@@ -23,7 +23,7 @@ export default async function handler(req, res) {
     const { account_id, status, csm, issue_type, priority } = req.query;
     let query = supabase
       .from('issues')
-      .select('*')
+      .select('*, accounts(id, account_name, tenant_id, csm, csm_lead, rag_status)')
       .eq('org_id', orgId)
       .order('reported_date', { ascending: false, nullsFirst: false })
       .order('created_at', { ascending: false });
@@ -39,7 +39,22 @@ export default async function handler(req, res) {
 
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
-    return res.json(data);
+
+    // Account is the source of truth: when an issue is linked to an account,
+    // its CSM / CSM Lead / Tenant ID / Account name always reflect the account,
+    // never whatever was typed into the issue.
+    const rows = (data || []).map(i => {
+      const a = i.accounts;
+      if (!a) return i;
+      return {
+        ...i,
+        account_name: a.account_name ?? i.account_name,
+        tenant_id:    a.tenant_id   ?? i.tenant_id,
+        csm:          a.csm         ?? i.csm,
+        csm_lead:     a.csm_lead    ?? i.csm_lead,
+      };
+    });
+    return res.json(rows);
   }
 
   // POST — create issue

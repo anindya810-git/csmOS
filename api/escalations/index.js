@@ -22,7 +22,7 @@ export default async function handler(req, res) {
 
     let query = supabase
       .from('escalations')
-      .select('*, accounts(id, rag_status)')
+      .select('*, accounts(id, account_name, tenant_id, csm, rag_status)')
       .eq('org_id', orgId)
       .order('date_of_escalation', { ascending: false });
 
@@ -39,7 +39,22 @@ export default async function handler(req, res) {
 
     const { data, error } = await query;
     if (error) return res.status(500).json({ error: error.message });
-    return res.json(data);
+
+    // Account is the source of truth: when an escalation is linked to an
+    // account, its CSM / Tenant ID / Account name / RAG always reflect the
+    // account, never whatever was typed into the escalation. (RAG was already
+    // read from the join; this also corrects CSM, Tenant ID and Account name.)
+    const rows = (data || []).map(e => {
+      const a = e.accounts;
+      if (!a) return e;
+      return {
+        ...e,
+        account_name: a.account_name ?? e.account_name,
+        tenant_id:    a.tenant_id   ?? e.tenant_id,
+        csm:          a.csm         ?? e.csm,
+      };
+    });
+    return res.json(rows);
   }
 
   if (req.method === 'POST') {
