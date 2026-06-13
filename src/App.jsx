@@ -1,4 +1,4 @@
-import React, { lazy, useEffect } from 'react';
+import React, { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FieldLabelsProvider } from './context/FieldLabelsContext';
@@ -100,6 +100,11 @@ function ImpersonationEntry() {
 function AppRoutes() {
   const { user } = useAuth();
   return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    }>
     <Routes>
       {/* Public landing page at root */}
       <Route path="/" element={<PublicRootRoute />} />
@@ -146,6 +151,7 @@ function AppRoutes() {
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </Suspense>
   );
 }
 

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useSuperadminAuth } from '../../context/SuperadminAuthContext';
 
@@ -63,9 +63,17 @@ export default function SuperadminLayout() {
         </div>
       </aside>
 
-      {/* Main content */}
+      {/* Main content — Suspense keeps the sidebar mounted while a lazily-loaded
+          superadmin page chunk arrives (without it, navigating shows a blank
+          page until a manual refresh). */}
       <main className="flex-1 min-w-0 overflow-auto">
-        <Outlet />
+        <Suspense fallback={
+          <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        }>
+          <Outlet />
+        </Suspense>
       </main>
     </div>
   );
