@@ -15,6 +15,7 @@ import AiPanel from './AiPanel';
 import { ISSUE_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
+import { useFeatures } from '../hooks/useFeatures';
 
 // Every issue field can be shown as a column; these start visible.
 const ISSUES_DEFAULT_ON = ['account_name', 'priority', 'description', 'issue_type', 'owner_team', 'status', 'reported_date', 'csm'];
@@ -226,6 +227,7 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
 export default function IssuesDashboard() {
   const { user } = useAuth();
   const { can } = usePermissions();
+  const { isEnabled } = useFeatures();
   const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'issues', Object.fromEntries(ISSUES_COLS.map(c => [c.key, !c.off]))
@@ -460,7 +462,7 @@ export default function IssuesDashboard() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {user?.role === 'admin' && (
+          {user?.role === 'admin' && isEnabled('bulk_updates') && (
             <button
               onClick={() => { setBulkOpen(o => !o); setBulkValue(''); }}
               className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition
@@ -542,6 +544,7 @@ export default function IssuesDashboard() {
           )}
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
           <ColumnToggle columns={ISSUES_COLS.map(c => ({ ...c, label: fieldLabel('issues', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
+          {isEnabled('advanced_search') && (
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
@@ -554,7 +557,8 @@ export default function IssuesDashboard() {
             </svg>
             Advanced{conditions.length > 0 ? ` (${conditions.length})` : ''}
           </button>
-          {hasFilters && <button onClick={clearAll} className="text-sm text-gray-400 hover:text-gray-600 underline">Clear all</button>}
+          )}
+          {hasFilters && <button onClick={clearAll} className={`text-sm text-gray-400 hover:text-gray-600 underline${isEnabled('advanced_search') ? '' : ' ml-auto'}`}>Clear all</button>}
         </div>
 
         {advancedOpen && (

@@ -1,6 +1,7 @@
 import supabase from '../_utils/supabase.js';
 import { verifyToken, generateApiKey, hashApiKey } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
+import { getOrgFeatures, featureEnabled } from '../_utils/features.js';
 import bcrypt from 'bcryptjs';
 
 const ALLOWED_ROLES = ['admin', 'csm', 'sales', 'product', 'cx_strategy', 'ps'];
@@ -10,6 +11,10 @@ const ALLOWED_ROLES = ['admin', 'csm', 'sales', 'product', 'cx_strategy', 'ps'];
 async function handleApiKeys(req, res, caller) {
   const { id } = req.query;
   const orgId = caller.org_id || 1;
+
+  const features = await getOrgFeatures(orgId);
+  if (!featureEnabled(features, 'api_access'))
+    return res.status(403).json({ error: 'API Access is disabled for your organisation.' });
 
   if (req.method === 'GET') {
     const { data, error } = await supabase

@@ -11,6 +11,7 @@ import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { ACCOUNT_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
+import { useFeatures } from '../hooks/useFeatures';
 
 // Every account field is available as a column; only these start visible.
 const DEFAULT_ON = ['account_name', 'industry', 'mrr', 'csm', 'rag_status', 'renewal_date', 'churn_status', 'region'];
@@ -162,6 +163,7 @@ export default function AccountsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { can } = usePermissions();
+  const { isEnabled } = useFeatures();
   const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'accounts', Object.fromEntries(ACCOUNTS_COLS.map(c => [c.key, !c.off]))
@@ -332,7 +334,7 @@ export default function AccountsPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {user?.role === 'admin' && (
+          {user?.role === 'admin' && isEnabled('bulk_updates') && (
             <button
               onClick={() => { setBulkOpen(o => !o); setBulkValue(''); }}
               className={`inline-flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-lg border transition
@@ -378,6 +380,7 @@ export default function AccountsPage() {
           <MultiSelectDropdown options={['North','South','East','West']} value={query.region} onChange={v => setQuery(q => ({...q, region: v}))} placeholder="All Regions" />
           <MultiSelectDropdown options={filters.tiers || []} value={query.mrr_tier} onChange={v => setQuery(q => ({...q, mrr_tier: v}))} placeholder="All Tiers" />
           <ColumnToggle columns={ACCOUNTS_COLS.map(c => ({ ...c, label: fieldLabel('accounts', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
+          {isEnabled('advanced_search') && (
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
@@ -390,8 +393,9 @@ export default function AccountsPage() {
             </svg>
             Advanced{conditions.length > 0 ? ` (${conditions.length})` : ''}
           </button>
+          )}
           {hasFilters && (
-            <button onClick={clearAll} className="text-sm text-gray-400 hover:text-gray-600 underline">Clear all</button>
+            <button onClick={clearAll} className={`text-sm text-gray-400 hover:text-gray-600 underline${isEnabled('advanced_search') ? '' : ' ml-auto'}`}>Clear all</button>
           )}
         </div>
 

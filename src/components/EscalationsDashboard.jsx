@@ -15,6 +15,7 @@ import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { ESCALATION_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
+import { useFeatures } from '../hooks/useFeatures';
 
 // Every escalation field can be shown as a column; these start visible.
 const ESC_DEFAULT_ON = ['account_name', 'rag_status', 'date_of_escalation', 'description', 'status', 'csm', 'ownership', 'eta', 'escalated_by'];
@@ -126,6 +127,7 @@ export default function EscalationsDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { can } = usePermissions();
+  const { isEnabled } = useFeatures();
   const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'escalations', Object.fromEntries(ESC_COLS.map(c => [c.key, !c.off]))
@@ -379,7 +381,7 @@ export default function EscalationsDashboard() {
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
             Weekly View
           </button>
-          {user?.role === 'admin' && (
+          {user?.role === 'admin' && isEnabled('bulk_updates') && (
             <button
               onClick={() => { setBulkOpen(o => !o); setBulkValue(''); }}
               className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition
@@ -582,6 +584,7 @@ export default function EscalationsDashboard() {
           <MultiSelectDropdown placeholder="All Issue Types" options={allIssueTypes} value={filters.issue_type} onChange={v => setFilter('issue_type', v)} />
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
           <ColumnToggle columns={ESC_COLS.map(c => ({ ...c, label: fieldLabel('escalations', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
+          {isEnabled('advanced_search') && (
           <button
             onClick={() => setAdvancedOpen(o => !o)}
             className={`ml-auto inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition
@@ -594,8 +597,9 @@ export default function EscalationsDashboard() {
             </svg>
             Advanced{conditions.length > 0 ? ` (${conditions.length})` : ''}
           </button>
+          )}
           {hasFilters && (
-            <button onClick={clearAll} className="text-sm text-gray-400 hover:text-gray-600 underline">Clear all</button>
+            <button onClick={clearAll} className={`text-sm text-gray-400 hover:text-gray-600 underline${isEnabled('advanced_search') ? '' : ' ml-auto'}`}>Clear all</button>
           )}
         </div>
 

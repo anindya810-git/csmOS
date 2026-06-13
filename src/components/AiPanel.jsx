@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import axios from 'axios';
 import { useAiConfig } from '../context/AiConfigContext';
+import { useFeatures } from '../hooks/useFeatures';
 import { timeAgo, fullTime } from './LastEdited';
 
 const SparkIcon = ({ className = 'w-4 h-4' }) => (
@@ -23,6 +24,7 @@ export default function AiPanel({
   onGenerated, compact = false, hint,
 }) {
   const { ai } = useAiConfig();
+  const { isEnabled } = useFeatures();
   const enabled = !!ai?.enabled;
 
   const [text, setText]       = useState(initialText || '');
@@ -30,6 +32,10 @@ export default function AiPanel({
   const [loading, setLoading] = useState(false);
   const [error, setError]     = useState('');
   const [showFull, setShowFull] = useState(false);
+
+  // Org-level entitlement: when AI is turned off for this org, hide every
+  // AI panel across the app. (Declared after all hooks to satisfy rules-of-hooks.)
+  if (!isEnabled('ai')) return null;
 
   // In compact mode (inside expanded rows/cards), clamp long output so the
   // row stays scannable — especially on mobile.

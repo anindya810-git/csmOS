@@ -1,6 +1,7 @@
 import supabase from '../_utils/supabase.js';
 import { verifyAuth } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
+import { getOrgFeatures, featureEnabled } from '../_utils/features.js';
 
 export default async function handler(req, res) {
   setCors(res);
@@ -137,6 +138,9 @@ export default async function handler(req, res) {
   // PATCH — bulk update, admin only
   if (req.method === 'PATCH') {
     if (user.role !== 'admin') return res.status(403).json({ error: 'Admin only' });
+    const features = await getOrgFeatures(orgId);
+    if (!featureEnabled(features, 'bulk_updates'))
+      return res.status(403).json({ error: 'Bulk updates are disabled for your organisation.' });
     const { ids, field, value } = req.body;
     const ALLOWED = [
       'status', 'priority', 'owner_team', 'csm', 'csm_lead',

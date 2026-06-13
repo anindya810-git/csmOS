@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/superadminAxios';
+import { FEATURE_DEFS } from '../../hooks/useFeatures';
 
 const PLAN_OPTIONS   = ['trial', 'starter', 'pro', 'enterprise'];
 const STATUS_OPTIONS = ['active', 'suspended', 'cancelled'];
@@ -18,6 +19,8 @@ export default function OrgDetail() {
   const [impersonating, setImpersonating] = useState(false);
   const [impersonateLink, setImpersonateLink] = useState('');
   const [error, setError]   = useState('');
+  const [featForm, setFeatForm] = useState({});
+  const [featSaving, setFeatSaving] = useState(false);
 
   useEffect(() => { fetchOrg(); }, [id]);
 
@@ -27,8 +30,23 @@ export default function OrgDetail() {
       const { data } = await api.get(`/api/superadmin?resource=orgs&id=${id}`);
       setOrg(data);
       setForm({ name: data.name, plan: data.plan, billing_status: data.billing_status, user_limit: data.user_limit, notes: data.notes || '' });
+      setFeatForm(data.features || {});
     } catch { setError('Failed to load organisation'); }
     finally { setLoading(false); }
+  }
+
+  // Default-on: a feature is enabled unless explicitly set to false.
+  const featOn = (key) => featForm[key] !== false;
+  const toggleFeature = (key) => setFeatForm(f => ({ ...f, [key]: f[key] === false }));
+
+  async function saveFeatures() {
+    setFeatSaving(true); setError('');
+    try {
+      const { data } = await api.put(`/api/superadmin?resource=orgs&id=${id}`, { features: featForm });
+      setOrg(o => ({ ...o, ...data }));
+      setFeatForm(data.features || featForm);
+    } catch (err) { setError(err?.response?.data?.error || 'Failed to save features'); }
+    finally { setFeatSaving(false); }
   }
 
   async function save() {
@@ -92,13 +110,14 @@ export default function OrgDetail() {
       {error && <div className="bg-red-950 border border-red-800 text-red-300 text-sm px-4 py-3 rounded-xl">{error}</div>}
 
       {/* Usage stats */}
-      <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+      <div className="grid grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-3">
         {[
           ['Users', org._stats?.users, org.user_limit ? `/ ${org.user_limit}` : ''],
           ['Accounts', org._stats?.accounts],
           ['Issues', org._stats?.issues],
           ['Escalations', org._stats?.escalations],
           ['Tasks', org._stats?.tasks],
+          ['Feature Reqs', org._stats?.feature_requests],
           ['Reports', org._stats?.custom_reports],
         ].map(([label, val, sub]) => (
           <div key={label} className="bg-gray-900 border border-gray-800 rounded-xl p-3 text-center">
@@ -158,6 +177,40 @@ export default function OrgDetail() {
             </button>
           </div>
         )}
+      </div>
+
+      {/* Features / Entitlements */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl">
+        <div className="px-5 py-4 border-b border-gray-800 flex items-center justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-white">Features &amp; Entitlements</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Turn features off for this organisation. Changes apply on the user's next page load.</p>
+          </div>
+          <button
+            onClick={saveFeatures}
+            disabled={featSaving || JSON.stringify(featForm) === JSON.stringify(org.features || {})}
+            className="text-xs px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white rounded-lg font-semibold transition disabled:opacity-40"
+          >
+            {featSaving ? 'Saving…' : 'Save Features'}
+          </button>
+        </div>
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {FEATURE_DEFS.map(f => (
+            <button
+              key={f.key}
+              onClick={() => toggleFeature(f.key)}
+              className={`flex items-center justify-between gap-3 text-left px-4 py-3 rounded-xl border transition ${featOn(f.key) ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-950 border-gray-800'}`}
+            >
+              <div className="min-w-0">
+                <p className={`text-sm font-medium ${featOn(f.key) ? 'text-white' : 'text-gray-500'}`}>{f.label}</p>
+                <p className="text-xs text-gray-500 truncate">{f.desc}</p>
+              </div>
+              <span className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition ${featOn(f.key) ? 'bg-brand-600' : 'bg-gray-700'}`}>
+                <span className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${featOn(f.key) ? 'left-[18px]' : 'left-0.5'}`} />
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Users table */}

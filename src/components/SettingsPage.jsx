@@ -6,6 +6,7 @@ import { FIELD_CATALOG } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions, getDefaultPermsForRole, PERM_OBJECTS, PERM_ACTIONS } from '../context/PermissionsContext';
 import { useAiConfig } from '../context/AiConfigContext';
+import { useFeatures } from '../hooks/useFeatures';
 import { timeAgo, fullTime } from './LastEdited';
 
 // Users seen within this window count as currently active.
@@ -283,6 +284,7 @@ const API_DOCS = [
 
 export default function SettingsPage() {
   const { user } = useAuth();
+  const { isEnabled } = useFeatures();
   const navigate = useNavigate();
 
   const [settingsPage, setSettingsPage] = useState('users');
@@ -631,9 +633,12 @@ export default function SettingsPage() {
     finally { setPermSaving(false); }
   };
 
-  const visibleNavItems = user?.role === 'cx_strategy'
+  // Map each settings tab to its org feature flag; tabs without a flag always show.
+  const TAB_FEATURE = { permissions: 'permissions', ai: 'ai', api: 'api_access', fields: 'field_management' };
+  const visibleNavItems = (user?.role === 'cx_strategy'
     ? NAV_ITEMS.filter(i => i.key === 'fields')
-    : NAV_ITEMS;
+    : NAV_ITEMS
+  ).filter(i => !TAB_FEATURE[i.key] || isEnabled(TAB_FEATURE[i.key]));
 
   const { roots, childrenMap } = buildTree(users);
   const currentDdItems = ddData[ddField] || [];
@@ -701,6 +706,7 @@ export default function SettingsPage() {
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                 <p className="text-xs text-gray-400">{users.length} user{users.length !== 1 ? 's' : ''}</p>
                 <div className="flex items-center gap-3">
+                  {isEnabled('user_tree_view') && (
                   <div className="flex items-center bg-gray-100 rounded-lg p-0.5">
                     <button onClick={() => setViewMode('list')} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition ${viewMode === 'list' ? 'bg-white shadow-sm text-gray-900' : 'text-gray-500 hover:text-gray-700'}`}>
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
@@ -711,6 +717,7 @@ export default function SettingsPage() {
                       Tree
                     </button>
                   </div>
+                  )}
                   <button onClick={openAdd} className="inline-flex items-center gap-2 px-3 py-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                     Add User

@@ -2,6 +2,7 @@ import supabase from './_utils/supabase.js';
 import { verifyToken } from './_utils/auth.js';
 import { setCors } from './_utils/cors.js';
 import { callAI, AI_SECTIONS, DEFAULT_MODELS, PROVIDERS } from './_utils/ai.js';
+import { getOrgFeatures, featureEnabled } from './_utils/features.js';
 
 const PROMPT_KEYS = Object.keys(AI_SECTIONS); // account_summary, account_escalations, account_issues, ...
 
@@ -480,12 +481,18 @@ export default async function handler(req, res) {
   // GET ?resource=custom_reports falls into the dropdown_config branch and
   // returns the wrong payload (so saved reports never show up).
   if (req.query.resource === 'custom_reports') {
+    const features = await getOrgFeatures(orgId);
+    if (!featureEnabled(features, 'custom_reports'))
+      return res.status(403).json({ error: 'Custom Reports is disabled for your organisation.' });
     return handleCustomReports(req, res, user);
   }
 
   // AI generation is available to any authenticated user (they can already
   // see the underlying data); it runs before the admin gate.
   if (req.method === 'POST' && req.body?.action === 'ai_generate') {
+    const features = await getOrgFeatures(orgId);
+    if (!featureEnabled(features, 'ai'))
+      return res.status(403).json({ error: 'AI is disabled for your organisation.' });
     return handleGenerate(req, res, user);
   }
 

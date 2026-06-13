@@ -87,22 +87,28 @@ async function handleOrgs(req, res, admin) {
     ]);
     if (!org) return res.status(404).json({ error: 'Not found' });
 
-    const [{ data: accts }, { data: issues }, { data: escalations }, { data: tasks }] = await Promise.all([
+    // head:true count queries return { count }, not a data array.
+    const [accts, issues, escalations, tasks, frs, reports] = await Promise.all([
       supabase.from('accounts').select('id', { count: 'exact', head: true }).eq('org_id', id),
       supabase.from('issues').select('id', { count: 'exact', head: true }).eq('org_id', id),
       supabase.from('escalations').select('id', { count: 'exact', head: true }).eq('org_id', id),
       supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('org_id', id),
+      supabase.from('feature_requests').select('id', { count: 'exact', head: true }).eq('org_id', id),
+      supabase.from('custom_reports').select('id', { count: 'exact', head: true }).eq('org_id', id),
     ]);
 
     return res.json({
       ...org,
+      features: org.features || {},
       users: users || [],
-      stats: {
-        accounts: accts?.length ?? 0,
-        issues: issues?.length ?? 0,
-        escalations: escalations?.length ?? 0,
-        tasks: tasks?.length ?? 0,
+      _stats: {
         users: (users || []).length,
+        accounts: accts.count ?? 0,
+        issues: issues.count ?? 0,
+        escalations: escalations.count ?? 0,
+        tasks: tasks.count ?? 0,
+        feature_requests: frs.count ?? 0,
+        custom_reports: reports.count ?? 0,
       },
     });
   }
@@ -163,13 +169,14 @@ async function handleOrgs(req, res, admin) {
 
   if (req.method === 'PUT') {
     if (!id) return res.status(400).json({ error: 'id required' });
-    const { name, plan, billing_status, user_limit, notes } = req.body || {};
+    const { name, plan, billing_status, user_limit, notes, features } = req.body || {};
     const updates = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name;
     if (plan !== undefined) updates.plan = plan;
     if (billing_status !== undefined) updates.billing_status = billing_status;
     if (user_limit !== undefined) updates.user_limit = Number(user_limit);
     if (notes !== undefined) updates.notes = notes || null;
+    if (features !== undefined && features && typeof features === 'object') updates.features = features;
 
     const { data, error } = await supabase.from('organizations').update(updates).eq('id', id).select().single();
     if (error) return res.status(500).json({ error: error.message });

@@ -27,12 +27,14 @@ export default async function handler(req, res) {
 
   const orgId = user.org_id || 1;
   let orgName = null;
+  let features = {};
 
   // organizations table may not exist yet (pre-migration) — when it does,
-  // check for suspension. maybeSingle returns data:null on error, which is safe.
+  // check for suspension and read feature entitlements. maybeSingle returns
+  // data:null on error, which is safe.
   const { data: org } = await supabase
     .from('organizations')
-    .select('billing_status, name')
+    .select('billing_status, name, features')
     .eq('id', orgId)
     .maybeSingle();
 
@@ -40,6 +42,7 @@ export default async function handler(req, res) {
     return res.status(403).json({ error: 'Account suspended. Contact your administrator.' });
   }
   orgName = org?.name || null;
+  features = org?.features || {};
 
   const token = signToken({
     id: user.id, email: user.email, role: user.role,
@@ -47,6 +50,6 @@ export default async function handler(req, res) {
   });
   res.json({
     token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role, csm_name: user.csm_name, org_id: orgId, org_name: orgName },
+    user: { id: user.id, name: user.name, email: user.email, role: user.role, csm_name: user.csm_name, org_id: orgId, org_name: orgName, features },
   });
 }

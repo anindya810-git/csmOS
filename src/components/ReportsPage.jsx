@@ -1,7 +1,9 @@
 import React, { Suspense } from 'react';
 import { NavLink, Outlet } from 'react-router-dom';
+import { useFeatures } from '../hooks/useFeatures';
 
 export default function ReportsPage() {
+  const { isEnabled } = useFeatures();
   const tabClass = ({ isActive }) =>
     `px-4 py-2.5 text-sm font-medium border-b-2 transition -mb-px whitespace-nowrap ${
       isActive
@@ -23,7 +25,7 @@ export default function ReportsPage() {
         <NavLink to="account-mapping"  className={tabClass}>Account Mapping</NavLink>
         <NavLink to="task-pivot"       className={tabClass}>Task Analysis</NavLink>
         <NavLink to="feature-requests" className={tabClass}>Feature Requests</NavLink>
-        <NavLink to="custom"           className={tabClass}>Custom Reports</NavLink>
+        {isEnabled('custom_reports') && <NavLink to="custom" className={tabClass}>Custom Reports</NavLink>}
       </div>
       {/* Keep the tab bar mounted while a lazily-loaded report chunk arrives */}
       <Suspense fallback={

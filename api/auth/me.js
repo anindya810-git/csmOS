@@ -1,6 +1,7 @@
 import supabase from '../_utils/supabase.js';
 import { verifyToken } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
+import { getOrgFeatures } from '../_utils/features.js';
 
 export default async function handler(req, res) {
   setCors(res);
@@ -16,6 +17,7 @@ export default async function handler(req, res) {
       id: decoded.id, name: decoded.name, email: decoded.email,
       role: decoded.role, csm_name: decoded.csm_name,
       org_id: decoded.org_id, impersonated_by: decoded.impersonated_by,
+      features: await getOrgFeatures(decoded.org_id),
     });
   }
 
@@ -52,5 +54,6 @@ export default async function handler(req, res) {
   }
 
   if (!user) return res.status(401).json({ error: 'User not found' });
+  user.features = await getOrgFeatures(user.org_id);
   res.json(user);
 }
