@@ -216,52 +216,150 @@ const ALLOWED_FIELDS = {
 
 async function handleRunReport(req, res, user) {
   const cfg = req.body?.run_config || {};
-  const { entity, fields = [], groupBy, aggregation, filters = {}, sortBy, sortDir, limit } = cfg;
+  const { primaryEntity, columns = [], filters = [], groupBy, aggregation, sortBy, sortDir, limit } = cfg;
+
   const TABLE_MAP = { accounts: 'accounts', issues: 'issues', escalations: 'escalations', tasks: 'tasks' };
-  const table = TABLE_MAP[entity];
-  if (!table) return res.status(400).json({ error: 'Invalid entity' });
+  if (!TABLE_MAP[primaryEntity]) return res.status(400).json({ error: 'Invalid entity' });
 
-  const allowed = ALLOWED_FIELDS[entity];
-  const safeFields = fields.filter(f => allowed.has(f));
-  if (!safeFields.length && !groupBy) return res.status(400).json({ error: 'No valid fields selected' });
+  const primaryAllowed = ALLOWED_FIELDS[primaryEntity];
+  const accountAllowed = ALLOWED_FIELDS.accounts;
 
-  // Always pull groupBy field even if not in fields list
-  const selectCols = [...new Set(['id', ...safeFields, ...(groupBy && allowed.has(groupBy) ? [groupBy] : [])])].join(',');
+  // Partition columns by source
+  const primaryCols     = columns.filter(c => c.entity === primaryEntity && primaryAllowed.has(c.field));
+  const accountJoinCols = primaryEntity !== 'accounts'
+    ? columns.filter(c => c.entity === 'accounts' && accountAllowed.has(c.field))
+    : [];
+  const computedCols    = primaryEntity === 'accounts'
+    ? columns.filter(c => c.entity === 'accounts_computed')
+    : [];
 
-  let q = supabase.from(table).select(selectCols);
+  if (!primaryCols.length && !accountJoinCols.length && !computedCols.length && !groupBy)
+    return res.status(400).json({ error: 'No valid columns selected' });
 
-  // Apply whitelisted filters
-  for (const [field, values] of Object.entries(filters)) {
-    if (!allowed.has(field)) continue;
-    if (Array.isArray(values) && values.length > 0) q = q.in(field, values.map(String));
+  // Build Supabase select string (always include id for computed-field lookup)
+  const primarySelect = [...new Set(['id', ...primaryCols.map(c => c.field)])].join(',');
+  let selectStr = primarySelect;
+  if (accountJoinCols.length > 0) {
+    const accSelect = [...new Set(['id', ...accountJoinCols.map(c => c.field)])].join(',');
+    selectStr += `,accounts(${accSelect})`;
+  }
+  // For chart groupBy on a primary field, ensure it's fetched
+  if (groupBy && groupBy.entity === primaryEntity && primaryAllowed.has(groupBy.field)) {
+    selectStr = [...new Set([...selectStr.split(','), groupBy.field])].join(',');
   }
 
-  // CSM role: restrict to their own accounts
-  if (user.role === 'csm' && allowed.has('csm')) {
+  let q = supabase.from(primaryEntity).select(selectStr);
+
+  // Apply primary-entity filters server-side
+  const serverFilters = filters.filter(f => f.entity === primaryEntity && primaryAllowed.has(f.field));
+  for (const f of serverFilters) {
+    if (f.values?.length > 0) q = q.in(f.field, f.values.map(String));
+  }
+
+  // CSM role: restrict to own data
+  if (user.role === 'csm' && primaryAllowed.has('csm')) {
     const { data: u } = await supabase.from('users').select('csm_name').eq('id', user.id).maybeSingle();
     if (u?.csm_name) q = q.eq('csm', u.csm_name);
   }
 
-  if (sortBy && allowed.has(sortBy)) q = q.order(sortBy, { ascending: sortDir !== 'desc' });
+  // Sort (primary-entity fields only — joined fields can't be sorted server-side here)
+  if (sortBy?.entity === primaryEntity && primaryAllowed.has(sortBy?.field)) {
+    q = q.order(sortBy.field, { ascending: sortDir !== 'desc' });
+  }
   q = q.limit(Math.min(Number(limit) || 500, 1000));
 
   const { data, error } = await q;
   if (error) return res.status(500).json({ error: error.message });
 
-  let rows = data || [];
+  // Flatten: primary fields + joined account fields (keyed as account__field)
+  let rows = (data || []).map(row => {
+    const flat = {};
+    primaryCols.forEach(c => { flat[c.field] = row[c.field] ?? null; });
+    if (accountJoinCols.length > 0) {
+      const acct = row.accounts;
+      const isObj = acct && typeof acct === 'object' && !Array.isArray(acct);
+      accountJoinCols.forEach(c => {
+        const fk = c.flatKey || ('account__' + c.field);
+        flat[fk] = isObj ? (acct[c.field] ?? null) : null;
+      });
+    }
+    return flat;
+  });
 
-  // Server-side groupBy aggregation
-  if (groupBy && allowed.has(groupBy) && aggregation?.type) {
-    const aggField = aggregation.field && allowed.has(aggregation.field) ? aggregation.field : null;
+  // Account-side filters applied client-side after flatten (only when primary ≠ accounts)
+  if (primaryEntity !== 'accounts') {
+    const clientFilters = filters.filter(f => f.entity === 'accounts' && accountAllowed.has(f.field));
+    for (const f of clientFilters) {
+      if (f.values?.length > 0) {
+        const fk = f.flatKey || ('account__' + f.field);
+        rows = rows.filter(r => f.values.map(String).includes(String(r[fk] ?? '')));
+      }
+    }
+  }
+
+  // Computed metrics (accounts primary only) — parallel count queries
+  if (computedCols.length > 0 && (data || []).length > 0) {
+    const accountIds = (data || []).map(r => r.id).filter(Boolean);
+    const cd = {};
+    const needs = key => computedCols.some(c => c.field === key);
+    const countQueries = [];
+
+    if (needs('issues_count') || needs('open_issues_count')) {
+      countQueries.push(supabase.from('issues').select('account_id,status').in('account_id', accountIds).then(({ data: d }) => {
+        (d||[]).forEach(r => {
+          if (!cd[r.account_id]) cd[r.account_id] = {};
+          cd[r.account_id].issues_count = (cd[r.account_id].issues_count || 0) + 1;
+          if (r.status === 'Open') cd[r.account_id].open_issues_count = (cd[r.account_id].open_issues_count || 0) + 1;
+        });
+      }));
+    }
+    if (needs('escalations_count') || needs('open_escalations_count')) {
+      countQueries.push(supabase.from('escalations').select('account_id,status').in('account_id', accountIds).then(({ data: d }) => {
+        (d||[]).forEach(r => {
+          if (!cd[r.account_id]) cd[r.account_id] = {};
+          cd[r.account_id].escalations_count = (cd[r.account_id].escalations_count || 0) + 1;
+          if (r.status === 'Open') cd[r.account_id].open_escalations_count = (cd[r.account_id].open_escalations_count || 0) + 1;
+        });
+      }));
+    }
+    if (needs('tasks_count') || needs('open_tasks_count')) {
+      countQueries.push(supabase.from('tasks').select('account_id,status').in('account_id', accountIds).then(({ data: d }) => {
+        (d||[]).forEach(r => {
+          if (!cd[r.account_id]) cd[r.account_id] = {};
+          cd[r.account_id].tasks_count = (cd[r.account_id].tasks_count || 0) + 1;
+          if (r.status === 'Open') cd[r.account_id].open_tasks_count = (cd[r.account_id].open_tasks_count || 0) + 1;
+        });
+      }));
+    }
+    await Promise.all(countQueries);
+
+    rows = rows.map((row, i) => {
+      const accId = (data || [])[i]?.id;
+      const extra = (accId && cd[accId]) || {};
+      const result = { ...row };
+      computedCols.forEach(c => { result[c.field] = extra[c.field] ?? 0; });
+      return result;
+    });
+  }
+
+  // Chart / KPI aggregation
+  const groupByFlatKey = groupBy
+    ? (groupBy.flatKey || (groupBy.entity === primaryEntity ? groupBy.field : 'account__' + groupBy.field))
+    : null;
+
+  if (groupByFlatKey && aggregation?.type) {
+    const aggFlatKey = aggregation.type !== 'count' && aggregation.field
+      ? (aggregation.flatKey || (aggregation.entity === primaryEntity ? aggregation.field : 'account__' + aggregation.field))
+      : null;
     const groups = {};
     for (const row of rows) {
-      const key = String(row[groupBy] ?? '(blank)');
+      const key = String(row[groupByFlatKey] ?? '(blank)');
       if (!groups[key]) groups[key] = { label: key, count: 0, sum: 0, vals: [] };
       groups[key].count++;
-      if (aggField) { const n = Number(row[aggField]); if (!isNaN(n)) { groups[key].sum += n; groups[key].vals.push(n); } }
+      if (aggFlatKey) { const n = Number(row[aggFlatKey]); if (!isNaN(n)) { groups[key].sum += n; groups[key].vals.push(n); } }
     }
     rows = Object.values(groups).map(g => ({
-      [groupBy]: g.label,
+      [groupByFlatKey]: g.label,
       value: aggregation.type === 'sum' ? g.sum
         : aggregation.type === 'avg' ? (g.vals.length ? Math.round(g.sum / g.vals.length * 100) / 100 : 0)
         : g.count,
