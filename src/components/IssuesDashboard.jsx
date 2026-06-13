@@ -127,6 +127,102 @@ function IssueCell({ issue, k }) {
   return <span className="block max-w-[220px] truncate text-gray-600 text-xs" title={String(v)}>{String(v)}</span>;
 }
 
+// Defined at module scope so React never unmounts it on parent re-renders.
+// Defined inside the component it would be a new type every render → inputs lose focus.
+function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSelect }) {
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+      {!isEdit && (
+        <div className="sm:col-span-2 lg:col-span-1">
+          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
+          <select value={f.account_id || ''} onChange={e => onAccountSelect(e.target.value, set)} className="!py-1.5 text-sm">
+            <option value="">Select account…</option>
+            {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
+          </select>
+        </div>
+      )}
+      {isEdit && (
+        <>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
+            <select value={f.account_id || ''} onChange={e => onAccountSelect(e.target.value, set)} className="!py-1.5 text-sm">
+              <option value="">Select account…</option>
+              {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
+            </select>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account Name <span className="text-gray-300 font-normal normal-case">(read-only)</span></p>
+            <input type="text" value={f.account_name || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
+          </div>
+          <div>
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM <span className="text-gray-300 font-normal normal-case">(from account)</span></p>
+            <input type="text" value={f.csm || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
+          </div>
+        </>
+      )}
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Reported Date</p>
+        <input type="date" value={f.reported_date || ''} onChange={e => set(p => ({ ...p, reported_date: e.target.value }))} className="!py-1.5 text-sm" />
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Priority</p>
+        <select value={f.priority || 'P1'} onChange={e => set(p => ({ ...p, priority: e.target.value }))} className="!py-1.5 text-sm">
+          <option value="">—</option>
+          {['P0','P1','P2','P3'].map(p => <option key={p}>{p}</option>)}
+        </select>
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
+        <select value={f.status || 'Open'} onChange={e => set(p => ({ ...p, status: e.target.value }))} className="!py-1.5 text-sm">
+          {['Open','In Progress','Deferred','Resolved','Closed'].map(s => <option key={s}>{s}</option>)}
+        </select>
+      </div>
+      <div className="sm:col-span-2 lg:col-span-3">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Description *</p>
+        <textarea rows={3} value={f.description || ''}
+          onChange={e => set(p => ({ ...p, description: e.target.value }))}
+          placeholder="Describe the issue…" className="text-sm" />
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Type</p>
+        <select value={f.issue_type || ''} onChange={e => set(p => ({ ...p, issue_type: e.target.value, issue_sub_type: '' }))} className="!py-1.5 text-sm">
+          <option value="">—</option>
+          {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+        </select>
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Sub-Type</p>
+        <select value={f.issue_sub_type || ''} onChange={e => set(p => ({ ...p, issue_sub_type: e.target.value }))} className="!py-1.5 text-sm" disabled={!f.issue_type}>
+          <option value="">{f.issue_type ? '—' : 'Select Issue Type first'}</option>
+          {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === f.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+        </select>
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Owner Team</p>
+        <input type="text" value={f.owner_team || ''} onChange={e => set(p => ({ ...p, owner_team: e.target.value }))} placeholder="Engineering, PS, Product…" className="!py-1.5 text-sm" />
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Support Ticket #</p>
+        <input type="number" value={f.support_ticket || ''} onChange={e => set(p => ({ ...p, support_ticket: e.target.value }))} className="!py-1.5 text-sm" />
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Dev Ticket #</p>
+        <input type="number" value={f.dev_ticket || ''} onChange={e => set(p => ({ ...p, dev_ticket: e.target.value }))} className="!py-1.5 text-sm" />
+      </div>
+      <div>
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Closure Date</p>
+        <input type="text" value={f.closure_date || ''} onChange={e => set(p => ({ ...p, closure_date: e.target.value }))} placeholder="e.g. 2026-04-30" className="!py-1.5 text-sm" />
+      </div>
+      <div className="sm:col-span-2 lg:col-span-3">
+        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>
+        <textarea rows={2} value={f.next_steps || ''}
+          onChange={e => set(p => ({ ...p, next_steps: e.target.value }))}
+          placeholder="What happens next…" className="text-sm" />
+      </div>
+    </div>
+  );
+}
+
 export default function IssuesDashboard() {
   const { user } = useAuth();
   const { can } = usePermissions();
@@ -351,105 +447,6 @@ export default function IssuesDashboard() {
     resolved:   displayed.filter(i => i.status === 'Resolved' || i.status === 'Closed').length,
   };
 
-  const inp = (field, placeholder, type = 'text', formState = form, setter = setForm) => (
-    <input type={type} value={formState[field] || ''} placeholder={placeholder}
-      onChange={e => setter(f => ({ ...f, [field]: e.target.value }))}
-      className="!py-1.5 text-sm" />
-  );
-
-  // ── Form fields shared between add + edit ────────────────────────────────────
-  const IssueFormFields = ({ f, set, isEdit }) => (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-      {!isEdit && (
-        <div className="sm:col-span-2 lg:col-span-1">
-          <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
-          <select value={f.account_id || ''} onChange={e => handleAccountSelect(e.target.value, set)} className="!py-1.5 text-sm">
-            <option value="">Select account…</option>
-            {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-          </select>
-        </div>
-      )}
-      {isEdit && (
-        <>
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
-            <select value={f.account_id || ''} onChange={e => handleAccountSelect(e.target.value, set)} className="!py-1.5 text-sm">
-              <option value="">Select account…</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-            </select>
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account Name <span className="text-gray-300 font-normal normal-case">(read-only)</span></p>
-            <input type="text" value={f.account_name || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
-          </div>
-          <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM <span className="text-gray-300 font-normal normal-case">(from account)</span></p>
-            <input type="text" value={f.csm || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
-          </div>
-        </>
-      )}
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Reported Date</p>
-        <input type="date" value={f.reported_date || ''} onChange={e => set(p => ({ ...p, reported_date: e.target.value }))} className="!py-1.5 text-sm" />
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Priority</p>
-        <select value={f.priority || 'P1'} onChange={e => set(p => ({ ...p, priority: e.target.value }))} className="!py-1.5 text-sm">
-          <option value="">—</option>
-          {['P0','P1','P2','P3'].map(p => <option key={p}>{p}</option>)}
-        </select>
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
-        <select value={f.status || 'Open'} onChange={e => set(p => ({ ...p, status: e.target.value }))} className="!py-1.5 text-sm">
-          {['Open','In Progress','Deferred','Resolved','Closed'].map(s => <option key={s}>{s}</option>)}
-        </select>
-      </div>
-      <div className="sm:col-span-2 lg:col-span-3">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Description *</p>
-        <textarea rows={3} value={f.description || ''}
-          onChange={e => set(p => ({ ...p, description: e.target.value }))}
-          placeholder="Describe the issue…" className="text-sm" />
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Type</p>
-        <select value={f.issue_type || ''} onChange={e => set(p => ({ ...p, issue_type: e.target.value, issue_sub_type: '' }))} className="!py-1.5 text-sm">
-          <option value="">—</option>
-          {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-        </select>
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Sub-Type</p>
-        <select value={f.issue_sub_type || ''} onChange={e => set(p => ({ ...p, issue_sub_type: e.target.value }))} className="!py-1.5 text-sm" disabled={!f.issue_type}>
-          <option value="">{f.issue_type ? '—' : 'Select Issue Type first'}</option>
-          {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === f.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-        </select>
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Owner Team</p>
-        <input type="text" value={f.owner_team || ''} onChange={e => set(p => ({ ...p, owner_team: e.target.value }))} placeholder="Engineering, PS, Product…" className="!py-1.5 text-sm" />
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Support Ticket #</p>
-        <input type="number" value={f.support_ticket || ''} onChange={e => set(p => ({ ...p, support_ticket: e.target.value }))} className="!py-1.5 text-sm" />
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Dev Ticket #</p>
-        <input type="number" value={f.dev_ticket || ''} onChange={e => set(p => ({ ...p, dev_ticket: e.target.value }))} className="!py-1.5 text-sm" />
-      </div>
-      <div>
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Closure Date</p>
-        <input type="text" value={f.closure_date || ''} onChange={e => set(p => ({ ...p, closure_date: e.target.value }))} placeholder="e.g. 2026-04-30" className="!py-1.5 text-sm" />
-      </div>
-      <div className="sm:col-span-2 lg:col-span-3">
-        <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>
-        <textarea rows={2} value={f.next_steps || ''}
-          onChange={e => set(p => ({ ...p, next_steps: e.target.value }))}
-          placeholder="What happens next…" className="text-sm" />
-      </div>
-    </div>
-  );
-
   return (
     <div className="space-y-5">
       {/* Header */}
@@ -491,7 +488,7 @@ export default function IssuesDashboard() {
       {showForm && (
         <div className="card border-brand-200 bg-brand-50/30 space-y-4">
           <p className="text-sm font-semibold text-gray-800">New Issue</p>
-          <IssueFormFields f={form} set={setForm} isEdit={false} />
+          <IssueFormFields f={form} set={setForm} isEdit={false} accounts={accounts} dropdownConfig={dropdownConfig} onAccountSelect={handleAccountSelect} />
           <div className="flex gap-2 pt-1">
             <button onClick={handleSave} disabled={saving || !form.description}
               className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
@@ -929,7 +926,7 @@ export default function IssuesDashboard() {
               </button>
             </div>
             <div className="flex-1 overflow-y-auto p-5">
-              <IssueFormFields f={editForm} set={setEditForm} isEdit={true} />
+              <IssueFormFields f={editForm} set={setEditForm} isEdit={true} accounts={accounts} dropdownConfig={dropdownConfig} onAccountSelect={handleAccountSelect} />
             </div>
             <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
               <button onClick={handleEditSave} disabled={editSaving || !editForm.description}

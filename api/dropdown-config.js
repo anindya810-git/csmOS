@@ -378,7 +378,13 @@ async function handleCustomReports(req, res, user) {
   if (req.method === 'GET') {
     let q = supabase.from('custom_reports').select('*').eq('org_id', orgId).order('updated_at', { ascending: false });
     if (user.role !== 'admin') q = q.or(`created_by_id.eq.${user.id},is_public.eq.true`);
-    const { data, error } = await q;
+    let { data, error } = await q;
+    // Pre-migration fallback: org_id column not yet added
+    if (error?.code === '42703') {
+      let q2 = supabase.from('custom_reports').select('*').order('updated_at', { ascending: false });
+      if (user.role !== 'admin') q2 = q2.or(`created_by_id.eq.${user.id},is_public.eq.true`);
+      ({ data, error } = await q2);
+    }
     if (error) return res.status(500).json({ error: error.message });
     return res.json(data || []);
   }
@@ -390,10 +396,17 @@ async function handleCustomReports(req, res, user) {
   if (req.method === 'POST') {
     const { name, description, config, is_public } = req.body || {};
     if (!name || !config) return res.status(400).json({ error: 'name and config required' });
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('custom_reports')
       .insert({ org_id: orgId, name, description: description || '', config, is_public: !!is_public, created_by: user.name || user.email || '', created_by_id: user.id || null })
       .select().single();
+    // Pre-migration fallback
+    if (error?.code === '42703') {
+      ({ data, error } = await supabase
+        .from('custom_reports')
+        .insert({ name, description: description || '', config, is_public: !!is_public, created_by: user.name || user.email || '', created_by_id: user.id || null })
+        .select().single());
+    }
     if (error) return res.status(500).json({ error: error.message });
     return res.status(201).json(data);
   }
@@ -463,12 +476,20 @@ export default async function handler(req, res) {
   const orgId = user.org_id || 1;
 
   if (req.method === 'GET') {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('dropdown_config')
       .select('*')
       .eq('org_id', orgId)
       .order('sort_order')
       .order('value');
+    // Pre-migration: org_id column doesn't exist yet — fall back to unscoped query
+    if (error?.code === '42703') {
+      ({ data, error } = await supabase
+        .from('dropdown_config')
+        .select('*')
+        .order('sort_order')
+        .order('value'));
+    }
     if (error) return res.status(500).json({ error: error.message });
     const grouped = {};
     data.forEach(row => {
