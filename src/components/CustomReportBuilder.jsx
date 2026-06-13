@@ -234,8 +234,8 @@ function ColumnPicker({ primaryEntity, selectedCols, onToggle, onClose }) {
 
 function Card({ title, children, action }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60">
+    <div className="bg-white border border-gray-200 rounded-2xl">
+      <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/60 rounded-t-2xl">
         <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">{title}</span>
         {action}
       </div>
@@ -780,40 +780,56 @@ export default function CustomReportBuilder() {
         {/* ── Sort & limit (table only) ── */}
         {!isChart && (
           <Card title="Sort & Limit">
-            <div className="flex gap-2 mb-3">
-              <select
-                value={config.sortBy ? `${config.sortBy.entity}__${config.sortBy.field}` : ''}
-                onChange={e => {
-                  const found = available.find(af => `${af.entity}__${af.field}` === e.target.value);
-                  setConfig(c => ({ ...c, sortBy: found || null }));
-                }}
-                className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none"
-              >
-                <option value="">No sort</option>
-                {available.map(af => (
-                  <option key={`${af.entity}__${af.field}`} value={`${af.entity}__${af.field}`}>
-                    {af.entity !== config.primaryEntity ? `[Account] ${af.label}` : af.label}
-                  </option>
-                ))}
-              </select>
-              <select
-                value={config.sortDir}
-                onChange={e => setConfig(c => ({ ...c, sortDir: e.target.value }))}
-                className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none"
-              >
-                <option value="desc">Desc</option>
-                <option value="asc">Asc</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-3">
-              <label className="text-sm text-gray-500 flex-shrink-0">Max rows</label>
-              <input
-                type="number"
-                value={config.limit}
-                onChange={e => setConfig(c => ({ ...c, limit: Math.max(1, Math.min(1000, Number(e.target.value) || 200)) }))}
-                min={1} max={1000}
-                className="w-28 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none"
-              />
+            <div className="space-y-5">
+              {/* Sort by */}
+              <div>
+                <label className="block text-xs font-medium text-gray-500 mb-1.5">Sort by column</label>
+                <div className="flex gap-2">
+                  <select
+                    value={config.sortBy ? `${config.sortBy.entity}__${config.sortBy.field}` : ''}
+                    onChange={e => {
+                      const found = available.find(af => `${af.entity}__${af.field}` === e.target.value);
+                      setConfig(c => ({ ...c, sortBy: found || null }));
+                    }}
+                    className="flex-1 border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  >
+                    <option value="">None (default order)</option>
+                    {available.map(af => (
+                      <option key={`${af.entity}__${af.field}`} value={`${af.entity}__${af.field}`}>
+                        {af.entity !== config.primaryEntity ? `[Account] ${af.label}` : af.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex rounded-xl border border-gray-300 overflow-hidden flex-shrink-0 text-xs font-semibold">
+                    {[{ v: 'asc', icon: '↑', label: 'Asc' }, { v: 'desc', icon: '↓', label: 'Desc' }].map(({ v, icon, label }) => (
+                      <button
+                        key={v}
+                        onClick={() => setConfig(c => ({ ...c, sortDir: v }))}
+                        className={`px-3 py-2 transition ${config.sortDir === v ? 'bg-brand-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                      >
+                        {icon} {label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Row limit */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-700">Row limit</p>
+                  <p className="text-xs text-gray-400 mt-0.5">Max 1,000 rows per run</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    value={config.limit}
+                    onChange={e => setConfig(c => ({ ...c, limit: Math.max(1, Math.min(1000, Number(e.target.value) || 200)) }))}
+                    min={1} max={1000}
+                    className="w-20 border border-gray-300 rounded-xl px-3 py-2 text-sm text-center focus:outline-none focus:ring-2 focus:ring-brand-500"
+                  />
+                  <span className="text-sm text-gray-400">rows</span>
+                </div>
+              </div>
             </div>
           </Card>
         )}
