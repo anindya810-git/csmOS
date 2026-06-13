@@ -439,7 +439,7 @@ export default function FeatureRequestsPage() {
                   <LinkLine count={stats.issues} singular="Issue" dotBg="bg-blue-400" textCls="text-blue-600" onClick={() => openDrillIssues(fr)} />
                 )}
                 {stats.accounts > 0 && (
-                  <LinkLine count={stats.accounts} singular="Account" dotBg="bg-brand-400" textCls="text-brand-600" onClick={() => openDrillAccounts(fr)} />
+                  <LinkLine count={stats.accounts} singular="Account" dotBg="bg-brand-500" textCls="text-brand-600" onClick={() => openDrillAccounts(fr)} />
                 )}
                 {fr.expected_rollout_date && <span className="text-gray-500">Rollout: {fmtDate(fr.expected_rollout_date)}</span>}
               </div>
@@ -512,7 +512,7 @@ export default function FeatureRequestsPage() {
                         <div className="flex flex-col gap-1 text-xs">
                           <LinkLine count={stats.escalations} singular="Escalation" dotBg="bg-orange-400" textCls="text-orange-600 hover:text-orange-800" onClick={() => openDrillEscalations(fr)} />
                           <LinkLine count={stats.issues} singular="Issue" dotBg="bg-blue-400" textCls="text-blue-600 hover:text-blue-800" onClick={() => openDrillIssues(fr)} />
-                          <LinkLine count={stats.accounts} singular="Account" dotBg="bg-brand-400" textCls="text-brand-600 hover:text-brand-800" onClick={() => openDrillAccounts(fr)} />
+                          <LinkLine count={stats.accounts} singular="Account" dotBg="bg-brand-500" textCls="text-brand-600 hover:text-brand-800" onClick={() => openDrillAccounts(fr)} />
                         </div>
                       </td>
                       <td className="px-4 py-3">
