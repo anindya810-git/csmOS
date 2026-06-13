@@ -27,6 +27,8 @@ const TasksPage                 = lazy(() => import('./components/TasksPage'));
 const TaskPivotReport           = lazy(() => import('./components/TaskPivotReport'));
 const FeatureRequestsPage       = lazy(() => import('./components/FeatureRequestsPage'));
 const FeatureRequestReport      = lazy(() => import('./components/FeatureRequestReport'));
+const CustomReportsPage         = lazy(() => import('./components/CustomReportsPage'));
+const CustomReportBuilder       = lazy(() => import('./components/CustomReportBuilder'));
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -72,6 +74,8 @@ function AppRoutes() {
           <Route path="account-mapping" element={<AccountMappingReport />} />
           <Route path="task-pivot"     element={<TaskPivotReport />} />
           <Route path="feature-requests" element={<FeatureRequestReport />} />
+          <Route path="custom"         element={<CustomReportsPage />} />
+          <Route path="custom/builder" element={<CustomReportBuilder />} />
         </Route>
         <Route path="renewal" element={<Navigate to="/reports/renewals" replace />} />
         <Route path="rag" element={<Navigate to="/reports/rag" replace />} />

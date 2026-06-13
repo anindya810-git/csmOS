@@ -206,6 +206,123 @@ async function handleGenerate(req, res, user) {
   return res.json({ text, generated_at });
 }
 
+// Whitelisted fields per entity — prevents arbitrary column selection (security).
+const ALLOWED_FIELDS = {
+  accounts: new Set(['id','account_name','tenant_id','csm','csm_lead','rag_status','region','industry','mrr','mrr_tier','renewal_date','golive_date','adoption_score','stickiness_score']),
+  issues: new Set(['id','account_name','priority','issue_type','issue_sub_type','owner_team','status','reported_date','closure_date','csm','csm_lead','description']),
+  escalations: new Set(['id','account_name','date_of_escalation','month','status','csm','ownership','trigger_reason','issue_type','escalated_by','description','source_of_escalation']),
+  tasks: new Set(['id','task_subject','nature_of_task','account_name','assigned_to','assigned_by','due_date','status']),
+};
+
+async function handleRunReport(req, res, user) {
+  const cfg = req.body?.run_config || {};
+  const { entity, fields = [], groupBy, aggregation, filters = {}, sortBy, sortDir, limit } = cfg;
+  const TABLE_MAP = { accounts: 'accounts', issues: 'issues', escalations: 'escalations', tasks: 'tasks' };
+  const table = TABLE_MAP[entity];
+  if (!table) return res.status(400).json({ error: 'Invalid entity' });
+
+  const allowed = ALLOWED_FIELDS[entity];
+  const safeFields = fields.filter(f => allowed.has(f));
+  if (!safeFields.length && !groupBy) return res.status(400).json({ error: 'No valid fields selected' });
+
+  // Always pull groupBy field even if not in fields list
+  const selectCols = [...new Set(['id', ...safeFields, ...(groupBy && allowed.has(groupBy) ? [groupBy] : [])])].join(',');
+
+  let q = supabase.from(table).select(selectCols);
+
+  // Apply whitelisted filters
+  for (const [field, values] of Object.entries(filters)) {
+    if (!allowed.has(field)) continue;
+    if (Array.isArray(values) && values.length > 0) q = q.in(field, values.map(String));
+  }
+
+  // CSM role: restrict to their own accounts
+  if (user.role === 'csm' && allowed.has('csm')) {
+    const { data: u } = await supabase.from('users').select('csm_name').eq('id', user.id).maybeSingle();
+    if (u?.csm_name) q = q.eq('csm', u.csm_name);
+  }
+
+  if (sortBy && allowed.has(sortBy)) q = q.order(sortBy, { ascending: sortDir !== 'desc' });
+  q = q.limit(Math.min(Number(limit) || 500, 1000));
+
+  const { data, error } = await q;
+  if (error) return res.status(500).json({ error: error.message });
+
+  let rows = data || [];
+
+  // Server-side groupBy aggregation
+  if (groupBy && allowed.has(groupBy) && aggregation?.type) {
+    const aggField = aggregation.field && allowed.has(aggregation.field) ? aggregation.field : null;
+    const groups = {};
+    for (const row of rows) {
+      const key = String(row[groupBy] ?? '(blank)');
+      if (!groups[key]) groups[key] = { label: key, count: 0, sum: 0, vals: [] };
+      groups[key].count++;
+      if (aggField) { const n = Number(row[aggField]); if (!isNaN(n)) { groups[key].sum += n; groups[key].vals.push(n); } }
+    }
+    rows = Object.values(groups).map(g => ({
+      [groupBy]: g.label,
+      value: aggregation.type === 'sum' ? g.sum
+        : aggregation.type === 'avg' ? (g.vals.length ? Math.round(g.sum / g.vals.length * 100) / 100 : 0)
+        : g.count,
+    })).sort((a, b) => b.value - a.value);
+  }
+
+  return res.json({ rows, total: (data || []).length });
+}
+
+async function handleCustomReports(req, res, user) {
+  if (req.method === 'GET') {
+    let q = supabase.from('custom_reports').select('*').order('updated_at', { ascending: false });
+    if (user.role !== 'admin') q = q.or(`created_by_id.eq.${user.id},is_public.eq.true`);
+    const { data, error } = await q;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data || []);
+  }
+
+  if (req.method === 'POST' && req.body?.run_config) {
+    return handleRunReport(req, res, user);
+  }
+
+  if (req.method === 'POST') {
+    const { name, description, config, is_public } = req.body || {};
+    if (!name || !config) return res.status(400).json({ error: 'name and config required' });
+    const { data, error } = await supabase
+      .from('custom_reports')
+      .insert({ name, description: description || '', config, is_public: !!is_public, created_by: user.name || user.email || '', created_by_id: user.id || null })
+      .select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.status(201).json(data);
+  }
+
+  const id = req.query.id || req.body?.id;
+  if (!id) return res.status(400).json({ error: 'id required' });
+
+  const { data: existing } = await supabase.from('custom_reports').select('created_by_id').eq('id', id).maybeSingle();
+  if (!existing) return res.status(404).json({ error: 'Not found' });
+  if (user.role !== 'admin' && existing.created_by_id !== user.id) return res.status(403).json({ error: 'Forbidden' });
+
+  if (req.method === 'PUT') {
+    const { name, description, config, is_public } = req.body || {};
+    const updates = { updated_at: new Date().toISOString() };
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (config !== undefined) updates.config = config;
+    if (is_public !== undefined) updates.is_public = !!is_public;
+    const { data, error } = await supabase.from('custom_reports').update(updates).eq('id', id).select().single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
+  }
+
+  if (req.method === 'DELETE') {
+    const { error } = await supabase.from('custom_reports').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ success: true });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
 async function handleAiSave(req, res) {
   const { provider, keys, clear, models, prompts } = req.body || {};
   const rows = [];
@@ -260,6 +377,11 @@ export default async function handler(req, res) {
   // see the underlying data); it runs before the admin gate.
   if (req.method === 'POST' && req.body?.action === 'ai_generate') {
     return handleGenerate(req, res, user);
+  }
+
+  // Custom reports CRUD + run — available to any authenticated user.
+  if (req.query.resource === 'custom_reports') {
+    return handleCustomReports(req, res, user);
   }
 
   const isAdmin = user.role === 'admin';
