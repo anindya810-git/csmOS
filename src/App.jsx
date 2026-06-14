@@ -30,6 +30,7 @@ const TasksPage                 = lazy(() => import('./components/TasksPage'));
 const TaskPivotReport           = lazy(() => import('./components/TaskPivotReport'));
 const FeatureRequestsPage       = lazy(() => import('./components/FeatureRequestsPage'));
 const FeatureRequestReport      = lazy(() => import('./components/FeatureRequestReport'));
+const WatchlistPage             = lazy(() => import('./components/WatchlistPage'));
 const CustomReportsPage         = lazy(() => import('./components/CustomReportsPage'));
 const CustomReportBuilder       = lazy(() => import('./components/CustomReportBuilder'));
 
@@ -131,6 +132,7 @@ function AppRoutes() {
         <Route path="accounts/:id/timeline" element={<AccountTimeline />} />
         <Route path="tasks" element={<TasksPage />} />
         <Route path="feature-requests" element={<FeatureRequestsPage />} />
+        <Route path="watchlist" element={<WatchlistPage />} />
         <Route path="reports" element={<ReportsPage />}>
           <Route index element={<Navigate to="rag" replace />} />
           <Route path="rag"            element={<RAGDashboard />} />

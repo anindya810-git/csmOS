@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/superadminAxios';
 import { FEATURE_DEFS } from '../../hooks/useFeatures';
 import CloneOrgModal from './CloneOrgModal';
+import OrgLoginReport from './OrgLoginReport';
 
 const PLAN_OPTIONS   = ['trial', 'starter', 'pro', 'enterprise'];
 const STATUS_OPTIONS = ['active', 'suspended', 'cancelled'];
@@ -25,6 +26,7 @@ export default function OrgDetail() {
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoError, setLogoError] = useState('');
   const [showClone, setShowClone] = useState(false);
+  const [showLoginReport, setShowLoginReport] = useState(false);
 
   useEffect(() => { fetchOrg(); }, [id]);
 
@@ -320,6 +322,15 @@ export default function OrgDetail() {
             {impersonating ? 'Generating…' : 'Login as Admin'}
           </button>
           <button
+            onClick={() => setShowLoginReport(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-sm font-medium transition border border-gray-600"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+            Activity Report
+          </button>
+          <button
             onClick={() => setShowClone(true)}
             className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-sm font-medium transition border border-gray-600"
           >
@@ -349,6 +360,8 @@ export default function OrgDetail() {
           </div>
         )}
       </div>
+
+      {showLoginReport && <OrgLoginReport org={org} onClose={() => setShowLoginReport(false)} />}
 
       {showClone && (
         <CloneOrgModal

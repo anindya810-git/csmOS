@@ -12,6 +12,7 @@ import { TASK_FIELDS } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
+import { useWatchlist } from '../hooks/useWatchlist';
 
 // Every task field can be shown as a column; these start visible.
 const TASKS_DEFAULT_ON = ['task_subject', 'nature_of_task', 'account_name', 'assigned_to', 'due_date', 'derived_status'];
@@ -70,6 +71,7 @@ export default function TasksPage() {
   const isAdmin   = user?.role === 'admin';
   const { can } = usePermissions();
   const { isEnabled } = useFeatures();
+  const { isWatched, toggle: watchToggle } = useWatchlist();
   const { label: fieldLabel } = useFieldLabels();
   const visibleTaskCols = TASKS_COLS.filter(c => !c.adminOnly || isAdmin);
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
@@ -527,6 +529,14 @@ export default function TasksPage() {
                               </button>
                             </>
                           )}
+                          <button onClick={ev => { ev.stopPropagation(); watchToggle('tasks', task.id); }}
+                            className={`p-1.5 rounded-md transition ${isWatched('tasks', task.id) ? 'text-brand-600' : 'text-gray-300 hover:text-gray-500'}`}
+                            title={isWatched('tasks', task.id) ? 'Remove from watchlist' : 'Add to watchlist'}>
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                            </svg>
+                          </button>
                         </div>
                       </td>
                     </tr>

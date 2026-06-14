@@ -512,7 +512,8 @@ const DEFAULT_CONFIG = {
 export default function CustomReportBuilder() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const editId = searchParams.get('id');
+  const editId     = searchParams.get('id');
+  const isViewMode = !!(editId && !searchParams.get('edit'));
 
   const [name, setName]                   = useState('');
   const [description, setDescription]     = useState('');
@@ -537,7 +538,7 @@ export default function CustomReportBuilder() {
   const groupByValue = config.groupBy      ? `${config.groupBy.entity}__${config.groupBy.field}`           : '';
   const aggFldValue  = config.aggregation.field ? `${config.aggregation.entity}__${config.aggregation.field}` : '';
 
-  // Load saved report
+  // Load saved report — in view mode, auto-run after loading
   useEffect(() => {
     if (!editId) return;
     axios.get('/api/dropdown-config?resource=custom_reports').then(({ data }) => {
@@ -548,7 +549,31 @@ export default function CustomReportBuilder() {
         if (report.config) {
           const cfg = { ...report.config };
           if (!cfg.selectedEntities && cfg.primaryEntity) cfg.selectedEntities = [cfg.primaryEntity];
-          setConfig({ ...DEFAULT_CONFIG, ...cfg });
+          const fullConfig = { ...DEFAULT_CONFIG, ...cfg };
+          setConfig(fullConfig);
+          if (isViewMode) {
+            const ents  = fullConfig.selectedEntities || ['accounts'];
+            const pEnt  = derivePrimary(ents);
+            const isChrt = fullConfig.vizType !== 'table';
+            setRunning(true);
+            axios.post('/api/dropdown-config?resource=custom_reports', {
+              run_config: {
+                primaryEntity: pEnt,
+                columns:       fullConfig.columns,
+                filters:       (fullConfig.filters || []).filter(f => f.values?.length > 0),
+                groupBy:       isChrt ? fullConfig.groupBy : null,
+                aggregation:   isChrt ? fullConfig.aggregation : null,
+                sortBy:        !isChrt ? fullConfig.sortBy : null,
+                sortDir:       fullConfig.sortDir,
+                limit:         fullConfig.limit,
+              },
+            }).then(resp => {
+              setPreview(resp.data.rows || []);
+              setPreviewTotal(resp.data.total ?? null);
+            }).catch(e => {
+              setError(e?.response?.data?.error || 'Failed to run report');
+            }).finally(() => setRunning(false));
+          }
         }
       }
     }).catch(() => {});
@@ -645,6 +670,64 @@ export default function CustomReportBuilder() {
   }
 
   const nonAcctSelected = selectedEntities.filter(e => e !== 'accounts');
+
+  // View mode: hide config panel, show full-width results
+  if (isViewMode) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate('/reports/custom')} className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition flex-shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg font-bold text-gray-900 truncate">{name || 'Loading…'}</h1>
+            {description && <p className="text-sm text-gray-500 mt-0.5">{description}</p>}
+          </div>
+          <button
+            onClick={runPreview}
+            disabled={running}
+            className="flex items-center gap-2 px-3 py-2 border border-gray-200 text-gray-600 text-sm rounded-xl hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            <svg className={`w-4 h-4 ${running ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {running ? 'Running…' : 'Refresh'}
+          </button>
+          <button
+            onClick={() => navigate(`/reports/custom/builder?id=${editId}&edit=1`)}
+            className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit Report
+          </button>
+        </div>
+
+        {error && <p className="text-sm text-red-600 px-1">{error}</p>}
+
+        <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 bg-gray-50/80">
+            <span className="text-sm font-semibold text-gray-700">Results</span>
+            {previewTotal != null && (
+              <span className="text-xs text-gray-400">{previewTotal.toLocaleString()} row{previewTotal !== 1 ? 's' : ''}</span>
+            )}
+          </div>
+          <div className="p-4 min-h-[400px]">
+            <PreviewPanel
+              vizType={config.vizType}
+              columns={config.columns}
+              groupBy={config.groupBy}
+              primaryEntity={primaryEntity}
+              data={preview}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start">

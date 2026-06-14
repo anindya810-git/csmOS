@@ -40,12 +40,12 @@ export default function SuperadminDashboard() {
       ) : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-            <StatCard label="Total Orgs"        value={stats?.totals?.orgs}        color="brand" />
-            <StatCard label="Active Orgs"        value={(stats?.byStatus || {})['active'] ?? 0} color="green" />
-            <StatCard label="Suspended Orgs"     value={(stats?.byStatus || {})['suspended'] ?? 0} color="amber" />
-            <StatCard label="Total Users"        value={stats?.totals?.users}       color="violet" />
-            <StatCard label="Total Accounts"     value={stats?.totals?.accounts}    color="brand" />
-            <StatCard label="Total Issues"       value={stats?.totals?.issues}      color="red" />
+            <StatCard label="Total Orgs"        value={stats?.totalOrgs}        color="brand" />
+            <StatCard label="Active Orgs"        value={stats?.activeOrgs ?? 0}   color="green" />
+            <StatCard label="Suspended Orgs"     value={stats?.suspendedOrgs ?? 0} color="amber" />
+            <StatCard label="Total Users"        value={stats?.totalUsers}        color="violet" />
+            <StatCard label="Total Accounts"     value={stats?.totalAccounts}     color="brand" />
+            <StatCard label="Total Issues"       value={stats?.totalIssues}       color="red" />
           </div>
 
           <div className="bg-gray-900 border border-gray-800 rounded-2xl">
@@ -55,7 +55,7 @@ export default function SuperadminDashboard() {
             <div className="p-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
               {['trial', 'starter', 'pro', 'enterprise'].map(plan => (
                 <div key={plan} className="bg-gray-800 rounded-xl p-3 text-center">
-                  <p className="text-2xl font-bold text-white">{(stats?.byPlan || {})[plan] ?? 0}</p>
+                  <p className="text-2xl font-bold text-white">{(stats?.planBreakdown || {})[plan] ?? 0}</p>
                   <p className="text-xs text-gray-400 mt-0.5 capitalize">{plan}</p>
                 </div>
               ))}

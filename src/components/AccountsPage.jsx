@@ -12,6 +12,7 @@ import { ACCOUNT_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
+import { useWatchlist } from '../hooks/useWatchlist';
 import { evalConditions } from '../utils/conditions';
 
 // Every account field is available as a column; only these start visible.
@@ -165,6 +166,7 @@ export default function AccountsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const { isEnabled } = useFeatures();
+  const { isWatched, toggle: watchToggle } = useWatchlist();
   const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'accounts', Object.fromEntries(ACCOUNTS_COLS.map(c => [c.key, !c.off]))
@@ -623,7 +625,19 @@ export default function AccountsPage() {
                     </td>
                   ))}
                   <td className="px-3 py-3 sticky right-0 z-10 bg-white group-hover:bg-gray-50 shadow-[-2px_0_6px_rgba(0,0,0,0.05)]">
-                    <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={ev => { ev.stopPropagation(); watchToggle('accounts', a.id); }}
+                        className={`p-1 rounded transition ${isWatched('accounts', a.id) ? 'text-brand-600' : 'text-gray-300 hover:text-gray-500'}`}
+                        title={isWatched('accounts', a.id) ? 'Remove from watchlist' : 'Add to watchlist'}
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                        </svg>
+                      </button>
+                      <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                    </div>
                   </td>
                 </tr>
               ))}
