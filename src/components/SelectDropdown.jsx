@@ -12,6 +12,7 @@ export default function SelectDropdown({
   clearable = true,
   disabled = false,
   searchable: searchableProp,
+  menuWidth,
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
@@ -30,7 +31,11 @@ export default function SelectDropdown({
     const r = triggerRef.current.getBoundingClientRect();
     const panelH = Math.min(filtered.length * 38 + (searchable ? 50 : 10) + (clearable ? 38 : 0), 290);
     const top = window.innerHeight - r.bottom > panelH + 8 ? r.bottom + 4 : Math.max(8, r.top - panelH - 4);
-    setPos({ top, left: r.left, width: Math.max(r.width, compact ? 160 : r.width) });
+    let width = Math.max(r.width, menuWidth || (compact ? 160 : 0));
+    width = Math.min(width, window.innerWidth - 16);
+    let left = r.left;
+    if (left + width > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - width);
+    setPos({ top, left, width });
   }, [open]);
 
   useEffect(() => {
@@ -100,7 +105,7 @@ export default function SelectDropdown({
             )}
             {filtered.map(o => (
               <button key={String(o.value)} type="button" onClick={() => select(o.value)}
-                className={`w-full text-left px-3.5 py-2.5 text-sm transition ${String(value) === String(o.value) ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
+                className={`w-full text-left px-3.5 py-2.5 text-sm transition ${menuWidth ? 'truncate' : ''} ${String(value) === String(o.value) ? 'bg-brand-50 text-brand-700 font-semibold' : 'text-gray-700 hover:bg-gray-50'}`}>
                 {o.label}
               </button>
             ))}

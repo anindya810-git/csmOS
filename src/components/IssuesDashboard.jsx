@@ -141,6 +141,8 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
         <div className="sm:col-span-2 lg:col-span-1">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
           <SelectDropdown
+            searchable
+            menuWidth={380}
             options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
             value={String(f.account_id || '')}
             onChange={v => onAccountSelect(v, set)}
@@ -154,6 +156,7 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
             <SelectDropdown
               searchable
+              menuWidth={380}
               options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
               value={String(f.account_id || '')}
               onChange={v => onAccountSelect(v, set)}
