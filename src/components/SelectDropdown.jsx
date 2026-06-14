@@ -11,6 +11,7 @@ export default function SelectDropdown({
   compact = false,
   clearable = true,
   disabled = false,
+  searchable: searchableProp,
 }) {
   const [open, setOpen] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0, width: 0 });
@@ -19,7 +20,7 @@ export default function SelectDropdown({
   const panelRef = useRef(null);
 
   const opts = useMemo(() => options.map(norm), [options]);
-  const searchable = opts.length > 10;
+  const searchable = searchableProp !== undefined ? searchableProp : opts.length > 10;
   const filtered = search
     ? opts.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
     : opts;

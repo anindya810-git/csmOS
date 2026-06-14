@@ -661,6 +661,7 @@ export default function TasksPage() {
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Account</label>
                     <SelectDropdown
+                      searchable
                       options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
                       value={String(form.account_id || '')}
                       onChange={onAccountChange}

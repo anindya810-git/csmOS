@@ -451,6 +451,7 @@ export default function EscalationsDashboard() {
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Account *</label>
                   <SelectDropdown
+                    searchable
                     options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
                     value={String(form.account_id || '')}
                     onChange={v => handleAccountSelect(v)}
@@ -1403,6 +1404,7 @@ export default function EscalationsDashboard() {
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
                   <SelectDropdown
+                    searchable
                     options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
                     value={String(editForm.account_id || '')}
                     onChange={v => handleEditAccountSelect(v)}
