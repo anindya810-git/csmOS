@@ -24,6 +24,7 @@ export default async function handler(req, res) {
 
   if (resource === 'orgs' && req.query.action === 'logo') return handleOrgLogo(req, res, admin);
   if (resource === 'orgs') return handleOrgs(req, res, admin);
+  if (resource === 'clone') return handleCloneOrg(req, res, admin);
   if (resource === 'stats') return handleStats(req, res);
 
   return res.status(404).json({ error: 'Not found' });
@@ -239,6 +240,115 @@ async function handleOrgs(req, res, admin) {
   }
 
   return res.status(405).json({ error: 'Method not allowed' });
+}
+
+async function handleCloneOrg(req, res, admin) {
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  const { source_org_id, new_name, new_slug, clone_users, clone_dropdown, clone_accounts } = req.body || {};
+  if (!source_org_id || !new_name || !new_slug)
+    return res.status(400).json({ error: 'source_org_id, new_name and new_slug are required' });
+
+  const { data: srcOrg } = await supabase.from('organizations').select('*').eq('id', source_org_id).maybeSingle();
+  if (!srcOrg) return res.status(404).json({ error: 'Source org not found' });
+
+  // Create the new org (logo is not cloned — storage paths are org-specific)
+  const { data: newOrg, error: orgErr } = await supabase
+    .from('organizations')
+    .insert({
+      name: new_name, slug: new_slug,
+      plan: srcOrg.plan, billing_status: 'active',
+      user_limit: srcOrg.user_limit, notes: srcOrg.notes,
+      features: srcOrg.features || {},
+    })
+    .select().single();
+  if (orgErr) return res.status(500).json({ error: orgErr.message });
+
+  const cloned = {};
+  let userIdMap = {};
+
+  // Clone users (parallel inserts; silently skip email conflicts)
+  if (clone_users) {
+    const { data: srcUsers } = await supabase
+      .from('users').select('id, name, email, password_hash, role, csm_name, is_active')
+      .eq('org_id', source_org_id);
+    if (srcUsers?.length) {
+      const pairs = await Promise.all(srcUsers.map(async ({ id: oldId, ...u }) => {
+        const { data: nu } = await supabase.from('users')
+          .insert({ ...u, org_id: newOrg.id, is_active: u.is_active !== false })
+          .select('id').single();
+        return nu ? [oldId, nu.id] : null;
+      }));
+      userIdMap = Object.fromEntries(pairs.filter(Boolean));
+      cloned.users = Object.keys(userIdMap).length;
+    }
+  }
+
+  // Clone dropdown configs
+  if (clone_dropdown) {
+    const { data: srcDD } = await supabase.from('dropdown_config').select('*').eq('org_id', source_org_id);
+    if (srcDD?.length) {
+      const { data: ins } = await supabase.from('dropdown_config')
+        .insert(srcDD.map(({ id, org_id, ...r }) => ({ ...r, org_id: newOrg.id })))
+        .select('id');
+      cloned.dropdowns = ins?.length || 0;
+    }
+  }
+
+  // Clone accounts + all linked data
+  if (clone_accounts) {
+    const { data: srcAccounts } = await supabase.from('accounts').select('*').eq('org_id', source_org_id);
+    if (srcAccounts?.length) {
+      // Parallel-insert accounts; build old→new ID map from returned rows
+      const pairs = await Promise.all(srcAccounts.map(async ({ id: oldId, created_at, updated_at, org_id: _oid, ...rest }) => {
+        const { data: na } = await supabase.from('accounts')
+          .insert({ ...rest, org_id: newOrg.id }).select('id').single();
+        return na ? [oldId, na.id] : null;
+      }));
+      const acctIdMap = Object.fromEntries(pairs.filter(Boolean));
+      cloned.accounts = Object.keys(acctIdMap).length;
+
+      // Helper: strip PK/timestamps, remap org_id + account_id, apply extra overrides
+      const remap = (row, extra = {}) => {
+        const { id, created_at, updated_at, account_id, org_id: _oid2, ...rest } = row;
+        return {
+          ...rest,
+          org_id: newOrg.id,
+          ...(account_id != null ? { account_id: acctIdMap[account_id] } : {}),
+          ...extra,
+        };
+      };
+      const filterMap = (rows, extraFn = () => ({})) =>
+        (rows || []).filter(r => !r.account_id || acctIdMap[r.account_id]).map(r => remap(r, extraFn(r)));
+
+      // For tasks: remap assigned_to / assigned_by if users were also cloned
+      const mapUid = (uid) => (clone_users && uid) ? (userIdMap[uid] || null) : null;
+
+      const [issRes, escRes, tskRes, frRes] = await Promise.all([
+        supabase.from('issues').select('*').eq('org_id', source_org_id),
+        supabase.from('escalations').select('*').eq('org_id', source_org_id),
+        supabase.from('tasks').select('*').eq('org_id', source_org_id),
+        supabase.from('feature_requests').select('*').eq('org_id', source_org_id),
+      ]);
+
+      const [insIss, insEsc, insTsk, insFR] = await Promise.all([
+        issRes.data?.length ? supabase.from('issues').insert(filterMap(issRes.data)).select('id') : { data: [] },
+        escRes.data?.length ? supabase.from('escalations').insert(filterMap(escRes.data)).select('id') : { data: [] },
+        tskRes.data?.length ? supabase.from('tasks').insert(filterMap(tskRes.data, r => ({
+          assigned_to: mapUid(r.assigned_to),
+          assigned_by: mapUid(r.assigned_by),
+        }))).select('id') : { data: [] },
+        frRes.data?.length ? supabase.from('feature_requests').insert(filterMap(frRes.data)).select('id') : { data: [] },
+      ]);
+
+      cloned.issues = insIss.data?.length || 0;
+      cloned.escalations = insEsc.data?.length || 0;
+      cloned.tasks = insTsk.data?.length || 0;
+      cloned.feature_requests = insFR.data?.length || 0;
+    }
+  }
+
+  return res.status(201).json({ org: newOrg, cloned });
 }
 
 async function handleStats(req, res) {

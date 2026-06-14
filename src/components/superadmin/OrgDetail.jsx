@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../utils/superadminAxios';
 import { FEATURE_DEFS } from '../../hooks/useFeatures';
+import CloneOrgModal from './CloneOrgModal';
 
 const PLAN_OPTIONS   = ['trial', 'starter', 'pro', 'enterprise'];
 const STATUS_OPTIONS = ['active', 'suspended', 'cancelled'];
@@ -23,6 +24,7 @@ export default function OrgDetail() {
   const [featSaving, setFeatSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoError, setLogoError] = useState('');
+  const [showClone, setShowClone] = useState(false);
 
   useEffect(() => { fetchOrg(); }, [id]);
 
@@ -318,6 +320,15 @@ export default function OrgDetail() {
             {impersonating ? 'Generating…' : 'Login as Admin'}
           </button>
           <button
+            onClick={() => setShowClone(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-xl text-sm font-medium transition border border-gray-600"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+            </svg>
+            Clone Organisation
+          </button>
+          <button
             onClick={deleteOrg}
             className="flex items-center gap-2 px-4 py-2 bg-red-900/50 hover:bg-red-900 text-red-300 rounded-xl text-sm font-medium transition border border-red-800"
           >
@@ -338,6 +349,16 @@ export default function OrgDetail() {
           </div>
         )}
       </div>
+
+      {showClone && (
+        <CloneOrgModal
+          org={org}
+          onClose={() => setShowClone(false)}
+          onCloned={(newOrg) => {
+            // The modal's "View New Org" button handles navigation; nothing extra needed here.
+          }}
+        />
+      )}
     </div>
   );
 }
