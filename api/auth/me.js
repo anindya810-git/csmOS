@@ -72,8 +72,9 @@ export default async function handler(req, res) {
   user.reportees = reportees;
 
   const meta = await getOrgMeta(user.org_id);
-  user.features = meta.features;
+  user.features     = meta.features;
   user.org_logo_url = meta.logo_url;
-  user.org_name = meta.org_name;
+  user.org_name     = meta.org_name;
+  user.org_theme    = meta.theme_color || null;
   res.json(user);
 }

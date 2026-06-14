@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { applyTheme } from '../utils/colorTheme';
 
 // Resolves whether the current hostname is a white-label org domain. When it
 // is, the app skips the public Custally landing page and shows a login screen
@@ -46,10 +47,12 @@ export function TenantBrandProvider({ children }) {
       .then(r => {
         if (cancelled) return;
         const next = r.data?.found
-          ? { org_name: r.data.org_name, logo_url: r.data.logo_url }
+          ? { org_name: r.data.org_name, logo_url: r.data.logo_url, theme_color: r.data.theme_color || null }
           : null;
         setBrand(next);
         applyTabBranding(next);
+        // Pre-login: apply the org's theme so the Sign In button already matches.
+        if (next?.theme_color) applyTheme(next.theme_color);
         try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ brand: next })); } catch {}
       })
       .catch(() => {})

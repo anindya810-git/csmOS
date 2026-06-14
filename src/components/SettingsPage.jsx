@@ -9,6 +9,7 @@ import { useAiConfig } from '../context/AiConfigContext';
 import { useFeatures } from '../hooks/useFeatures';
 import { timeAgo, fullTime } from './LastEdited';
 import SelectDropdown from './SelectDropdown';
+import { applyTheme, generateScale, scaleToHex } from '../utils/colorTheme';
 
 // Users seen within this window count as currently active.
 const ACTIVE_WINDOW_MIN = 5;
@@ -203,6 +204,15 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    key: 'appearance',
+    label: 'Appearance',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" />
+      </svg>
+    ),
+  },
 ];
 
 const AI_PROVIDERS = [
@@ -351,6 +361,12 @@ export default function SettingsPage() {
   const [renameEdits,  setRenameEdits]  = useState({});
   const [renameSaving, setRenameSaving] = useState(null);
 
+  // Appearance / color theme
+  const [themeColor,   setThemeColor]   = useState('');
+  const [hexInput,     setHexInput]     = useState('');
+  const [themeSaving,  setThemeSaving]  = useState(false);
+  const [themeMsg,     setThemeMsg]     = useState('');
+
   useEffect(() => {
     if (!user) return;
     if (user.role !== 'admin' && user.role !== 'cx_strategy') { navigate('/'); return; }
@@ -385,6 +401,18 @@ export default function SettingsPage() {
     if (settingsPage !== 'api' || user?.role !== 'admin') return;
     axios.get('/api/admin/users?resource=api_keys')
       .then(r => setApiKeys(Array.isArray(r.data) ? r.data : []))
+      .catch(() => {});
+  }, [settingsPage, user]);
+
+  // ── Appearance — load saved theme on tab open ─────────────────
+  useEffect(() => {
+    if (settingsPage !== 'appearance' || user?.role !== 'admin') return;
+    axios.get('/api/admin/users?resource=org_settings')
+      .then(r => {
+        const c = r.data?.theme_color || '';
+        setThemeColor(c);
+        setHexInput(c);
+      })
       .catch(() => {});
   }, [settingsPage, user]);
 
@@ -1380,6 +1408,187 @@ export default function SettingsPage() {
             )}
           </>
         )}
+
+        {/* ── Appearance page ───────────────────────────────────────── */}
+        {settingsPage === 'appearance' && user?.role === 'admin' && (() => {
+          const PRESETS = [
+            { label: 'Custally Green', hex: '#0ea4a4' },
+            { label: 'Ocean Blue',     hex: '#0284c7' },
+            { label: 'Indigo',         hex: '#4f46e5' },
+            { label: 'Violet',         hex: '#7c3aed' },
+            { label: 'Rose',           hex: '#e11d48' },
+            { label: 'Amber',          hex: '#d97706' },
+            { label: 'Teal',           hex: '#0d9488' },
+            { label: 'Slate',          hex: '#475569' },
+          ];
+          const isValidHex = h => /^#[0-9a-fA-F]{6}$/.test(h.trim());
+
+          const handlePreset = (hex) => {
+            setThemeColor(hex);
+            setHexInput(hex);
+            applyTheme(hex);
+          };
+
+          const handleHexChange = (val) => {
+            setHexInput(val);
+            const v = val.trim();
+            if (isValidHex(v)) {
+              setThemeColor(v);
+              applyTheme(v);
+            }
+          };
+
+          const handleColorPicker = (e) => {
+            const v = e.target.value;
+            setHexInput(v);
+            setThemeColor(v);
+            applyTheme(v);
+          };
+
+          const handleReset = () => {
+            setThemeColor('');
+            setHexInput('');
+            applyTheme(null);
+          };
+
+          const handleSaveTheme = async () => {
+            setThemeSaving(true); setThemeMsg('');
+            try {
+              const val = isValidHex(themeColor) ? themeColor : null;
+              await axios.put('/api/admin/users?resource=org_settings', { theme_color: val });
+              applyTheme(val);
+              setThemeColor(val || '');
+              setHexInput(val || '');
+              setThemeMsg('Saved!');
+              setTimeout(() => setThemeMsg(''), 2500);
+            } catch (e) {
+              setThemeMsg(e.response?.data?.error || 'Failed to save');
+            } finally { setThemeSaving(false); }
+          };
+
+          const scale = isValidHex(themeColor) ? generateScale(themeColor) : null;
+
+          return (
+            <>
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Appearance</h2>
+                <p className="text-sm text-gray-500 mt-0.5">Customise the brand color used across the app</p>
+              </div>
+
+              {/* Presets */}
+              <div className="card p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700">Color Presets</h3>
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+                  {PRESETS.map(p => (
+                    <button
+                      key={p.hex}
+                      title={p.label}
+                      onClick={() => handlePreset(p.hex)}
+                      className={`group flex flex-col items-center gap-1.5 focus:outline-none`}
+                    >
+                      <span
+                        className={`w-10 h-10 rounded-full border-2 transition-transform group-hover:scale-110 ${themeColor === p.hex ? 'border-gray-800 scale-110' : 'border-white shadow-md'}`}
+                        style={{ backgroundColor: p.hex }}
+                      />
+                      <span className="text-[10px] text-gray-500 text-center leading-tight">{p.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Custom hex + picker */}
+              <div className="card p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700">Custom Color</h3>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    value={isValidHex(themeColor) ? themeColor : '#0ea4a4'}
+                    onChange={handleColorPicker}
+                    className="!w-12 !h-12 !p-0.5 !rounded-xl !border-gray-200 cursor-pointer"
+                    title="Pick a color"
+                  />
+                  <input
+                    value={hexInput}
+                    onChange={e => handleHexChange(e.target.value)}
+                    placeholder="#0ea4a4"
+                    className="w-36 font-mono text-sm"
+                    maxLength={7}
+                  />
+                  {themeColor && (
+                    <button onClick={handleReset} className="text-xs text-gray-400 hover:text-gray-600 transition">
+                      Reset to default
+                    </button>
+                  )}
+                </div>
+                {hexInput && !isValidHex(hexInput) && (
+                  <p className="text-xs text-red-500">Enter a valid 6-digit hex color (e.g. #4f46e5)</p>
+                )}
+              </div>
+
+              {/* Shade scale preview */}
+              {scale && (
+                <div className="card p-5 space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-700">Color Scale Preview</h3>
+                  <div className="flex gap-1.5 flex-wrap">
+                    {[50, 100, 200, 300, 400, 500, 600, 700, 800, 900].map(stop => {
+                      const [r, g, b] = scale[stop] || [0, 0, 0];
+                      const hex = scaleToHex([r, g, b]);
+                      const isDark = (r * 299 + g * 587 + b * 114) / 1000 < 128;
+                      return (
+                        <div key={stop} className="flex flex-col items-center gap-1">
+                          <div
+                            className="w-10 h-10 rounded-lg shadow-sm"
+                            style={{ backgroundColor: hex }}
+                          />
+                          <span className={`text-[10px] font-mono`} style={{ color: stop >= 700 ? '#374151' : '#6b7280' }}>{stop}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* UI preview */}
+              <div className="card p-5 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700">Live Preview</h3>
+                <div className="flex flex-wrap gap-3 items-center">
+                  <button className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
+                    Primary button
+                  </button>
+                  <button className="px-4 py-2 bg-brand-100 hover:bg-brand-200 text-brand-700 text-sm font-medium rounded-lg transition">
+                    Secondary button
+                  </button>
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-brand-100 text-brand-700">
+                    Badge
+                  </span>
+                  <a href="#" onClick={e => e.preventDefault()} className="text-sm text-brand-600 hover:text-brand-700 font-medium underline">
+                    Link text
+                  </a>
+                  <div className="w-32 h-1.5 rounded-full bg-brand-200 overflow-hidden">
+                    <div className="h-full w-2/3 bg-brand-600 rounded-full" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Save */}
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={handleSaveTheme}
+                  disabled={themeSaving || (!themeColor && !isValidHex(hexInput))}
+                  className="px-5 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold rounded-xl transition disabled:opacity-50"
+                >
+                  {themeSaving ? 'Saving…' : 'Save theme'}
+                </button>
+                {themeMsg && (
+                  <span className={`text-sm font-medium ${themeMsg === 'Saved!' ? 'text-green-600' : 'text-red-600'}`}>
+                    {themeMsg}
+                  </span>
+                )}
+              </div>
+            </>
+          );
+        })()}
+
       </div>
 
       {/* ── Replace User Modal ────────────────────────────────────────── */}

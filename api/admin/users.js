@@ -133,6 +133,29 @@ export default async function handler(req, res) {
     return handleReplaceUser(req, res, caller, orgId);
   }
 
+  // Org-level settings that admins can edit (currently: theme_color).
+  if (req.query.resource === 'org_settings') {
+    if (req.method === 'GET') {
+      const { data } = await supabase.from('organizations').select('theme_color').eq('id', orgId).maybeSingle();
+      return res.json({ theme_color: data?.theme_color || null });
+    }
+    if (req.method === 'PUT') {
+      const { theme_color } = req.body || {};
+      const val = typeof theme_color === 'string' && /^#[0-9a-fA-F]{6}$/.test(theme_color.trim())
+        ? theme_color.trim()
+        : null;
+      const { data, error } = await supabase
+        .from('organizations')
+        .update({ theme_color: val, updated_at: new Date().toISOString() })
+        .eq('id', orgId)
+        .select('theme_color')
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json({ theme_color: data.theme_color || null });
+    }
+    return res.status(405).json({ error: 'Method not allowed' });
+  }
+
   const { id } = req.query;
 
   if (req.method === 'GET') {

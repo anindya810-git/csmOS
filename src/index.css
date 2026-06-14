@@ -2,8 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Custally brand CSS variables — used by the landing page and globally */
+/* Custally brand CSS variables — used by the landing page and globally.
+   The --brand-NNN vars are space-separated RGB triplets so Tailwind's
+   opacity modifier syntax (bg-brand-600/50) works correctly.
+   Inject a <style id="org-theme"> to override just these vars per-org. */
 :root {
+  --brand-50:  236 251 245;
+  --brand-100: 214 245 233;
+  --brand-200: 174 235 211;
+  --brand-300: 45  212 167;
+  --brand-400: 27  196 154;
+  --brand-500: 14  164 126;
+  --brand-600: 14  164 126;
+  --brand-700: 10  124 94;
+  --brand-800: 7   102 72;
+  --brand-900: 6   37  29;
+
   --brand:        #0EA47E;
   --brand-deep:   #0A7C5E;
   --brand-bright: #2DD4A7;

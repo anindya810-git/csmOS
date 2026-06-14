@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import axios from 'axios';
+import { applyTheme } from '../utils/colorTheme';
 
 const AuthContext = createContext(null);
 
@@ -33,11 +34,15 @@ export function AuthProvider({ children }) {
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', beat); };
   }, []);
 
+  // Apply or remove the org's brand color whenever the user changes.
+  useEffect(() => { applyTheme(user?.org_theme || null); }, [user?.org_theme]);
+
   const login = async (email, password) => {
     const r = await axios.post('/api/auth/login', { email, password });
     localStorage.setItem('token', r.data.token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${r.data.token}`;
     setUser(r.data.user);
+    applyTheme(r.data.user?.org_theme || null);
     return r.data.user;
   };
 
@@ -45,6 +50,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
+    applyTheme(null);
   };
 
   return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>;

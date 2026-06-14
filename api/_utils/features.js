@@ -44,8 +44,9 @@ export async function getOrgMeta(orgId) {
     .eq('id', orgId)
     .maybeSingle();
   return {
-    features: (data && data.features) || {},
-    logo_url: (data && data.logo_url) || null,
-    org_name: (data && data.name) || null,
+    features:    (data && data.features)    || {},
+    logo_url:    (data && data.logo_url)    || null,
+    org_name:    (data && data.name)        || null,
+    theme_color: (data && data.theme_color) || null,
   };
 }
