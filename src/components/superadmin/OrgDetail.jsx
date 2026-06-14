@@ -25,6 +25,10 @@ export default function OrgDetail() {
   const [featSaving, setFeatSaving] = useState(false);
   const [logoBusy, setLogoBusy] = useState(false);
   const [logoError, setLogoError] = useState('');
+  const [domain, setDomain] = useState('');
+  const [domainSaving, setDomainSaving] = useState(false);
+  const [domainError, setDomainError] = useState('');
+  const [domainSaved, setDomainSaved] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [showLoginReport, setShowLoginReport] = useState(false);
 
@@ -37,6 +41,7 @@ export default function OrgDetail() {
       setOrg(data);
       setForm({ name: data.name, plan: data.plan, billing_status: data.billing_status, user_limit: data.user_limit, notes: data.notes || '' });
       setFeatForm(data.features || {});
+      setDomain(data.custom_domain || '');
     } catch { setError('Failed to load organisation'); }
     finally { setLoading(false); }
   }
@@ -81,6 +86,18 @@ export default function OrgDetail() {
       setOrg(o => ({ ...o, ...data }));
     } catch (err) { setLogoError(err?.response?.data?.error || 'Failed to remove'); }
     finally { setLogoBusy(false); }
+  }
+
+  async function saveDomain() {
+    setDomainSaving(true); setDomainError(''); setDomainSaved(false);
+    try {
+      const { data } = await api.put(`/api/superadmin?resource=orgs&id=${id}`, { custom_domain: domain.trim() });
+      setOrg(o => ({ ...o, ...data }));
+      setDomain(data.custom_domain || '');
+      setDomainSaved(true);
+      setTimeout(() => setDomainSaved(false), 2500);
+    } catch (err) { setDomainError(err?.response?.data?.error || 'Failed to save domain'); }
+    finally { setDomainSaving(false); }
   }
 
   async function save() {
@@ -187,6 +204,44 @@ export default function OrgDetail() {
           )}
         </div>
         {logoError && <p className="text-xs text-red-400 mt-3">{logoError}</p>}
+      </div>
+
+      {/* Custom domain (white-label) */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
+        <h2 className="text-sm font-semibold text-white">Custom Domain (White-label)</h2>
+        <p className="text-xs text-gray-500 mt-0.5">
+          Visitors to this domain skip the Custally landing page and land on a login screen showing this org's logo only — no Custally branding. Leave blank to disable.
+        </p>
+        <div className="mt-4 flex items-center gap-3 flex-wrap">
+          <input
+            value={domain}
+            onChange={e => { setDomain(e.target.value); setDomainSaved(false); }}
+            placeholder="projectnext.me"
+            spellCheck={false}
+            autoCapitalize="none"
+            className={`${inputCls} flex-1 min-w-[220px] max-w-md`}
+          />
+          <button
+            onClick={saveDomain}
+            disabled={domainSaving || (domain.trim() === (org.custom_domain || ''))}
+            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold transition disabled:opacity-40"
+          >
+            {domainSaving ? 'Saving…' : 'Save Domain'}
+          </button>
+          {domainSaved && <span className="text-xs text-emerald-400 font-medium">Saved ✓</span>}
+        </div>
+        {domainError && <p className="text-xs text-red-400 mt-3">{domainError}</p>}
+        {org.custom_domain && (
+          <div className="mt-4 bg-gray-950 border border-gray-800 rounded-xl p-4 space-y-1.5">
+            <p className="text-xs text-gray-400">
+              Active domain: <span className="text-white font-medium">{org.custom_domain}</span>
+            </p>
+            <p className="text-xs text-gray-500">
+              DNS setup: add <span className="text-gray-300 font-medium">{org.custom_domain}</span> as a domain in the Vercel project, then point the client's DNS there
+              (apex → A record <span className="text-gray-300 font-mono">76.76.21.21</span>, or a subdomain → CNAME to <span className="text-gray-300 font-mono">cname.vercel-dns.com</span>).
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Edit form */}

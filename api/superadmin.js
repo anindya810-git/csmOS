@@ -2,6 +2,7 @@ import supabase from './_utils/supabase.js';
 import bcrypt from 'bcryptjs';
 import { signSuperadminToken, signImpersonationToken, verifySuperadminToken } from './_utils/auth.js';
 import { setCors } from './_utils/cors.js';
+import { normalizeHost } from './_utils/domain.js';
 
 export default async function handler(req, res) {
   setCors(res);
@@ -218,7 +219,7 @@ async function handleOrgs(req, res, admin) {
 
   if (req.method === 'PUT') {
     if (!id) return res.status(400).json({ error: 'id required' });
-    const { name, plan, billing_status, user_limit, notes, features } = req.body || {};
+    const { name, plan, billing_status, user_limit, notes, features, custom_domain } = req.body || {};
     const updates = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name;
     if (plan !== undefined) updates.plan = plan;
@@ -226,9 +227,16 @@ async function handleOrgs(req, res, admin) {
     if (user_limit !== undefined) updates.user_limit = Number(user_limit);
     if (notes !== undefined) updates.notes = notes || null;
     if (features !== undefined && features && typeof features === 'object') updates.features = features;
+    // White-label custom domain. Stored normalized; empty clears it.
+    if (custom_domain !== undefined) updates.custom_domain = normalizeHost(custom_domain) || null;
 
     const { data, error } = await supabase.from('organizations').update(updates).eq('id', id).select().single();
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      // Unique-violation → the domain is already claimed by another org.
+      if (error.code === '23505')
+        return res.status(409).json({ error: 'That domain is already assigned to another organisation.' });
+      return res.status(500).json({ error: error.message });
+    }
     return res.json(data);
   }
 

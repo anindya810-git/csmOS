@@ -5,6 +5,7 @@ import { FieldLabelsProvider } from './context/FieldLabelsContext';
 import { PermissionsProvider } from './context/PermissionsContext';
 import { AiConfigProvider } from './context/AiConfigContext';
 import { SuperadminAuthProvider, useSuperadminAuth } from './context/SuperadminAuthContext';
+import { TenantBrandProvider, useTenantBrand } from './context/TenantBrandContext';
 import Login from './components/Login';
 import Layout from './components/Layout';
 import ReportsPage from './components/ReportsPage';
@@ -52,12 +53,16 @@ function ProtectedRoute({ children }) {
 
 function PublicRootRoute() {
   const { user, loading } = useAuth();
-  if (loading) return (
+  const { brand, loading: brandLoading } = useTenantBrand();
+  // Wait for both lookups so a white-label domain never flashes the landing page.
+  if (loading || brandLoading) return (
     <div className="min-h-screen flex items-center justify-center bg-white">
       <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
     </div>
   );
-  return user ? <Navigate to="/accounts" replace /> : <LandingPage />;
+  if (user) return <Navigate to="/accounts" replace />;
+  // On a custom org domain, go straight to the branded login — no landing page.
+  return brand ? <Login /> : <LandingPage />;
 }
 
 function AdminRoute({ children }) {
@@ -159,6 +164,7 @@ function AppRoutes() {
 export default function App() {
   return (
     <ErrorBoundary>
+      <TenantBrandProvider>
       <SuperadminAuthProvider>
         <AuthProvider>
           <FieldLabelsProvider>
@@ -170,6 +176,7 @@ export default function App() {
           </FieldLabelsProvider>
         </AuthProvider>
       </SuperadminAuthProvider>
+      </TenantBrandProvider>
     </ErrorBoundary>
   );
 }

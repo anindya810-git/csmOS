@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { useTenantBrand } from '../context/TenantBrandContext';
 import { useNavigate, Link } from 'react-router-dom';
 
 function CustallyLogo() {
@@ -17,8 +18,36 @@ function CustallyLogo() {
   );
 }
 
+// On a white-label custom domain, render the org's own logo/name. Otherwise the
+// default Custally mark. `onDark` styles it for the dark left panel.
+function BrandMark({ brand, onDark }) {
+  if (brand) {
+    if (brand.logo_url) {
+      return (
+        <div className="bg-white rounded-lg px-3 py-2 inline-flex items-center shadow-sm">
+          <img src={brand.logo_url} alt={brand.org_name || 'Logo'} className="h-7 max-w-[170px] object-contain" />
+        </div>
+      );
+    }
+    return (
+      <span className={`font-bold text-2xl tracking-tight ${onDark ? 'text-white' : 'text-gray-900'}`}>
+        {brand.org_name}
+      </span>
+    );
+  }
+  return (
+    <div className="flex items-center gap-3">
+      <CustallyLogo />
+      <span className={`font-bold text-2xl tracking-tight ${onDark ? 'text-white' : 'text-gray-900'}`}>
+        Cust<span className={onDark ? 'text-brand-300' : 'text-brand-600'}>ally</span>
+      </span>
+    </div>
+  );
+}
+
 export default function Login() {
   const { login } = useAuth();
+  const { brand } = useTenantBrand();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -43,11 +72,8 @@ export default function Login() {
       {/* Left panel — brand */}
       <div className="hidden lg:flex flex-col justify-between w-[420px] shrink-0 bg-brand-900 p-10 text-white">
         <div>
-          <div className="flex items-center gap-3 mb-12">
-            <CustallyLogo />
-            <span className="font-bold text-2xl tracking-tight">
-              Cust<span className="text-brand-300">ally</span>
-            </span>
+          <div className="mb-12">
+            <BrandMark brand={brand} onDark />
           </div>
           <h2 className="text-3xl font-bold leading-tight mb-4">Customer experience, simplified.</h2>
           <p className="text-white/60 text-base leading-relaxed">
@@ -75,16 +101,15 @@ export default function Login() {
       {/* Right panel — form */}
       <div className="flex-1 flex flex-col items-center justify-center bg-white px-6 py-12">
         {/* Mobile logo */}
-        <div className="lg:hidden flex items-center gap-3 mb-10">
-          <CustallyLogo />
-          <span className="font-bold text-2xl tracking-tight text-gray-900">
-            Cust<span className="text-brand-600">ally</span>
-          </span>
+        <div className="lg:hidden mb-10">
+          <BrandMark brand={brand} />
         </div>
 
         <div className="w-full max-w-sm">
           <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back</h1>
-          <p className="text-sm text-gray-500 mb-8">Sign in to your Custally account</p>
+          <p className="text-sm text-gray-500 mb-8">
+            {brand ? `Sign in to your ${brand.org_name} account` : 'Sign in to your Custally account'}
+          </p>
 
           {error && (
             <div className="mb-5 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
@@ -124,11 +149,14 @@ export default function Login() {
             Contact your admin if you've forgotten your password.
           </p>
 
-          <div className="mt-8 pt-6 border-t border-gray-100 text-center">
-            <Link to="/" className="text-sm text-brand-700 hover:text-brand-900 font-medium transition">
-              ← Back to home
-            </Link>
-          </div>
+          {/* No landing page on a white-label domain → hide the home link there. */}
+          {!brand && (
+            <div className="mt-8 pt-6 border-t border-gray-100 text-center">
+              <Link to="/" className="text-sm text-brand-700 hover:text-brand-900 font-medium transition">
+                ← Back to home
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </div>

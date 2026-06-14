@@ -2,10 +2,29 @@ import bcrypt from 'bcryptjs';
 import supabase from '../_utils/supabase.js';
 import { signToken } from '../_utils/auth.js';
 import { setCors } from '../_utils/cors.js';
+import { normalizeHost } from '../_utils/domain.js';
 
 export default async function handler(req, res) {
   setCors(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
+
+  // Public branding lookup for white-label custom domains. The login screen
+  // calls this BEFORE auth to decide whether the current hostname belongs to
+  // an org (→ show that org's logo, skip the Custally landing page) or not
+  // (→ canonical domain, show the normal Custally landing page). Returns only
+  // public branding (name + logo) for an exact custom_domain match.
+  if (req.method === 'GET') {
+    const host = normalizeHost(req.query.host || req.headers.host);
+    if (!host) return res.json({ found: false });
+    const { data } = await supabase
+      .from('organizations')
+      .select('id, name, logo_url, custom_domain')
+      .eq('custom_domain', host)
+      .maybeSingle();
+    if (!data) return res.json({ found: false });
+    return res.json({ found: true, org_id: data.id, org_name: data.name, logo_url: data.logo_url || null });
+  }
+
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
   const { email, password } = req.body;
