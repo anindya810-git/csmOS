@@ -28,6 +28,7 @@ export default async function handler(req, res) {
   if (resource === 'clone') return handleCloneOrg(req, res, admin);
   if (resource === 'stats') return handleStats(req, res);
   if (resource === 'admins') return handleAdmins(req, res, admin);
+  if (resource === 'feature_requests') return handleFeatureRequests(req, res, admin);
 
   return res.status(404).json({ error: 'Not found' });
 }
@@ -525,4 +526,80 @@ async function handleReplaceAdmin(req, res, admin) {
     await supabase.from('superadmin_users').update({ is_active: false }).eq('id', old_admin_id);
   }
   return res.json({ success: true, from: oldA.name, to: newA.name, deactivated: !!deactivate_old });
+}
+
+// Cross-org feature request management for superadmins.
+// approved_by_id is intentionally omitted — it FK-references the users table,
+// not superadmin_users; the text approved_by field carries the identity instead.
+async function handleFeatureRequests(req, res, admin) {
+  const { id, org_id, status: statusFilter, priority: priorityFilter } = req.query;
+
+  if (req.method === 'GET') {
+    let query = supabase
+      .from('feature_requests')
+      .select('*, organizations(id, name)')
+      .order('created_at', { ascending: false });
+    if (org_id) query = query.eq('org_id', org_id);
+    if (statusFilter) query = query.eq('status', statusFilter);
+    if (priorityFilter) query = query.eq('priority', priorityFilter);
+    const { data, error } = await query;
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data || []);
+  }
+
+  if (req.method === 'PUT') {
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const { action, rejection_reason, title, description, related_to, priority, expected_rollout_date, status } = req.body || {};
+    const now = new Date().toISOString();
+
+    if (action === 'approve') {
+      const { data, error } = await supabase
+        .from('feature_requests')
+        .update({ status: 'approved', approved_by: admin.name, approved_at: now, updated_at: now })
+        .eq('id', id)
+        .select('*, organizations(id, name)')
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json(data);
+    }
+
+    if (action === 'reject') {
+      if (!rejection_reason?.trim()) return res.status(400).json({ error: 'rejection_reason required' });
+      const { data, error } = await supabase
+        .from('feature_requests')
+        .update({ status: 'rejected', rejection_reason: rejection_reason.trim(), approved_by: admin.name, approved_at: now, updated_at: now })
+        .eq('id', id)
+        .select('*, organizations(id, name)')
+        .single();
+      if (error) return res.status(500).json({ error: error.message });
+      return res.json(data);
+    }
+
+    const updates = { updated_at: now };
+    if (title !== undefined) updates.title = title;
+    if (description !== undefined) updates.description = description || null;
+    if (related_to !== undefined) updates.related_to = related_to || null;
+    if (priority !== undefined) updates.priority = priority;
+    if (expected_rollout_date !== undefined) updates.expected_rollout_date = expected_rollout_date || null;
+    if (status !== undefined) updates.status = status;
+    if (Object.keys(updates).length === 1) return res.status(400).json({ error: 'Nothing to update' });
+
+    const { data, error } = await supabase
+      .from('feature_requests')
+      .update(updates)
+      .eq('id', id)
+      .select('*, organizations(id, name)')
+      .single();
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data);
+  }
+
+  if (req.method === 'DELETE') {
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const { error } = await supabase.from('feature_requests').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ success: true });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
 }

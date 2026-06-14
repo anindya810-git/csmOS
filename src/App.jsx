@@ -41,6 +41,7 @@ const SuperadminDashboard = lazy(() => import('./components/superadmin/Superadmi
 const OrgList            = lazy(() => import('./components/superadmin/OrgList'));
 const OrgDetail          = lazy(() => import('./components/superadmin/OrgDetail'));
 const SuperadminUsers    = lazy(() => import('./components/superadmin/SuperadminUsers'));
+const SuperadminFeatureRequests = lazy(() => import('./components/superadmin/SuperadminFeatureRequests'));
 
 function ProtectedRoute({ children }) {
   const { user, loading } = useAuth();
@@ -137,6 +138,7 @@ function AppRoutes() {
         <Route path="orgs" element={<OrgList />} />
         <Route path="orgs/:id" element={<OrgDetail />} />
         <Route path="admins" element={<SuperadminUsers />} />
+        <Route path="feature-requests" element={<SuperadminFeatureRequests />} />
       </Route>
 
       <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
