@@ -582,7 +582,7 @@ export default function EscalationsDashboard() {
           <MultiSelectDropdown placeholder="All Ownerships" options={allOwnerships} value={filters.ownership} onChange={v => setFilter('ownership', v)} />
           <MultiSelectDropdown placeholder="All Issue Types" options={allIssueTypes} value={filters.issue_type} onChange={v => setFilter('issue_type', v)} />
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
-          <ColumnToggle columns={ESC_COLS.map(c => ({ ...c, label: fieldLabel('escalations', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
+          {isEnabled('column_selection') && <ColumnToggle columns={ESC_COLS.map(c => ({ ...c, label: fieldLabel('escalations', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />}
           {isEnabled('advanced_search') && (
           <button
             onClick={() => setAdvancedOpen(o => !o)}

@@ -542,7 +542,7 @@ export default function IssuesDashboard() {
             <MultiSelectDropdown placeholder="All CSMs" options={allCsms} value={filters.csm} onChange={v => setFilter('csm', v)} />
           )}
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
-          <ColumnToggle columns={ISSUES_COLS.map(c => ({ ...c, label: fieldLabel('issues', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
+          {isEnabled('column_selection') && <ColumnToggle columns={ISSUES_COLS.map(c => ({ ...c, label: fieldLabel('issues', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />}
           {isEnabled('advanced_search') && (
           <button
             onClick={() => setAdvancedOpen(o => !o)}

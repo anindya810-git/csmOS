@@ -12,6 +12,7 @@ export const FEATURE_KEYS = [
   'bulk_updates',
   'field_management',
   'user_tree_view',
+  'column_selection',
 ];
 
 // Fetch an org's feature map. Missing column (pre-migration), missing row,

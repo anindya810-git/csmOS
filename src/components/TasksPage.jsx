@@ -11,6 +11,7 @@ import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { TASK_FIELDS } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
+import { useFeatures } from '../hooks/useFeatures';
 
 // Every task field can be shown as a column; these start visible.
 const TASKS_DEFAULT_ON = ['task_subject', 'nature_of_task', 'account_name', 'assigned_to', 'due_date', 'derived_status'];
@@ -68,6 +69,7 @@ export default function TasksPage() {
   const navigate  = useNavigate();
   const isAdmin   = user?.role === 'admin';
   const { can } = usePermissions();
+  const { isEnabled } = useFeatures();
   const { label: fieldLabel } = useFieldLabels();
   const visibleTaskCols = TASKS_COLS.filter(c => !c.adminOnly || isAdmin);
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
@@ -366,7 +368,7 @@ export default function TasksPage() {
             className="text-xs text-gray-400 hover:text-gray-600 transition">Clear</button>
         ) : null}
         <div className="ml-auto">
-          <ColumnToggle columns={visibleTaskCols.map(c => ({ ...c, label: fieldLabel('tasks', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
+          {isEnabled('column_selection') && <ColumnToggle columns={visibleTaskCols.map(c => ({ ...c, label: fieldLabel('tasks', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />}
         </div>
         {selected.size > 0 && isAdmin && (
           <div className="ml-auto flex items-center gap-2">

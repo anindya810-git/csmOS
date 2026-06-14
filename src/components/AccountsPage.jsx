@@ -378,7 +378,7 @@ export default function AccountsPage() {
           <MultiSelectDropdown options={filters.industries || []} value={query.industry} onChange={v => setQuery(q => ({...q, industry: v}))} placeholder="All Industries" />
           <MultiSelectDropdown options={['North','South','East','West']} value={query.region} onChange={v => setQuery(q => ({...q, region: v}))} placeholder="All Regions" />
           <MultiSelectDropdown options={filters.tiers || []} value={query.mrr_tier} onChange={v => setQuery(q => ({...q, mrr_tier: v}))} placeholder="All Tiers" />
-          <ColumnToggle columns={ACCOUNTS_COLS.map(c => ({ ...c, label: fieldLabel('accounts', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />
+          {isEnabled('column_selection') && <ColumnToggle columns={ACCOUNTS_COLS.map(c => ({ ...c, label: fieldLabel('accounts', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />}
           {isEnabled('advanced_search') && (
           <button
             onClick={() => setAdvancedOpen(o => !o)}
