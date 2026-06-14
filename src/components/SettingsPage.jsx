@@ -8,6 +8,7 @@ import { usePermissions, getDefaultPermsForRole, PERM_OBJECTS, PERM_ACTIONS } fr
 import { useAiConfig } from '../context/AiConfigContext';
 import { useFeatures } from '../hooks/useFeatures';
 import { timeAgo, fullTime } from './LastEdited';
+import SelectDropdown from './SelectDropdown';
 
 // Users seen within this window count as currently active.
 const ACTIVE_WINDOW_MIN = 5;
@@ -1448,21 +1449,28 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Role</label>
-                <select value={form.role} onChange={e => setForm(f => ({...f, role: e.target.value}))}>
-                  <option value="csm">CSM</option>
-                  <option value="admin">Admin</option>
-                  <option value="sales">Sales</option>
-                  <option value="product">Product</option>
-                  <option value="cx_strategy">CX Strategy</option>
-                  <option value="ps">PS</option>
-                </select>
+                <SelectDropdown
+                  clearable={false}
+                  value={form.role}
+                  onChange={v => setForm(f => ({...f, role: v}))}
+                  options={[
+                    { value: 'csm', label: 'CSM' },
+                    { value: 'admin', label: 'Admin' },
+                    { value: 'sales', label: 'Sales' },
+                    { value: 'product', label: 'Product' },
+                    { value: 'cx_strategy', label: 'CX Strategy' },
+                    { value: 'ps', label: 'PS' },
+                  ]}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Team</label>
-                <select value={form.team} onChange={e => setForm(f => ({...f, team: e.target.value}))}>
-                  <option value="">— Select Team —</option>
-                  {TEAM_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
-                </select>
+                <SelectDropdown
+                  value={form.team}
+                  onChange={v => setForm(f => ({...f, team: v ?? ''}))}
+                  placeholder="— Select Team —"
+                  options={TEAM_OPTIONS}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">CSM Display Name <span className="text-gray-400 font-normal">(shown in account CSM field)</span></label>
@@ -1470,12 +1478,12 @@ export default function SettingsPage() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">CSM Lead <span className="text-gray-400 font-normal">(manager / lead for this CSM)</span></label>
-                <select value={form.csm_lead} onChange={e => setForm(f => ({...f, csm_lead: e.target.value}))} className="w-full">
-                  <option value="">— Select CSM Lead —</option>
-                  {[...new Set(users.filter(u => u.csm_name).map(u => u.csm_name))].sort().map(n => (
-                    <option key={n} value={n}>{n}</option>
-                  ))}
-                </select>
+                <SelectDropdown
+                  value={form.csm_lead}
+                  onChange={v => setForm(f => ({...f, csm_lead: v ?? ''}))}
+                  placeholder="— Select CSM Lead —"
+                  options={[...new Set(users.filter(u => u.csm_name).map(u => u.csm_name))].sort()}
+                />
               </div>
             </div>
             <div className="flex justify-end gap-3 px-5 pb-5">
