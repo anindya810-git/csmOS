@@ -360,6 +360,8 @@ export default function SettingsPage() {
   const [renameObj,    setRenameObj]    = useState('accounts');
   const [renameEdits,  setRenameEdits]  = useState({});
   const [renameSaving, setRenameSaving] = useState(null);
+  const [descEdits,    setDescEdits]    = useState({});
+  const [descSaving,   setDescSaving]   = useState(null);
 
   // Appearance / color theme
   const [themeColor,   setThemeColor]   = useState('');
@@ -622,6 +624,41 @@ export default function SettingsPage() {
   const customLabelFor = (objKey, fieldKey) =>
     labelRows.find(r => r.value === `${objKey}.${fieldKey}`);
 
+  const customDescFor = (objKey, fieldKey) =>
+    (ddData.field_description || []).find(r => r.value === `${objKey}.${fieldKey}`);
+
+  const handleDescSave = async (objKey, fieldKey) => {
+    const id = `${objKey}.${fieldKey}`;
+    const newDesc = (descEdits[id] ?? '').trim();
+    const existing = customDescFor(objKey, fieldKey);
+    setDescSaving(id);
+    try {
+      if (existing && !newDesc) {
+        await axios.delete(`/api/dropdown-config?id=${existing.id}`);
+      } else if (existing && newDesc !== (existing.parent_value || '')) {
+        await axios.put(`/api/dropdown-config?id=${existing.id}`, { parent_value: newDesc });
+      } else if (!existing && newDesc) {
+        await axios.post('/api/dropdown-config', { field_name: 'field_description', value: id, parent_value: newDesc, sort_order: 0 });
+      }
+      setDescEdits(e => { const n = { ...e }; delete n[id]; return n; });
+      loadDD();
+    } catch (e) { alert(e.response?.data?.error || 'Failed to save'); }
+    finally { setDescSaving(null); }
+  };
+
+  const handleDescReset = async (objKey, fieldKey) => {
+    const existing = customDescFor(objKey, fieldKey);
+    if (!existing) return;
+    const id = `${objKey}.${fieldKey}`;
+    setDescSaving(id);
+    try {
+      await axios.delete(`/api/dropdown-config?id=${existing.id}`);
+      setDescEdits(e => { const n = { ...e }; delete n[id]; return n; });
+      loadDD();
+    } catch (e) { alert(e.response?.data?.error || 'Failed to reset'); }
+    finally { setDescSaving(null); }
+  };
+
   const handleRenameSave = async (objKey, fieldKey) => {
     const id = `${objKey}.${fieldKey}`;
     const newLabel = (renameEdits[id] ?? '').trim();
@@ -692,7 +729,7 @@ export default function SettingsPage() {
   };
 
   // Map each settings tab to its org feature flag; tabs without a flag always show.
-  const TAB_FEATURE = { permissions: 'permissions', ai: 'ai', api: 'api_access', fields: 'field_management' };
+  const TAB_FEATURE = { permissions: 'permissions', ai: 'ai', api: 'api_access', fields: 'field_management', appearance: 'appearance' };
   const visibleNavItems = (user?.role === 'cx_strategy'
     ? NAV_ITEMS.filter(i => i.key === 'fields')
     : NAV_ITEMS
@@ -1233,7 +1270,7 @@ export default function SettingsPage() {
                   <div className="flex min-w-max">
                     {Object.entries(FIELD_CATALOG).map(([objKey, obj]) => (
                       <button key={objKey}
-                        onClick={() => { setRenameObj(objKey); setRenameEdits({}); }}
+                        onClick={() => { setRenameObj(objKey); setRenameEdits({}); setDescEdits({}); }}
                         className={`px-4 py-2.5 text-sm whitespace-nowrap border-b-2 transition
                           ${renameObj === objKey ? 'border-brand-600 text-brand-700 font-semibold bg-white' : 'border-transparent text-gray-600 hover:text-gray-800'}`}>
                         {obj.label}
@@ -1245,35 +1282,69 @@ export default function SettingsPage() {
                   <p className="text-xs text-gray-400 mb-3">Renamed fields show their new label in tables, column pickers, and reports. Leave blank and save to restore the default.</p>
                   {FIELD_CATALOG[renameObj].fields.map(f => {
                     const id = `${renameObj}.${f.key}`;
-                    const existing = customLabelFor(renameObj, f.key);
-                    const editVal = renameEdits[id] !== undefined ? renameEdits[id] : (existing?.parent_value || '');
-                    const dirty = renameEdits[id] !== undefined && renameEdits[id].trim() !== (existing?.parent_value || '');
+                    const existingLabel = customLabelFor(renameObj, f.key);
+                    const existingDesc  = customDescFor(renameObj, f.key);
+                    const labelVal  = renameEdits[id] !== undefined ? renameEdits[id] : (existingLabel?.parent_value || '');
+                    const labelDirty = renameEdits[id] !== undefined && renameEdits[id].trim() !== (existingLabel?.parent_value || '');
+                    const descVal   = descEdits[id]   !== undefined ? descEdits[id]   : (existingDesc?.parent_value  || '');
+                    const descDirty  = descEdits[id]   !== undefined && descEdits[id].trim()   !== (existingDesc?.parent_value  || '');
                     return (
-                      <div key={f.key} className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-gray-50 group">
-                        <span className="w-48 shrink-0 text-sm text-gray-500 truncate" title={f.key}>{f.label}</span>
-                        <input
-                          value={editVal}
-                          onChange={e => setRenameEdits(prev => ({ ...prev, [id]: e.target.value }))}
-                          onKeyDown={e => { if (e.key === 'Enter' && dirty) handleRenameSave(renameObj, f.key); }}
-                          placeholder={f.label}
-                          className="flex-1 !py-1.5 text-sm"
-                        />
-                        <div className="flex items-center gap-1 shrink-0 w-28 justify-end">
-                          {dirty && (
-                            <button onClick={() => handleRenameSave(renameObj, f.key)} disabled={renameSaving === id}
-                              className="text-xs px-2.5 py-1 bg-brand-600 text-white rounded-md hover:bg-brand-700 transition disabled:opacity-50">
-                              {renameSaving === id ? '…' : 'Save'}
-                            </button>
-                          )}
-                          {existing && !dirty && (
-                            <button onClick={() => handleRenameReset(renameObj, f.key)} disabled={renameSaving === id}
-                              className="text-xs px-2 py-1 text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100">
-                              {renameSaving === id ? '…' : 'Reset'}
-                            </button>
-                          )}
-                          {existing && !dirty && (
-                            <span className="w-2 h-2 rounded-full bg-brand-500" title="Custom label active" />
-                          )}
+                      <div key={f.key} className="px-3 py-3 rounded-lg hover:bg-gray-50 group border-b border-gray-50 last:border-0">
+                        <div className="flex items-start gap-3">
+                          <span className="w-48 shrink-0 text-sm text-gray-600 font-medium pt-1.5 truncate" title={f.key}>{f.label}</span>
+                          <div className="flex-1 space-y-2">
+                            {/* Label rename */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                value={labelVal}
+                                onChange={e => setRenameEdits(prev => ({ ...prev, [id]: e.target.value }))}
+                                onKeyDown={e => { if (e.key === 'Enter' && labelDirty) handleRenameSave(renameObj, f.key); }}
+                                placeholder={f.label}
+                                className="flex-1 !py-1.5 text-sm"
+                              />
+                              <div className="flex items-center gap-1 shrink-0">
+                                {labelDirty && (
+                                  <button onClick={() => handleRenameSave(renameObj, f.key)} disabled={renameSaving === id}
+                                    className="text-xs px-2.5 py-1 bg-brand-600 text-white rounded-md hover:bg-brand-700 transition disabled:opacity-50">
+                                    {renameSaving === id ? '…' : 'Save'}
+                                  </button>
+                                )}
+                                {existingLabel && !labelDirty && (
+                                  <button onClick={() => handleRenameReset(renameObj, f.key)} disabled={renameSaving === id}
+                                    className="text-xs px-2 py-1 text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100">
+                                    {renameSaving === id ? '…' : 'Reset'}
+                                  </button>
+                                )}
+                                {existingLabel && !labelDirty && (
+                                  <span className="w-2 h-2 rounded-full bg-brand-500 shrink-0" title="Custom label active" />
+                                )}
+                              </div>
+                            </div>
+                            {/* Field description */}
+                            <div className="flex items-start gap-2">
+                              <textarea
+                                value={descVal}
+                                onChange={e => setDescEdits(prev => ({ ...prev, [id]: e.target.value }))}
+                                placeholder="Add a description for this field (shown as a tooltip to users)…"
+                                rows={2}
+                                className="flex-1 !py-1.5 text-xs text-gray-600 resize-none"
+                              />
+                              <div className="flex items-center gap-1 shrink-0 pt-1">
+                                {descDirty && (
+                                  <button onClick={() => handleDescSave(renameObj, f.key)} disabled={descSaving === id}
+                                    className="text-xs px-2.5 py-1 bg-brand-600 text-white rounded-md hover:bg-brand-700 transition disabled:opacity-50">
+                                    {descSaving === id ? '…' : 'Save'}
+                                  </button>
+                                )}
+                                {existingDesc && !descDirty && (
+                                  <button onClick={() => handleDescReset(renameObj, f.key)} disabled={descSaving === id}
+                                    className="text-xs px-2 py-1 text-gray-400 hover:text-red-500 transition opacity-0 group-hover:opacity-100">
+                                    {descSaving === id ? '…' : 'Clear'}
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     );

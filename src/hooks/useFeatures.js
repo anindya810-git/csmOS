@@ -15,6 +15,7 @@ export const FEATURE_DEFS = [
   { key: 'column_selection', label: 'Column Selection',   desc: 'Per-user column visibility controls on dashboards' },
   { key: 'watchlist',       label: 'Watchlist',           desc: 'Eye-icon bookmarking on object pages' },
   { key: 'export',          label: 'Export',              desc: 'Excel and PDF export on all object pages' },
+  { key: 'appearance',      label: 'Appearance',          desc: 'Color theme customisation in Settings' },
 ];
 
 export function useFeatures() {
