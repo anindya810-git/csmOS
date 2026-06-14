@@ -363,11 +363,14 @@ export default function SettingsPage() {
   const [descEdits,    setDescEdits]    = useState({});
   const [descSaving,   setDescSaving]   = useState(null);
 
-  // Appearance / color theme
+  // Appearance / color theme + logo
   const [themeColor,   setThemeColor]   = useState('');
   const [hexInput,     setHexInput]     = useState('');
   const [themeSaving,  setThemeSaving]  = useState(false);
   const [themeMsg,     setThemeMsg]     = useState('');
+  const [orgLogoUrl,   setOrgLogoUrl]   = useState('');
+  const [logoBusy,     setLogoBusy]     = useState(false);
+  const [logoError,    setLogoError]    = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -406,9 +409,10 @@ export default function SettingsPage() {
       .catch(() => {});
   }, [settingsPage, user]);
 
-  // ── Appearance — load saved theme on tab open ─────────────────
+  // ── Appearance — load saved theme + logo on tab open ────────────
   useEffect(() => {
     if (settingsPage !== 'appearance' || user?.role !== 'admin') return;
+    setOrgLogoUrl(user.org_logo_url || '');
     axios.get('/api/admin/users?resource=org_settings')
       .then(r => {
         const c = r.data?.theme_color || '';
@@ -1539,11 +1543,66 @@ export default function SettingsPage() {
 
           const scale = isValidHex(themeColor) ? generateScale(themeColor) : null;
 
+          const onLogoFile = (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = '';
+            if (!file) return;
+            setLogoError('');
+            if (!file.type.startsWith('image/')) { setLogoError('Choose an image file (PNG, JPG or SVG).'); return; }
+            if (file.size > 512 * 1024) { setLogoError('Logo must be under 512 KB.'); return; }
+            const reader = new FileReader();
+            reader.onload = async () => {
+              setLogoBusy(true);
+              try {
+                const { data } = await axios.post('/api/admin/users?resource=org_logo', { logo_data: reader.result });
+                setOrgLogoUrl(data.logo_url || '');
+              } catch (err) { setLogoError(err.response?.data?.error || 'Upload failed'); }
+              finally { setLogoBusy(false); }
+            };
+            reader.readAsDataURL(file);
+          };
+
+          const removeLogo = async () => {
+            if (!window.confirm('Remove the org logo?')) return;
+            setLogoBusy(true); setLogoError('');
+            try {
+              await axios.delete('/api/admin/users?resource=org_logo');
+              setOrgLogoUrl('');
+            } catch (err) { setLogoError(err.response?.data?.error || 'Failed to remove'); }
+            finally { setLogoBusy(false); }
+          };
+
           return (
             <>
               <div>
                 <h2 className="text-xl font-bold text-gray-900">Appearance</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Customise the brand color used across the app</p>
+                <p className="text-sm text-gray-500 mt-0.5">Customise your org's logo and brand color</p>
+              </div>
+
+              {/* Logo */}
+              <div className="card p-5 space-y-4">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-700">Organisation Logo</h3>
+                  <p className="text-xs text-gray-400 mt-0.5">Replaces the default logo in the app header and login page. PNG / JPG / SVG, max 512 KB.</p>
+                </div>
+                <div className="flex items-center gap-4 flex-wrap">
+                  <div className="h-14 w-44 rounded-xl bg-gray-50 border border-gray-200 flex items-center justify-center overflow-hidden shrink-0">
+                    {orgLogoUrl
+                      ? <img src={orgLogoUrl} alt="Org logo" className="max-h-10 max-w-[160px] object-contain" />
+                      : <span className="text-xs text-gray-300">No logo</span>}
+                  </div>
+                  <label className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold cursor-pointer transition ${logoBusy ? 'bg-gray-100 text-gray-400' : 'bg-brand-600 hover:bg-brand-700 text-white'}`}>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    {logoBusy ? 'Uploading…' : (orgLogoUrl ? 'Replace logo' : 'Upload logo')}
+                    <input type="file" accept="image/png,image/jpeg,image/svg+xml,image/webp" className="hidden" disabled={logoBusy} onChange={onLogoFile} />
+                  </label>
+                  {orgLogoUrl && (
+                    <button onClick={removeLogo} disabled={logoBusy} className="px-4 py-2 rounded-lg text-sm font-medium text-red-600 border border-red-200 bg-red-50 hover:bg-red-100 transition disabled:opacity-50">
+                      Remove
+                    </button>
+                  )}
+                </div>
+                {logoError && <p className="text-xs text-red-500">{logoError}</p>}
               </div>
 
               {/* Presets */}

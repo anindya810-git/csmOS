@@ -4,6 +4,37 @@ import { setCors } from '../_utils/cors.js';
 import { getOrgFeatures, featureEnabled } from '../_utils/features.js';
 import bcrypt from 'bcryptjs';
 
+async function handleOrgLogo(req, res, orgId) {
+  if (req.method === 'DELETE') {
+    const { data: org } = await supabase.from('organizations').select('logo_url').eq('id', orgId).maybeSingle();
+    if (org?.logo_url) {
+      const path = org.logo_url.split('/org-logos/').pop();
+      if (path) await supabase.storage.from('org-logos').remove([path]);
+    }
+    await supabase.from('organizations').update({ logo_url: null, updated_at: new Date().toISOString() }).eq('id', orgId);
+    return res.json({ logo_url: null });
+  }
+
+  if (req.method === 'POST') {
+    const { logo_data } = req.body || {};
+    const match = typeof logo_data === 'string' && logo_data.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+    if (!match) return res.status(400).json({ error: 'Invalid image data' });
+    const [, contentType, b64] = match;
+    const ext = contentType.split('/').pop().replace('svg+xml', 'svg').replace('jpeg', 'jpg');
+    if (!['png', 'jpg', 'svg', 'webp'].includes(ext)) return res.status(400).json({ error: 'Unsupported format' });
+    const path = `org-${orgId}/logo-${Date.now()}.${ext}`;
+    try { await supabase.storage.createBucket('org-logos', { public: true }); } catch {}
+    const { error: upErr } = await supabase.storage.from('org-logos').upload(path, Buffer.from(b64, 'base64'), { contentType, upsert: true });
+    if (upErr) return res.status(500).json({ error: upErr.message });
+    const { data: pub } = supabase.storage.from('org-logos').getPublicUrl(path);
+    const logo_url = pub?.publicUrl || null;
+    await supabase.from('organizations').update({ logo_url, updated_at: new Date().toISOString() }).eq('id', orgId);
+    return res.json({ logo_url });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
 const ALLOWED_ROLES = ['admin', 'csm', 'sales', 'product', 'cx_strategy', 'ps'];
 
 // API key management for the open REST API. Session-JWT + admin only
@@ -126,6 +157,10 @@ export default async function handler(req, res) {
 
   if (req.query.resource === 'api_keys' || req.body?.resource === 'api_keys') {
     return handleApiKeys(req, res, caller);
+  }
+
+  if (req.query.resource === 'org_logo') {
+    return handleOrgLogo(req, res, orgId);
   }
 
   // Replace one user with another across every object they own/are tagged on.
