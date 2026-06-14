@@ -13,6 +13,7 @@ export const FEATURE_KEYS = [
   'field_management',
   'user_tree_view',
   'column_selection',
+  'watchlist',
 ];
 
 // Fetch an org's feature map. Missing column (pre-migration), missing row,

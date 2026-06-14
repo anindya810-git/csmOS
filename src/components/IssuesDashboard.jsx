@@ -488,19 +488,36 @@ export default function IssuesDashboard() {
       </div>
 
       {/* Add form */}
-      {showForm && (
-        <div className="card border-brand-200 bg-brand-50/30 space-y-4">
-          <p className="text-sm font-semibold text-gray-800">New Issue</p>
-          <IssueFormFields f={form} set={setForm} isEdit={false} accounts={accounts} dropdownConfig={dropdownConfig} onAccountSelect={handleAccountSelect} />
-          <div className="flex gap-2 pt-1">
-            <button onClick={handleSave} disabled={saving || !form.description}
-              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
-              {saving ? 'Saving…' : 'Save Issue'}
-            </button>
-            <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
+      {showForm && createPortal(
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }} />
+          <div className="fixed inset-y-0 right-0 w-[520px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+              <h3 className="text-sm font-semibold text-gray-900">Add Issue</h3>
+              <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="space-y-3">
+                <IssueFormFields f={form} set={setForm} isEdit={false} accounts={accounts} dropdownConfig={dropdownConfig} onAccountSelect={handleAccountSelect} />
+              </div>
+            </div>
+            <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
+              <button onClick={handleSave} disabled={saving || !form.description}
+                className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save Issue'}
+              </button>
+              <button type="button" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-lg transition">
+                Cancel
+              </button>
+            </div>
           </div>
-        </div>
+        </>,
+        document.body
       )}
 
       {/* Stats */}
@@ -774,7 +791,7 @@ export default function IssuesDashboard() {
                                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                                 </button>
                               )}
-                              {!isEditing && (
+                              {!isEditing && isEnabled('watchlist') && (
                                 <button onClick={ev => { ev.stopPropagation(); watchToggle('issues', issue.id); }}
                                   className={`p-1.5 rounded-md transition ${isWatched('issues', issue.id) ? 'text-brand-600' : 'text-gray-300 hover:text-gray-500'}`}
                                   title={isWatched('issues', issue.id) ? 'Remove from watchlist' : 'Add to watchlist'}>

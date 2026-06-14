@@ -407,132 +407,147 @@ export default function EscalationsDashboard() {
       </div>
 
       {/* Add Escalation Form */}
-      {showForm && (
-        <div className="card border-brand-200 bg-brand-50/30 space-y-4">
-          <p className="text-sm font-semibold text-gray-800">New Escalation</p>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-            <div className="sm:col-span-2 lg:col-span-1">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account *</p>
-              <select value={form.account_id || ''} onChange={e => handleAccountSelect(e.target.value)} className="!py-1.5 text-sm">
-                <option value="">Select account…</option>
-                {accounts.map(a => (
-                  <option key={a.id} value={a.id}>{a.account_name}</option>
-                ))}
-              </select>
+      {showForm && createPortal(
+        <>
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }} />
+          <div className="fixed inset-y-0 right-0 w-[520px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+              <h3 className="text-sm font-semibold text-gray-900">Add Escalation</h3>
+              <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
             </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date of Escalation</p>
-              <input type="date" value={form.date_of_escalation}
-                onChange={e => {
-                  const val = e.target.value;
-                  const month = val ? MONTHS[new Date(val + 'T00:00:00').getMonth()] : '';
-                  setForm(f => ({ ...f, date_of_escalation: val, month }));
-                }}
-                className="!py-1.5 text-sm" />
+            <div className="flex-1 overflow-y-auto p-5">
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Account *</label>
+                  <select value={form.account_id || ''} onChange={e => handleAccountSelect(e.target.value)} className="!py-1.5 text-sm">
+                    <option value="">Select account…</option>
+                    {accounts.map(a => (
+                      <option key={a.id} value={a.id}>{a.account_name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Date of Escalation</label>
+                  <input type="date" value={form.date_of_escalation}
+                    onChange={e => {
+                      const val = e.target.value;
+                      const month = val ? MONTHS[new Date(val + 'T00:00:00').getMonth()] : '';
+                      setForm(f => ({ ...f, date_of_escalation: val, month }));
+                    }}
+                    className="!py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Month</label>
+                  <select value={form.month} onChange={e => setForm(f => ({ ...f, month: e.target.value }))} className="!py-1.5 text-sm">
+                    <option value="">—</option>
+                    {MONTHS.map(m => <option key={m}>{m}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Description *</label>
+                  <textarea rows={3} value={form.description}
+                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                    placeholder="Describe the escalation issue…" className="text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Action Taken</label>
+                  <textarea rows={2} value={form.action_taken}
+                    onChange={e => setForm(f => ({ ...f, action_taken: e.target.value }))}
+                    placeholder="What steps were taken to resolve this…" className="text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
+                  <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="!py-1.5 text-sm">
+                    {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Ownership</label>
+                  <select value={form.ownership} onChange={e => setForm(f => ({ ...f, ownership: e.target.value }))} className="!py-1.5 text-sm">
+                    <option value="">—</option>
+                    {(dropdownConfig.ownership || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">ETA</label>
+                  <input type="date" value={form.eta}
+                    onChange={e => setForm(f => ({ ...f, eta: e.target.value }))}
+                    className="!py-1.5 text-sm" />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">CSM</label>
+                  {csms.length ? (
+                    <select value={form.csm} onChange={e => setForm(f => ({ ...f, csm: e.target.value }))} className="!py-1.5 text-sm">
+                      <option value="">—</option>
+                      {csms.map(c => <option key={c}>{c}</option>)}
+                    </select>
+                  ) : inp('csm', 'CSM name')}
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">PS Leader</label>
+                  <select value={form.ps_leader} onChange={e => setForm(f => ({ ...f, ps_leader: e.target.value }))} className="!py-1.5 text-sm">
+                    <option value="">—</option>
+                    {(dropdownConfig.ps_leader || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Escalated By</label>
+                  <select value={form.escalated_by} onChange={e => setForm(f => ({ ...f, escalated_by: e.target.value }))} className="!py-1.5 text-sm">
+                    <option value="">—</option>
+                    {(dropdownConfig.escalated_by || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Trigger Reason</label>
+                  <select value={form.trigger_reason} onChange={e => setForm(f => ({ ...f, trigger_reason: e.target.value }))} className="!py-1.5 text-sm">
+                    <option value="">—</option>
+                    {(dropdownConfig.trigger_reason || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Source of Escalation</label>
+                  <select value={form.source_of_escalation} onChange={e => setForm(f => ({ ...f, source_of_escalation: e.target.value }))} className="!py-1.5 text-sm">
+                    <option value="">—</option>
+                    {(dropdownConfig.source_of_escalation || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Issue Type</label>
+                  <select value={form.issue_type} onChange={e => setForm(f => ({ ...f, issue_type: e.target.value, issue_sub_type: '' }))} className="!py-1.5 text-sm">
+                    <option value="">—</option>
+                    {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Issue Sub-Type</label>
+                  <select value={form.issue_sub_type} onChange={e => setForm(f => ({ ...f, issue_sub_type: e.target.value }))} className="!py-1.5 text-sm" disabled={!form.issue_type}>
+                    <option value="">{form.issue_type ? '—' : 'Select Issue Type first'}</option>
+                    {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === form.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Email Subject</label>
+                  <input type="text" value={form.email_subject || ''} onChange={e => setForm(f => ({ ...f, email_subject: e.target.value }))} placeholder="Email subject line (if any)" className="!py-1.5 text-sm" />
+                </div>
+              </div>
             </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Month</p>
-              <select value={form.month} onChange={e => setForm(f => ({ ...f, month: e.target.value }))} className="!py-1.5 text-sm">
-                <option value="">—</option>
-                {MONTHS.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </div>
-            <div className="sm:col-span-2 lg:col-span-3">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Description *</p>
-              <textarea rows={3} value={form.description}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                placeholder="Describe the escalation issue…" className="text-sm" />
-            </div>
-            <div className="sm:col-span-2 lg:col-span-3">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Action Taken</p>
-              <textarea rows={2} value={form.action_taken}
-                onChange={e => setForm(f => ({ ...f, action_taken: e.target.value }))}
-                placeholder="What steps were taken to resolve this…" className="text-sm" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
-              <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="!py-1.5 text-sm">
-                {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
-              </select>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
-              <select value={form.ownership} onChange={e => setForm(f => ({ ...f, ownership: e.target.value }))} className="!py-1.5 text-sm">
-                <option value="">—</option>
-                {(dropdownConfig.ownership || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-              </select>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">ETA</p>
-              <input type="date" value={form.eta}
-                onChange={e => setForm(f => ({ ...f, eta: e.target.value }))}
-                className="!py-1.5 text-sm" />
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
-              {csms.length ? (
-                <select value={form.csm} onChange={e => setForm(f => ({ ...f, csm: e.target.value }))} className="!py-1.5 text-sm">
-                  <option value="">—</option>
-                  {csms.map(c => <option key={c}>{c}</option>)}
-                </select>
-              ) : inp('csm', 'CSM name')}
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
-              <select value={form.ps_leader} onChange={e => setForm(f => ({ ...f, ps_leader: e.target.value }))} className="!py-1.5 text-sm">
-                <option value="">—</option>
-                {(dropdownConfig.ps_leader || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-              </select>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
-              <select value={form.escalated_by} onChange={e => setForm(f => ({ ...f, escalated_by: e.target.value }))} className="!py-1.5 text-sm">
-                <option value="">—</option>
-                {(dropdownConfig.escalated_by || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-              </select>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Trigger Reason</p>
-              <select value={form.trigger_reason} onChange={e => setForm(f => ({ ...f, trigger_reason: e.target.value }))} className="!py-1.5 text-sm">
-                <option value="">—</option>
-                {(dropdownConfig.trigger_reason || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-              </select>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source of Escalation</p>
-              <select value={form.source_of_escalation} onChange={e => setForm(f => ({ ...f, source_of_escalation: e.target.value }))} className="!py-1.5 text-sm">
-                <option value="">—</option>
-                {(dropdownConfig.source_of_escalation || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-              </select>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Type</p>
-              <select value={form.issue_type} onChange={e => setForm(f => ({ ...f, issue_type: e.target.value, issue_sub_type: '' }))} className="!py-1.5 text-sm">
-                <option value="">—</option>
-                {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-              </select>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Sub-Type</p>
-              <select value={form.issue_sub_type} onChange={e => setForm(f => ({ ...f, issue_sub_type: e.target.value }))} className="!py-1.5 text-sm" disabled={!form.issue_type}>
-                <option value="">{form.issue_type ? '—' : 'Select Issue Type first'}</option>
-                {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === form.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-              </select>
-            </div>
-            <div className="sm:col-span-2">
-              <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email Subject</p>
-              {inp('email_subject', 'Email subject line (if any)')}
+            <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
+              <button onClick={handleSave} disabled={saving || !form.description}
+                className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50">
+                {saving ? 'Saving…' : 'Save Escalation'}
+              </button>
+              <button type="button" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}
+                className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-lg transition">
+                Cancel
+              </button>
             </div>
           </div>
-          <div className="flex gap-2 pt-1">
-            <button onClick={handleSave} disabled={saving || !form.description}
-              className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
-              {saving ? 'Saving…' : 'Save Escalation'}
-            </button>
-            <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}
-              className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
-          </div>
-        </div>
+        </>,
+        document.body
       )}
 
       {/* Stats */}
@@ -841,7 +856,7 @@ export default function EscalationsDashboard() {
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                               </button>
                             )}
-                            {!isEditing && (
+                            {!isEditing && isEnabled('watchlist') && (
                               <button onClick={ev => { ev.stopPropagation(); watchToggle('escalations', e.id); }}
                                 className={`p-1.5 rounded-md transition ${isWatched('escalations', e.id) ? 'text-brand-600' : 'text-gray-300 hover:text-gray-500'}`}
                                 title={isWatched('escalations', e.id) ? 'Remove from watchlist' : 'Add to watchlist'}>

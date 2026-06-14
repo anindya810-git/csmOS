@@ -1,6 +1,7 @@
 import React, { Suspense, useRef, useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useFeatures } from '../hooks/useFeatures';
 
 const icon = (d) => (
   <svg className="w-5 h-5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -16,7 +17,7 @@ const NAV_ITEMS = [
   { to: '/tasks',       end: false, label: 'Tasks',       d: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4' },
   { to: '/reports',          end: false, label: 'Reports',     d: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z' },
   { to: '/feature-requests', end: false, label: 'Feature Requests', short: 'Features', d: 'M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v18m0 0h10a2 2 0 002-2V9M9 21H5a2 2 0 01-2-2V9m0 0h18' },
-  { to: '/watchlist',        end: false, label: 'Watchlist',        short: 'Watched',  d: 'M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z' },
+  { to: '/watchlist',        end: false, label: 'Watchlist',        short: 'Watched',  d: 'M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z', feature: 'watchlist' },
 ];
 
 function getInitials(name) {
@@ -28,11 +29,33 @@ function getInitials(name) {
 
 export default function Layout() {
   const { user, logout } = useAuth();
+  const { isEnabled } = useFeatures();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
   const handleLogout = () => { logout(); navigate('/login'); };
+
+  // Dynamic favicon + browser title when org has a logo/name
+  useEffect(() => {
+    document.title = user?.org_name ? `${user.org_name} · Custally` : 'Custally';
+    if (user?.org_logo_url) {
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = user.org_logo_url;
+    }
+    return () => {
+      // Reset to default when logged out / component unmounts
+      document.title = 'Custally';
+    };
+  }, [user?.org_logo_url, user?.org_name]);
+
+  // Filter nav items based on feature flags
+  const navItems = NAV_ITEMS.filter(item => !item.feature || isEnabled(item.feature));
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -75,7 +98,7 @@ export default function Layout() {
               )}
             </a>
             <nav className="hidden sm:flex items-center gap-1">
-              {NAV_ITEMS.map(item => (
+              {navItems.map(item => (
                 <NavLink key={item.to} to={item.to} end={item.end} className={topNavClass}>
                   {icon(item.d)}
                   {item.label}
@@ -152,7 +175,7 @@ export default function Layout() {
 
       {/* Mobile bottom tab bar */}
       <nav className="sm:hidden fixed bottom-0 inset-x-0 z-40 bg-white border-t border-gray-200 flex pb-safe shadow-[0_-1px_3px_rgba(0,0,0,0.04)]">
-        {NAV_ITEMS.map(item => (
+        {navItems.map(item => (
           <NavLink key={item.to} to={item.to} end={item.end} className={tabNavClass}>
             {icon(item.d)}
             <span className="text-[10px] font-medium leading-none truncate max-w-full px-0.5">{item.short || item.label}</span>

@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -626,7 +627,7 @@ export default function AccountsPage() {
                   ))}
                   <td className="px-3 py-3 sticky right-0 z-10 bg-white group-hover:bg-gray-50 shadow-[-2px_0_6px_rgba(0,0,0,0.05)]">
                     <div className="flex items-center gap-1">
-                      <button
+                      {isEnabled('watchlist') && <button
                         onClick={ev => { ev.stopPropagation(); watchToggle('accounts', a.id); }}
                         className={`p-1 rounded transition ${isWatched('accounts', a.id) ? 'text-brand-600' : 'text-gray-300 hover:text-gray-500'}`}
                         title={isWatched('accounts', a.id) ? 'Remove from watchlist' : 'Add to watchlist'}
@@ -635,7 +636,7 @@ export default function AccountsPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                         </svg>
-                      </button>
+                      </button>}
                       <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                     </div>
                   </td>
@@ -716,7 +717,8 @@ function AddAccountModal({ onClose, onSave }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSave = async () => {
+  const handleSave = async (e) => {
+    e?.preventDefault?.();
     if (!form.account_name) { setError('Account name is required'); return; }
     setSaving(true);
     try {
@@ -727,36 +729,61 @@ function AddAccountModal({ onClose, onSave }) {
     } finally { setSaving(false); }
   };
 
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between p-5 sm:p-6 border-b border-gray-100 sticky top-0 bg-white rounded-t-2xl">
-          <h2 className="text-lg font-semibold text-gray-900">Add New Account</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition text-lg leading-none">✕</button>
+  return createPortal(
+    <>
+      <div className="fixed inset-0 z-40 bg-black/20" onClick={onClose} />
+      <div className="fixed inset-y-0 right-0 w-[520px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
+          <h3 className="text-sm font-semibold text-gray-900">Add New Account</h3>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
         </div>
-        <div className="p-5 sm:p-6 space-y-4">
-          {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="sm:col-span-2"><label className="block text-xs font-medium text-gray-600 mb-1">Account Name *</label><input value={form.account_name} onChange={e => setForm(f=>({...f, account_name: e.target.value}))} /></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Tenant ID</label><input value={form.tenant_id} onChange={e => setForm(f=>({...f, tenant_id: e.target.value}))} /></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Industry</label><input value={form.industry} onChange={e => setForm(f=>({...f, industry: e.target.value}))} /></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">MRR (₹)</label><input type="number" value={form.mrr} onChange={e => setForm(f=>({...f, mrr: e.target.value}))} /></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">Region</label>
+        <div className="flex-1 overflow-y-auto p-5">
+          <form id="add-account-form" onSubmit={handleSave} className="space-y-3">
+            {error && <p className="text-sm text-red-600 bg-red-50 p-3 rounded-lg">{error}</p>}
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Account Name *</label>
+              <input value={form.account_name} onChange={e => setForm(f=>({...f, account_name: e.target.value}))} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Tenant ID</label>
+              <input value={form.tenant_id} onChange={e => setForm(f=>({...f, tenant_id: e.target.value}))} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Industry</label>
+              <input value={form.industry} onChange={e => setForm(f=>({...f, industry: e.target.value}))} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">MRR (₹)</label>
+              <input type="number" value={form.mrr} onChange={e => setForm(f=>({...f, mrr: e.target.value}))} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Region</label>
               <SelectDropdown options={['North','South','East','West']} value={form.region} onChange={v => setForm(f=>({...f, region: v}))} placeholder="—" />
             </div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">CSM</label><input value={form.csm} onChange={e => setForm(f=>({...f, csm: e.target.value}))} /></div>
-            <div><label className="block text-xs font-medium text-gray-600 mb-1">RAG Status</label>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">CSM</label>
+              <input value={form.csm} onChange={e => setForm(f=>({...f, csm: e.target.value}))} />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">RAG Status</label>
               <SelectDropdown options={['Green','Amber','Red']} value={form.rag_status} onChange={v => setForm(f=>({...f, rag_status: v}))} clearable={false} />
             </div>
-          </div>
+          </form>
         </div>
-        <div className="flex justify-end gap-3 px-6 pb-6">
-          <button onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:text-gray-800 transition">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-60">
+        <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
+          <button type="submit" form="add-account-form" disabled={saving} className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50">
             {saving ? 'Saving…' : 'Create Account'}
+          </button>
+          <button type="button" onClick={onClose} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-lg transition">
+            Cancel
           </button>
         </div>
       </div>
-    </div>
+    </>,
+    document.body
   );
 }

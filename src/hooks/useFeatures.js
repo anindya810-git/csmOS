@@ -13,6 +13,7 @@ export const FEATURE_DEFS = [
   { key: 'field_management', label: 'Field Management',   desc: 'Dropdown values & field renaming in Settings' },
   { key: 'user_tree_view',   label: 'User Tree View',     desc: 'Org-chart tree view in Manage Users' },
   { key: 'column_selection', label: 'Column Selection',   desc: 'Per-user column visibility controls on dashboards' },
+  { key: 'watchlist',       label: 'Watchlist',           desc: 'Eye-icon bookmarking and the Watchlist page' },
 ];
 
 export function useFeatures() {
