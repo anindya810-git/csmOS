@@ -34,15 +34,22 @@ export function AuthProvider({ children }) {
     return () => { clearInterval(interval); document.removeEventListener('visibilitychange', beat); };
   }, []);
 
+  const onSuperadmin = () => window.location.pathname.startsWith('/superadmin');
+
   // Apply or remove the org's brand color whenever the user changes.
-  useEffect(() => { applyTheme(user?.org_theme || null); }, [user?.org_theme]);
+  // Never touch the theme while on superadmin routes — that panel always
+  // uses the default Custally theme regardless of the logged-in org's color.
+  useEffect(() => {
+    if (onSuperadmin()) return;
+    applyTheme(user?.org_theme || null);
+  }, [user?.org_theme]);
 
   const login = async (email, password) => {
     const r = await axios.post('/api/auth/login', { email, password });
     localStorage.setItem('token', r.data.token);
     axios.defaults.headers.common['Authorization'] = `Bearer ${r.data.token}`;
     setUser(r.data.user);
-    applyTheme(r.data.user?.org_theme || null);
+    if (!onSuperadmin()) applyTheme(r.data.user?.org_theme || null);
     return r.data.user;
   };
 
@@ -50,7 +57,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem('token');
     delete axios.defaults.headers.common['Authorization'];
     setUser(null);
-    applyTheme(null);
+    if (!onSuperadmin()) applyTheme(null);
   };
 
   return <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>;
