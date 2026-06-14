@@ -9,6 +9,7 @@ import Login from './components/Login';
 import Layout from './components/Layout';
 import ReportsPage from './components/ReportsPage';
 import LandingPage from './components/LandingPage';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Route-level code splitting: each page chunk loads on demand so the initial
 // bundle stays small (e.g. recharts only ships with the pages that chart).
@@ -157,16 +158,18 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <SuperadminAuthProvider>
-      <AuthProvider>
-        <FieldLabelsProvider>
-          <PermissionsProvider>
-            <AiConfigProvider>
-              <AppRoutes />
-            </AiConfigProvider>
-          </PermissionsProvider>
-        </FieldLabelsProvider>
-      </AuthProvider>
-    </SuperadminAuthProvider>
+    <ErrorBoundary>
+      <SuperadminAuthProvider>
+        <AuthProvider>
+          <FieldLabelsProvider>
+            <PermissionsProvider>
+              <AiConfigProvider>
+                <AppRoutes />
+              </AiConfigProvider>
+            </PermissionsProvider>
+          </FieldLabelsProvider>
+        </AuthProvider>
+      </SuperadminAuthProvider>
+    </ErrorBoundary>
   );
 }

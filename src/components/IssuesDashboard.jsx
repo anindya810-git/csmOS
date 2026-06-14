@@ -784,12 +784,13 @@ export default function IssuesDashboard() {
                                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Description</p>
                                   <p className="text-sm text-gray-800 whitespace-pre-wrap">{issue.description}</p>
                                 </div>
-                                {issue.next_steps && (
-                                  <div>
-                                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>
-                                    <p className="text-sm text-gray-800 whitespace-pre-wrap">{issue.next_steps}</p>
-                                  </div>
-                                )}
+                                <div>
+                                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>
+                                  {issue.next_steps
+                                    ? <p className="text-sm text-gray-800 whitespace-pre-wrap">{issue.next_steps}</p>
+                                    : <p className="text-sm text-gray-400 italic">None added — click the edit button to add</p>
+                                  }
+                                </div>
                                 <div className="sm:col-span-2 flex flex-wrap gap-4 text-xs text-gray-500">
                                   {issue.support_ticket && <span><span className="font-medium">Support Ticket:</span> #{issue.support_ticket}</span>}
                                   {issue.dev_ticket && <span><span className="font-medium">Dev Ticket:</span> #{issue.dev_ticket}</span>}
@@ -885,7 +886,13 @@ export default function IssuesDashboard() {
                   {open && !isEditing && (
                     <div className="px-4 pb-4 pt-1 bg-gray-50 border-t border-gray-100 space-y-2">
                       <p className="text-sm text-gray-800 whitespace-pre-wrap">{issue.description}</p>
-                      {issue.next_steps && <div><p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Next Steps</p><p className="text-sm text-gray-700">{issue.next_steps}</p></div>}
+                      <div>
+                        <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>
+                        {issue.next_steps
+                          ? <p className="text-sm text-gray-700">{issue.next_steps}</p>
+                          : <p className="text-sm text-gray-400 italic">None added</p>
+                        }
+                      </div>
                       <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
                         {issue.support_ticket && <span><span className="font-medium">ST:</span> #{issue.support_ticket}</span>}
                         {issue.dev_ticket && <span><span className="font-medium">DT:</span> #{issue.dev_ticket}</span>}
