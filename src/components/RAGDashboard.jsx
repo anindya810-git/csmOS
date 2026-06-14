@@ -12,13 +12,17 @@ const RAG_CONFIG = {
 };
 
 export default function RAGDashboard() {
-  const [accounts,     setAccounts]     = useState([]);
-  const [loading,      setLoading]      = useState(true);
-  const [error,        setError]        = useState(null);
-  const [activeRag,    setActiveRag]    = useState('');   // '' = all
-  const [filterCsm,    setFilterCsm]    = useState([]);
-  const [filterRegion, setFilterRegion] = useState([]);
-  const [search,       setSearch]       = useState('');
+  const [accounts,         setAccounts]         = useState([]);
+  const [loading,          setLoading]          = useState(true);
+  const [error,            setError]            = useState(null);
+  const [activeRag,        setActiveRag]        = useState('');
+  const [filterCsm,        setFilterCsm]        = useState([]);
+  const [filterRegion,     setFilterRegion]     = useState([]);
+  const [filterIndustry,   setFilterIndustry]   = useState([]);
+  const [filterMrrTier,    setFilterMrrTier]    = useState([]);
+  const [filterRenewal,    setFilterRenewal]    = useState([]);
+  const [filterChurn,      setFilterChurn]      = useState([]);
+  const [search,           setSearch]           = useState('');
 
   useEffect(() => {
     axios.get('/api/accounts')
@@ -26,23 +30,34 @@ export default function RAGDashboard() {
       .catch(e => { setError(e.message); setLoading(false); });
   }, []);
 
-  const csms    = useMemo(() => [...new Set(accounts.map(a => a.csm).filter(Boolean))].sort(), [accounts]);
-  const regions = useMemo(() => [...new Set(accounts.map(a => a.region).filter(Boolean))].sort(), [accounts]);
+  const csms           = useMemo(() => [...new Set(accounts.map(a => a.csm).filter(Boolean))].sort(), [accounts]);
+  const regions        = useMemo(() => [...new Set(accounts.map(a => a.region).filter(Boolean))].sort(), [accounts]);
+  const industries     = useMemo(() => [...new Set(accounts.map(a => a.industry).filter(Boolean))].sort(), [accounts]);
+  const mrrTiers       = useMemo(() => [...new Set(accounts.map(a => a.mrr_tier).filter(Boolean))].sort(), [accounts]);
+  const renewalStatuses= useMemo(() => [...new Set(accounts.map(a => a.renewal_status).filter(Boolean))].sort(), [accounts]);
+  const churnStatuses  = useMemo(() => [...new Set(accounts.map(a => a.churn_status).filter(Boolean))].sort(), [accounts]);
+
+  const applyBase = (list) => list.filter(a => {
+    if (filterCsm.length > 0        && !filterCsm.includes(a.csm))              return false;
+    if (filterRegion.length > 0     && !filterRegion.includes(a.region))        return false;
+    if (filterIndustry.length > 0   && !filterIndustry.includes(a.industry))    return false;
+    if (filterMrrTier.length > 0    && !filterMrrTier.includes(a.mrr_tier))     return false;
+    if (filterRenewal.length > 0    && !filterRenewal.includes(a.renewal_status)) return false;
+    if (filterChurn.length > 0      && !filterChurn.includes(a.churn_status))   return false;
+    return true;
+  });
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
-    return accounts.filter(a => {
-      if (activeRag              && a.rag_status !== activeRag)           return false;
-      if (filterCsm.length > 0    && !filterCsm.includes(a.csm))          return false;
-      if (filterRegion.length > 0 && !filterRegion.includes(a.region))    return false;
+    return applyBase(accounts).filter(a => {
+      if (activeRag && a.rag_status !== activeRag) return false;
       if (q && !a.account_name.toLowerCase().includes(q) &&
-               !(a.rag_reason   || '').toLowerCase().includes(q) &&
+               !(a.rag_reason    || '').toLowerCase().includes(q) &&
                !(a.actions_taken || '').toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [accounts, activeRag, filterCsm, filterRegion, search]);
+  }, [accounts, activeRag, filterCsm, filterRegion, filterIndustry, filterMrrTier, filterRenewal, filterChurn, search]);
 
-  // Group for display: Red → Amber → Green
   const grouped = useMemo(() => {
     const order = activeRag ? [activeRag] : RAG_ORDER;
     return order.map(rag => ({
@@ -51,19 +66,21 @@ export default function RAGDashboard() {
     })).filter(g => g.items.length > 0);
   }, [filtered, activeRag]);
 
-  // Summary counts (unfiltered by rag tab so the KPI cards always show totals)
   const summary = useMemo(() => {
-    const base = accounts.filter(a => {
-      if (filterCsm.length > 0    && !filterCsm.includes(a.csm))       return false;
-      if (filterRegion.length > 0 && !filterRegion.includes(a.region)) return false;
-      return true;
-    });
+    const base = applyBase(accounts);
     return RAG_ORDER.map(r => ({
       rag:   r,
       count: base.filter(a => a.rag_status === r).length,
       mrr:   base.filter(a => a.rag_status === r).reduce((s, a) => s + (a.mrr || 0), 0),
     }));
-  }, [accounts, filterCsm, filterRegion]);
+  }, [accounts, filterCsm, filterRegion, filterIndustry, filterMrrTier, filterRenewal, filterChurn]);
+
+  const hasFilters = filterCsm.length > 0 || filterRegion.length > 0 || filterIndustry.length > 0 ||
+    filterMrrTier.length > 0 || filterRenewal.length > 0 || filterChurn.length > 0 || activeRag || search;
+  function clearAll() {
+    setFilterCsm([]); setFilterRegion([]); setFilterIndustry([]); setFilterMrrTier([]);
+    setFilterRenewal([]); setFilterChurn([]); setActiveRag(''); setSearch('');
+  }
 
   if (loading) return (
     <div className="flex justify-center py-16">
@@ -96,31 +113,26 @@ export default function RAGDashboard() {
       </div>
 
       {/* ── Filters ── */}
-      <div className="flex flex-wrap gap-3 items-center">
-        <input
-          type="text" placeholder="Search accounts, reasons, actions…"
-          value={search} onChange={e => setSearch(e.target.value)}
-          className="!w-full sm:!w-64 text-sm"
-        />
-        <MultiSelectDropdown
-          options={csms}
-          value={filterCsm}
-          onChange={setFilterCsm}
-          placeholder="All CSMs"
-        />
-        <MultiSelectDropdown
-          options={regions}
-          value={filterRegion}
-          onChange={setFilterRegion}
-          placeholder="All Regions"
-        />
-        {(filterCsm.length > 0 || filterRegion.length > 0 || activeRag || search) && (
-          <button onClick={() => { setFilterCsm([]); setFilterRegion([]); setActiveRag(''); setSearch(''); }}
-            className="text-xs text-red-500 hover:text-red-700 hover:underline">
-            Clear all
-          </button>
-        )}
-        <span className="text-xs text-gray-400 ml-auto">{filtered.length} accounts</span>
+      <div className="card p-3 space-y-2">
+        <div className="flex flex-wrap gap-2 items-center">
+          <input
+            type="text" placeholder="Search accounts, reasons, actions…"
+            value={search} onChange={e => setSearch(e.target.value)}
+            className="!py-1.5 text-sm flex-1 min-w-[200px]"
+          />
+          <MultiSelectDropdown options={csms}           value={filterCsm}      onChange={setFilterCsm}      placeholder="All CSMs"      className="w-44" />
+          <MultiSelectDropdown options={regions}        value={filterRegion}   onChange={setFilterRegion}   placeholder="All Regions"   className="w-40" />
+          <MultiSelectDropdown options={industries}     value={filterIndustry} onChange={setFilterIndustry} placeholder="All Industries" className="w-44" />
+          <MultiSelectDropdown options={mrrTiers}       value={filterMrrTier}  onChange={setFilterMrrTier}  placeholder="All MRR Tiers" className="w-44" />
+          <MultiSelectDropdown options={renewalStatuses}value={filterRenewal}  onChange={setFilterRenewal}  placeholder="Renewal Status" className="w-48" />
+          <MultiSelectDropdown options={churnStatuses}  value={filterChurn}    onChange={setFilterChurn}    placeholder="Churn Status"  className="w-44" />
+        </div>
+        <div className="flex items-center justify-between">
+          {hasFilters ? (
+            <button onClick={clearAll} className="text-xs text-red-500 hover:text-red-700 hover:underline">Clear all filters</button>
+          ) : <span />}
+          <span className="text-xs text-gray-400">{filtered.length} accounts</span>
+        </div>
       </div>
 
       {/* ── Account list grouped by RAG ── */}

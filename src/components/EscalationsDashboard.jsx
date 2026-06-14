@@ -132,7 +132,8 @@ export default function EscalationsDashboard() {
   const { can } = usePermissions();
   const { isEnabled } = useFeatures();
   const { label: fieldLabel } = useFieldLabels();
-  const { isWatched, toggle: watchToggle } = useWatchlist();
+  const { isWatched, toggle: watchToggle, getIds: getWatchIds } = useWatchlist();
+  const [watchlistOnly, setWatchlistOnly] = useState(false);
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'escalations', Object.fromEntries(ESC_COLS.map(c => [c.key, !c.off]))
   );
@@ -322,13 +323,15 @@ export default function EscalationsDashboard() {
     setSearch('');
     setFilters({ status: [], csm: [], ownership: [], issue_type: [], month: [] });
     setConditions([]);
+    setWatchlistOnly(false);
     setPage(1);
   };
-  const hasFilters = !!(search || filters.status.length || filters.csm.length || filters.ownership.length || filters.issue_type.length || filters.month.length || conditions.length > 0);
+  const hasFilters = !!(search || filters.status.length || filters.csm.length || filters.ownership.length || filters.issue_type.length || filters.month.length || conditions.length > 0 || watchlistOnly);
   const activeConditions = conditions.filter(c => c.field && c.operator);
-  // paginated is derived after displayed is computed below
+  const watchedEscIds = new Set(getWatchIds('escalations'));
 
   const displayed = escalations.filter(e => {
+    if (watchlistOnly && !watchedEscIds.has(String(e.id))) return false;
     if (search) {
       const q = search.toLowerCase();
       const blob = [e.account_name, e.description, e.csm, e.ownership, e.escalated_by, e.issue_type].filter(Boolean).join(' ').toLowerCase();
@@ -629,6 +632,16 @@ export default function EscalationsDashboard() {
           <MultiSelectDropdown placeholder="All Ownerships" options={allOwnerships} value={filters.ownership} onChange={v => setFilter('ownership', v)} />
           <MultiSelectDropdown placeholder="All Issue Types" options={allIssueTypes} value={filters.issue_type} onChange={v => setFilter('issue_type', v)} />
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
+          {isEnabled('watchlist') && (
+            <button
+              onClick={() => setWatchlistOnly(w => !w)}
+              title="Show only watchlisted escalations"
+              className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition ${watchlistOnly ? 'bg-brand-50 border-brand-400 text-brand-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              Watchlist{watchlistOnly ? ` (${watchedEscIds.size})` : ''}
+            </button>
+          )}
           {isEnabled('column_selection') && <ColumnToggle columns={ESC_COLS.map(c => ({ ...c, label: fieldLabel('escalations', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />}
           {isEnabled('advanced_search') && (
           <button

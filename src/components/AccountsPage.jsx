@@ -168,7 +168,8 @@ export default function AccountsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const { isEnabled } = useFeatures();
-  const { isWatched, toggle: watchToggle } = useWatchlist();
+  const { isWatched, toggle: watchToggle, getIds: getWatchIds } = useWatchlist();
+  const [watchlistOnly, setWatchlistOnly] = useState(false);
   const { label: fieldLabel } = useFieldLabels();
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'accounts', Object.fromEntries(ACCOUNTS_COLS.map(c => [c.key, !c.off]))
@@ -256,7 +257,10 @@ export default function AccountsPage() {
 
   const activeConditions = conditions.filter(c => c.field && c.operator);
 
+  const watchedAccountIds = new Set(getWatchIds('accounts'));
+
   const displayed = sorted.filter(a => {
+    if (watchlistOnly && !watchedAccountIds.has(String(a.id)))                   return false;
     if (query.rag_status.length > 0 && !query.rag_status.includes(a.rag_status)) return false;
     if (query.csm.length > 0        && !query.csm.includes(a.csm))               return false;
     if (query.industry.length > 0   && !query.industry.includes(a.industry))     return false;
@@ -288,10 +292,11 @@ export default function AccountsPage() {
     setSearch('');
     setQuery({ csm: [], industry: [], region: [], rag_status: [], mrr_tier: [] });
     setConditions([]);
+    setWatchlistOnly(false);
     setPage(1);
   };
 
-  const hasFilters = search || Object.values(query).some(arr => arr.length > 0) || conditions.length > 0;
+  const hasFilters = search || Object.values(query).some(arr => arr.length > 0) || conditions.length > 0 || watchlistOnly;
 
   const paginated = displayed.slice((page - 1) * perPage, page * perPage);
 
@@ -415,6 +420,16 @@ export default function AccountsPage() {
           <MultiSelectDropdown options={filters.industries || []} value={query.industry} onChange={v => setQuery(q => ({...q, industry: v}))} placeholder="All Industries" />
           <MultiSelectDropdown options={['North','South','East','West']} value={query.region} onChange={v => setQuery(q => ({...q, region: v}))} placeholder="All Regions" />
           <MultiSelectDropdown options={filters.tiers || []} value={query.mrr_tier} onChange={v => setQuery(q => ({...q, mrr_tier: v}))} placeholder="All Tiers" />
+          {isEnabled('watchlist') && (
+            <button
+              onClick={() => setWatchlistOnly(w => !w)}
+              title="Show only watchlisted accounts"
+              className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition ${watchlistOnly ? 'bg-brand-50 border-brand-400 text-brand-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              Watchlist{watchlistOnly ? ` (${watchedAccountIds.size})` : ''}
+            </button>
+          )}
           {isEnabled('column_selection') && <ColumnToggle columns={ACCOUNTS_COLS.map(c => ({ ...c, label: fieldLabel('accounts', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />}
           {isEnabled('advanced_search') && (
           <button

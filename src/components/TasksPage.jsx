@@ -72,7 +72,8 @@ export default function TasksPage() {
   const isAdmin   = user?.role === 'admin';
   const { can } = usePermissions();
   const { isEnabled } = useFeatures();
-  const { isWatched, toggle: watchToggle } = useWatchlist();
+  const { isWatched, toggle: watchToggle, getIds: getWatchIds } = useWatchlist();
+  const [watchlistOnly, setWatchlistOnly] = useState(false);
   const { label: fieldLabel } = useFieldLabels();
   const visibleTaskCols = TASKS_COLS.filter(c => !c.adminOnly || isAdmin);
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
@@ -145,8 +146,11 @@ export default function TasksPage() {
   const accountOptions = useMemo(() =>
     [...new Set(tasks.map(t => t.account_name).filter(Boolean))].sort(), [tasks]);
 
+  const watchedTaskIds = useMemo(() => new Set(getWatchIds('tasks')), [getWatchIds]);
+
   const filtered = useMemo(() => {
     return tasks.filter(t => {
+      if (watchlistOnly && !watchedTaskIds.has(String(t.id))) return false;
       const ds = deriveStatus(t);
       if (statusFilter !== 'all' && ds !== statusFilter) return false;
       if (natureFilter && t.nature_of_task !== natureFilter) return false;
@@ -161,7 +165,7 @@ export default function TasksPage() {
       if (accountFilter.length > 0 && !accountFilter.includes(t.account_name)) return false;
       return true;
     });
-  }, [tasks, statusFilter, natureFilter, assigneeFilter, search]);
+  }, [tasks, statusFilter, natureFilter, assigneeFilter, search, watchlistOnly, watchedTaskIds]);
 
   const counts = useMemo(() => ({
     all:       tasks.length,
@@ -398,6 +402,16 @@ export default function TasksPage() {
             className="text-xs text-gray-400 hover:text-gray-600 transition">Clear</button>
         ) : null}
         <div className="ml-auto">
+          {isEnabled('watchlist') && (
+            <button
+              onClick={() => setWatchlistOnly(w => !w)}
+              title="Show only watchlisted tasks"
+              className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition ${watchlistOnly ? 'bg-brand-50 border-brand-400 text-brand-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+              Watchlist{watchlistOnly ? ` (${watchedTaskIds.size})` : ''}
+            </button>
+          )}
           {isEnabled('column_selection') && <ColumnToggle columns={visibleTaskCols.map(c => ({ ...c, label: fieldLabel('tasks', c.key, c.label) }))} prefs={colPrefs} onToggle={toggleCol} />}
         </div>
         {selected.size > 0 && isAdmin && (

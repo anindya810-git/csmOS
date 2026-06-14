@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
+import SelectDropdown from './SelectDropdown';
 
 const MON = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
@@ -147,23 +148,30 @@ export default function RenewalDashboard() {
 
       {/* ── Filter row ── */}
       <div className="flex flex-wrap gap-2 sm:gap-3">
-        <select value={filterCsm} onChange={e => setFilterCsm(e.target.value)}
-          className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500">
-          <option value="">All CSMs</option>
-          {csms.map(c => <option key={c} value={c}>{c}</option>)}
-        </select>
-        <select value={filterRag} onChange={e => setFilterRag(e.target.value)}
-          className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500">
-          <option value="">All RAG</option>
-          <option value="Green">Green</option>
-          <option value="Amber">Amber</option>
-          <option value="Red">Red</option>
-        </select>
-        <select value={filterRegion} onChange={e => setFilterRegion(e.target.value)}
-          className="!w-auto text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:ring-2 focus:ring-brand-500">
-          <option value="">All Regions</option>
-          {regions.map(r => <option key={r} value={r}>{r}</option>)}
-        </select>
+        <SelectDropdown
+          value={filterCsm}
+          onChange={v => setFilterCsm(v ?? '')}
+          options={csms}
+          placeholder="All CSMs"
+          className="w-44"
+          compact
+        />
+        <SelectDropdown
+          value={filterRag}
+          onChange={v => setFilterRag(v ?? '')}
+          options={['Green', 'Amber', 'Red']}
+          placeholder="All RAG"
+          className="w-36"
+          compact
+        />
+        <SelectDropdown
+          value={filterRegion}
+          onChange={v => setFilterRegion(v ?? '')}
+          options={regions}
+          placeholder="All Regions"
+          className="w-40"
+          compact
+        />
         {(filterCsm || filterRag || filterRegion) && (
           <button onClick={() => { setFilterCsm(''); setFilterRag(''); setFilterRegion(''); }}
             className="text-xs text-red-500 hover:text-red-700 hover:underline self-center">

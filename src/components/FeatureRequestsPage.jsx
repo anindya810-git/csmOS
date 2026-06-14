@@ -92,13 +92,17 @@ const EMPTY_FORM = { title: '', description: '', related_to: '', priority: 'P2',
 export default function FeatureRequestsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
-  const { isWatched, toggle: watchToggle } = useWatchlist();
+  const { isWatched, toggle: watchToggle, getIds: getWatchIds } = useWatchlist();
+  const [watchlistOnly, setWatchlistOnly] = useState(false);
   const navigate = useNavigate();
   const isAdmin = user?.role === 'admin';
   const canReview = (fr) => isAdmin || (fr?.approver_id != null && String(fr.approver_id) === String(user?.id));
 
   const [frs, setFrs]           = useState([]);
   const [loading, setLoading]   = useState(true);
+  // client-side watchlist filter applied on top of server-filtered frs
+  const watchedFrIds = new Set(getWatchIds('feature_requests'));
+  const displayedFrs = watchlistOnly ? frs.filter(fr => watchedFrIds.has(String(fr.id))) : frs;
   const [filters, setFilters]   = useState({ status: '', priority: '', related_to: '', search: '' });
   const [relatedOpts, setRelatedOpts] = useState([]);
 
@@ -435,15 +439,25 @@ export default function FeatureRequestsPage() {
         <SelectDropdown options={['P0', 'P1', 'P2', 'P3']} value={filters.priority} onChange={v => applyFilter({ priority: v })} placeholder="All Priorities" className="w-40" />
         <SelectDropdown options={relatedOpts} value={filters.related_to} onChange={v => applyFilter({ related_to: v })} placeholder="All Products" className="w-48" />
         <input value={filters.search} onChange={e => applyFilter({ search: e.target.value })} placeholder="Search title…" className="flex-1 min-w-[160px] !py-1.5 text-sm" />
+        {isEnabled('watchlist') && (
+          <button
+            onClick={() => setWatchlistOnly(w => !w)}
+            title="Show only watchlisted requests"
+            className={`inline-flex items-center gap-1.5 text-sm font-medium px-3 py-1.5 rounded-lg border transition ${watchlistOnly ? 'bg-brand-50 border-brand-400 text-brand-700' : 'bg-white border-gray-200 text-gray-500 hover:bg-gray-50'}`}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+            Watchlist{watchlistOnly ? ` (${watchedFrIds.size})` : ''}
+          </button>
+        )}
       </div>
 
       {/* Mobile card list */}
       <div className="md:hidden space-y-3">
         {loading ? (
           <div className="card text-center py-10 text-gray-400">Loading…</div>
-        ) : frs.length === 0 ? (
+        ) : displayedFrs.length === 0 ? (
           <div className="card text-center py-10 text-gray-400">No feature requests found.</div>
-        ) : frs.map(fr => {
+        ) : displayedFrs.map(fr => {
           const stats = frStats(fr);
           const canEdit = isAdmin || (fr.created_by_id === user?.id && fr.status === 'pending');
           return (
@@ -501,7 +515,7 @@ export default function FeatureRequestsPage() {
       <div className="card p-0 overflow-hidden hidden md:block">
         {loading ? (
           <div className="py-12 text-center text-gray-400">Loading…</div>
-        ) : frs.length === 0 ? (
+        ) : displayedFrs.length === 0 ? (
           <div className="py-12 text-center text-gray-400">No feature requests found.</div>
         ) : (
           <div className="overflow-x-auto">
@@ -518,7 +532,7 @@ export default function FeatureRequestsPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {frs.map(fr => {
+                {displayedFrs.map(fr => {
                   const stats = frStats(fr);
                   const canEdit = isAdmin || (fr.created_by_id === user?.id && fr.status === 'pending');
                   return (
