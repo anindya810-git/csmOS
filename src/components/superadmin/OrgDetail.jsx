@@ -268,7 +268,7 @@ export default function OrgDetail() {
       {/* Color theme */}
       {(() => {
         const PRESETS = [
-          { label: 'Custally Green', hex: '#0ea4a4' },
+          { label: 'Custally Green', hex: '#0ea47e' },
           { label: 'Ocean Blue',     hex: '#0284c7' },
           { label: 'Indigo',         hex: '#4f46e5' },
           { label: 'Violet',         hex: '#7c3aed' },
@@ -306,14 +306,14 @@ export default function OrgDetail() {
             <div className="flex items-center gap-3">
               <input
                 type="color"
-                value={isValid(themeHex) ? themeHex : '#0ea4a4'}
+                value={isValid(themeHex) ? themeHex : '#0ea47e'}
                 onChange={e => { setThemeHex(e.target.value); setThemeColor(e.target.value); }}
                 className="w-10 h-10 p-0.5 rounded-lg border border-gray-700 bg-gray-800 cursor-pointer shrink-0"
               />
               <input
                 value={themeHex}
                 onChange={e => { setThemeHex(e.target.value); }}
-                placeholder="#0ea4a4"
+                placeholder="#0ea47e"
                 maxLength={7}
                 className={`${inputCls} w-36 font-mono`}
               />
@@ -322,18 +322,20 @@ export default function OrgDetail() {
                   Clear
                 </button>
               )}
+            </div>
+            {themeHex && !isValid(themeHex) && (
+              <p className="text-xs text-red-400">Enter a valid 6-digit hex color (e.g. #4f46e5)</p>
+            )}
+            <div className="flex items-center gap-3">
               <button
                 onClick={saveTheme}
                 disabled={themeSaving || (unchanged && !themeSaved)}
-                className="ml-auto px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold transition disabled:opacity-40"
+                className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold whitespace-nowrap transition disabled:opacity-40"
               >
                 {themeSaving ? 'Saving…' : 'Save Theme'}
               </button>
               {themeSaved && <span className="text-xs text-emerald-400 font-medium">Saved ✓</span>}
             </div>
-            {themeHex && !isValid(themeHex) && (
-              <p className="text-xs text-red-400">Enter a valid 6-digit hex color (e.g. #4f46e5)</p>
-            )}
           </div>
         );
       })()}
@@ -463,7 +465,7 @@ export default function OrgDetail() {
         <div className="flex flex-wrap gap-3">
           <button
             onClick={impersonate} disabled={impersonating}
-            className="flex items-center gap-2 px-4 py-2 bg-violet-700 hover:bg-violet-600 text-white rounded-xl text-sm font-medium transition disabled:opacity-60"
+            className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium transition disabled:opacity-60"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />

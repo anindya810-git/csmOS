@@ -1412,7 +1412,7 @@ export default function SettingsPage() {
         {/* ── Appearance page ───────────────────────────────────────── */}
         {settingsPage === 'appearance' && user?.role === 'admin' && (() => {
           const PRESETS = [
-            { label: 'Custally Green', hex: '#0ea4a4' },
+            { label: 'Custally Green', hex: '#0ea47e' },
             { label: 'Ocean Blue',     hex: '#0284c7' },
             { label: 'Indigo',         hex: '#4f46e5' },
             { label: 'Violet',         hex: '#7c3aed' },
@@ -1502,7 +1502,7 @@ export default function SettingsPage() {
                 <div className="flex items-center gap-3">
                   <input
                     type="color"
-                    value={isValidHex(themeColor) ? themeColor : '#0ea4a4'}
+                    value={isValidHex(themeColor) ? themeColor : '#0ea47e'}
                     onChange={handleColorPicker}
                     className="!w-12 !h-12 !p-0.5 !rounded-xl !border-gray-200 cursor-pointer"
                     title="Pick a color"
@@ -1510,7 +1510,7 @@ export default function SettingsPage() {
                   <input
                     value={hexInput}
                     onChange={e => handleHexChange(e.target.value)}
-                    placeholder="#0ea4a4"
+                    placeholder="#0ea47e"
                     className="w-36 font-mono text-sm"
                     maxLength={7}
                   />
