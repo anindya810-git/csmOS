@@ -7,7 +7,7 @@ import OrgLoginReport from './OrgLoginReport';
 
 const PLAN_OPTIONS   = ['trial', 'starter', 'pro', 'enterprise'];
 const STATUS_OPTIONS = ['active', 'suspended', 'cancelled'];
-const PLAN_COLORS    = { trial: 'bg-gray-700 text-gray-300', starter: 'bg-blue-900 text-blue-300', pro: 'bg-violet-900 text-violet-300', enterprise: 'bg-amber-900 text-amber-300' };
+const PLAN_COLORS    = { trial: 'bg-gray-700 text-gray-300', starter: 'bg-blue-900 text-blue-300', pro: 'bg-teal-900 text-teal-300', enterprise: 'bg-amber-900 text-amber-300' };
 const STATUS_COLORS  = { active: 'bg-emerald-900 text-emerald-300', suspended: 'bg-amber-900 text-amber-300', cancelled: 'bg-red-900 text-red-300' };
 
 export default function OrgDetail() {
@@ -20,6 +20,7 @@ export default function OrgDetail() {
   const [saving, setSaving] = useState(false);
   const [impersonating, setImpersonating] = useState(false);
   const [impersonateLink, setImpersonateLink] = useState('');
+  const [linkCopied, setLinkCopied] = useState(false);
   const [error, setError]   = useState('');
   const [featForm, setFeatForm] = useState({});
   const [featSaving, setFeatSaving] = useState(false);
@@ -510,7 +511,23 @@ export default function OrgDetail() {
             <p className="text-xs text-amber-300 font-semibold">Support access link (valid 2 hours) — open in a separate browser/incognito window. You'll see exactly what this org's admin sees, with a banner indicating support access.</p>
             <div className="flex gap-2">
               <input readOnly value={impersonateLink} className="flex-1 bg-gray-900 border border-gray-700 text-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none" />
-              <button onClick={() => { navigator.clipboard.writeText(impersonateLink); }} className="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white rounded-lg text-xs font-medium transition">Copy</button>
+              <button
+                onClick={() => {
+                  const done = () => { setLinkCopied(true); setTimeout(() => setLinkCopied(false), 2000); };
+                  if (navigator.clipboard?.writeText) {
+                    navigator.clipboard.writeText(impersonateLink).then(done).catch(done);
+                  } else {
+                    // Fallback for non-secure contexts where the Clipboard API is unavailable.
+                    const el = document.createElement('textarea');
+                    el.value = impersonateLink; document.body.appendChild(el); el.select();
+                    try { document.execCommand('copy'); } catch {}
+                    document.body.removeChild(el); done();
+                  }
+                }}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold text-white transition shrink-0 ${linkCopied ? 'bg-emerald-600' : 'bg-amber-700 hover:bg-amber-600'}`}
+              >
+                {linkCopied ? 'Copied!' : 'Copy'}
+              </button>
             </div>
           </div>
         )}

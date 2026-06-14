@@ -7,7 +7,7 @@ function StatCard({ label, value, sub, color = 'brand' }) {
     green: 'text-emerald-400',
     amber: 'text-amber-400',
     red:   'text-red-400',
-    violet: 'text-violet-400',
+    cyan:  'text-cyan-400',
   };
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5">
@@ -43,7 +43,7 @@ export default function SuperadminDashboard() {
             <StatCard label="Total Orgs"        value={stats?.totalOrgs}        color="brand" />
             <StatCard label="Active Orgs"        value={stats?.activeOrgs ?? 0}   color="green" />
             <StatCard label="Suspended Orgs"     value={stats?.suspendedOrgs ?? 0} color="amber" />
-            <StatCard label="Total Users"        value={stats?.totalUsers}        color="violet" />
+            <StatCard label="Total Users"        value={stats?.totalUsers}        color="cyan" />
             <StatCard label="Total Accounts"     value={stats?.totalAccounts}     color="brand" />
             <StatCard label="Total Issues"       value={stats?.totalIssues}       color="red" />
           </div>

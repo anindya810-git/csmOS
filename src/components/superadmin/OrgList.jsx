@@ -4,7 +4,7 @@ import api from '../../utils/superadminAxios';
 import CreateOrgModal from './CreateOrgModal';
 import CloneOrgModal from './CloneOrgModal';
 
-const PLAN_COLORS = { trial: 'bg-gray-700 text-gray-300', starter: 'bg-blue-900 text-blue-300', pro: 'bg-violet-900 text-violet-300', enterprise: 'bg-amber-900 text-amber-300' };
+const PLAN_COLORS = { trial: 'bg-gray-700 text-gray-300', starter: 'bg-blue-900 text-blue-300', pro: 'bg-teal-900 text-teal-300', enterprise: 'bg-amber-900 text-amber-300' };
 const STATUS_COLORS = { active: 'bg-emerald-900 text-emerald-300', suspended: 'bg-amber-900 text-amber-300', cancelled: 'bg-red-900 text-red-300' };
 
 export default function OrgList() {
