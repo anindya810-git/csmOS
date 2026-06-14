@@ -135,7 +135,11 @@ export default function OrgDetail() {
     setImpersonating(true); setError('');
     try {
       const { data } = await api.post('/api/superadmin?action=impersonate', { org_id: Number(id) });
-      const url = `${window.location.origin}/superadmin/enter?token=${encodeURIComponent(data.token)}`;
+      // Open support sessions on the canonical Custally app domain, never the
+      // raw Vercel host. Override with VITE_APP_ORIGIN if the canonical domain
+      // ever changes. Branding/theme still come from the org on load.
+      const base = import.meta.env.VITE_APP_ORIGIN || 'https://custally.com';
+      const url = `${base}/superadmin/enter?token=${encodeURIComponent(data.token)}`;
       setImpersonateLink(url);
     } catch (err) { setError(err?.response?.data?.error || 'Failed to generate link'); }
     finally { setImpersonating(false); }

@@ -1,5 +1,5 @@
 import React, { lazy, Suspense, useEffect } from 'react';
-import { Routes, Route, Navigate, useNavigate, useSearchParams } from 'react-router-dom';
+import { Routes, Route, Navigate, useSearchParams } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { FieldLabelsProvider } from './context/FieldLabelsContext';
 import { PermissionsProvider } from './context/PermissionsContext';
@@ -87,20 +87,29 @@ function SuperadminRoute({ children }) {
   return admin ? children : <Navigate to="/superadmin/login" replace />;
 }
 
-// Impersonation entry: reads ?token= from URL, stores it, redirects to /
+// Impersonation entry: reads ?token= from URL, stores it, then does a FULL
+// reload (not client-side navigation) so AuthContext re-initializes and
+// fetches /api/auth/me with the impersonation token. Without the reload the
+// app keeps whatever session was already loaded, so the support view would
+// show stale features/theme instead of the org member's real view.
 function ImpersonationEntry() {
   const [params] = useSearchParams();
-  const navigate = useNavigate();
 
   useEffect(() => {
     const token = params.get('token');
     if (token) {
       localStorage.setItem('token', token);
+      window.location.replace('/accounts');
+    } else {
+      window.location.replace('/');
     }
-    navigate('/', { replace: true });
   }, []);
 
-  return null;
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-white">
+      <div className="w-8 h-8 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
 }
 
 function AppRoutes() {

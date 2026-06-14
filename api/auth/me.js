@@ -11,52 +11,58 @@ export default async function handler(req, res) {
   let decoded;
   try { decoded = verifyToken(req); } catch { return res.status(401).json({ error: 'Invalid token' }); }
 
-  // Impersonation tokens are fully self-contained — no DB lookup needed.
-  if (decoded.impersonated) {
-    const meta = await getOrgMeta(decoded.org_id);
-    return res.json({
-      id: decoded.id, name: decoded.name, email: decoded.email,
-      role: decoded.role, csm_name: decoded.csm_name,
-      org_id: decoded.org_id, impersonated_by: decoded.impersonated_by,
-      features: meta.features, org_logo_url: meta.logo_url, org_name: meta.org_name,
-    });
-  }
+  // Both normal and impersonation tokens carry a real user id, so the
+  // impersonated session resolves to the SAME profile the org user would see
+  // (features, theme, reportees, branding) — support access mirrors the org
+  // member exactly, never a stripped-down view.
+  const impersonated = !!decoded.impersonated;
 
-  // Stamp activity and read the profile in one round-trip.
-  // Falls back progressively when columns aren't migrated yet.
+  // Stamp activity and read the profile in one round-trip — but only for a
+  // genuine session. Impersonation must not pollute the real user's
+  // last_active_at with support visits, so it reads without stamping.
   let user = null;
 
-  const { data: stamped } = await supabase
-    .from('users')
-    .update({ last_active_at: new Date().toISOString() })
-    .eq('id', decoded.id)
-    .select('id, name, email, role, csm_name, org_id, is_active')
-    .maybeSingle();
-
-  if (stamped) {
-    user = stamped;
-  } else {
-    // org_id / last_active_at / is_active may not be migrated yet — try progressively simpler selects
-    const { data: withOrgId } = await supabase
+  if (!impersonated) {
+    const { data: stamped } = await supabase
       .from('users')
-      .select('id, name, email, role, csm_name, org_id')
+      .update({ last_active_at: new Date().toISOString() })
       .eq('id', decoded.id)
-      .limit(1);
-    if (withOrgId?.length) {
-      user = withOrgId[0];
+      .select('id, name, email, role, csm_name, org_id, is_active')
+      .maybeSingle();
+
+    if (stamped) {
+      user = stamped;
     } else {
-      const { data: plain } = await supabase
+      // org_id / last_active_at / is_active may not be migrated yet — try progressively simpler selects
+      const { data: withOrgId } = await supabase
         .from('users')
-        .select('id, name, email, role, csm_name')
+        .select('id, name, email, role, csm_name, org_id')
         .eq('id', decoded.id)
         .limit(1);
-      user = plain?.[0] || null;
+      if (withOrgId?.length) {
+        user = withOrgId[0];
+      } else {
+        const { data: plain } = await supabase
+          .from('users')
+          .select('id, name, email, role, csm_name')
+          .eq('id', decoded.id)
+          .limit(1);
+        user = plain?.[0] || null;
+      }
     }
+  } else {
+    const { data } = await supabase
+      .from('users')
+      .select('id, name, email, role, csm_name, org_id, is_active')
+      .eq('id', decoded.id)
+      .maybeSingle();
+    user = data;
   }
 
   if (!user) return res.status(401).json({ error: 'User not found' });
   // Deactivated mid-session → end the session (AuthContext drops the token on 403).
-  if (user.is_active === false) return res.status(403).json({ error: 'Account deactivated' });
+  // Impersonation is exempt so support can still inspect a deactivated account.
+  if (!impersonated && user.is_active === false) return res.status(403).json({ error: 'Account deactivated' });
 
   // Attach direct reportees so the frontend can restrict CSM dropdowns to the
   // user's own team (self + people whose csm_lead = this user's csm_name).
@@ -76,5 +82,7 @@ export default async function handler(req, res) {
   user.org_logo_url = meta.logo_url;
   user.org_name     = meta.org_name;
   user.org_theme    = meta.theme_color || null;
+  // Surface the support context so the UI can show an "impersonating" banner.
+  if (impersonated) user.impersonated_by = decoded.impersonated_by;
   res.json(user);
 }
