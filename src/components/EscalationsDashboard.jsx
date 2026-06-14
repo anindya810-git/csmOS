@@ -342,7 +342,7 @@ export default function EscalationsDashboard() {
     if (watchlistOnly && !watchedEscIds.has(String(e.id))) return false;
     if (search) {
       const q = search.toLowerCase();
-      const blob = [e.account_name, e.description, e.csm, e.ownership, e.escalated_by, e.issue_type].filter(Boolean).join(' ').toLowerCase();
+      const blob = [e.account_name, e.description, e.csm, e.ownership, e.escalated_by, e.issue_type, e.status, e.rag_status, e.priority, e.eta, e.tenant_id, e.next_steps].filter(Boolean).join(' ').toLowerCase();
       if (!blob.includes(q)) return false;
     }
     if (filters.status.length > 0    && !filters.status.includes(e.status))       return false;

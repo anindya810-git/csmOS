@@ -22,7 +22,7 @@ import { evalConditions } from '../utils/conditions';
 import ExportButton from './ExportButton';
 
 // Every issue field can be shown as a column; these start visible.
-const ISSUES_DEFAULT_ON = ['account_name', 'priority', 'description', 'issue_type', 'owner_team', 'status', 'reported_date', 'csm'];
+const ISSUES_DEFAULT_ON = ['account_name', 'priority', 'description', 'issue_type', 'owner_team', 'status', 'reported_date', 'csm', 'support_ticket'];
 const ISSUES_COLS = ISSUE_FIELDS.map(f => ({
   ...f,
   alwaysVisible: f.key === 'account_name',
@@ -216,7 +216,7 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
       </div>
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Closure Date</p>
-        <input type="text" value={f.closure_date || ''} onChange={e => set(p => ({ ...p, closure_date: e.target.value }))} placeholder="e.g. 2026-04-30" className="!py-1.5 text-sm" />
+        <input type="date" value={f.closure_date || ''} onChange={e => set(p => ({ ...p, closure_date: e.target.value }))} className="!py-1.5 text-sm" />
       </div>
       <div className="sm:col-span-2 lg:col-span-3">
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>
@@ -427,8 +427,13 @@ export default function IssuesDashboard() {
     if (watchlistOnly && !watchedIssueIds.has(String(issue.id))) return false;
     if (search) {
       const q = search.toLowerCase();
-      const blob = [issue.account_name, issue.description, issue.csm, issue.owner_team, issue.issue_type, issue.next_steps]
-        .filter(Boolean).join(' ').toLowerCase();
+      const blob = [
+        issue.account_name, issue.description, issue.csm, issue.owner_team,
+        issue.issue_type, issue.issue_sub_type, issue.next_steps, issue.status,
+        issue.priority, issue.tenant_id, issue.csm_lead,
+        issue.support_ticket != null ? String(issue.support_ticket) : '',
+        issue.dev_ticket != null ? String(issue.dev_ticket) : '',
+      ].filter(Boolean).join(' ').toLowerCase();
       if (!blob.includes(q)) return false;
     }
     if (filters.account_name.length > 0 && !filters.account_name.includes(issue.account_name)) return false;

@@ -101,14 +101,17 @@ export default function FeatureRequestsPage() {
   const isAdmin = user?.role === 'admin';
   const canReview = (fr) => isAdmin || (fr?.approver_id != null && String(fr.approver_id) === String(user?.id));
 
-  const [frs, setFrs]           = useState([]);
-  const [loading, setLoading]   = useState(true);
-  const [dateFrom, setDateFrom] = useState('');
-  const [dateTo,   setDateTo]   = useState('');
-  // client-side watchlist + created-date-range filters on top of server-filtered frs
+  const [frs, setFrs]               = useState([]);
+  const [loading, setLoading]       = useState(true);
+  const [dateFrom, setDateFrom]     = useState('');
+  const [dateTo,   setDateTo]       = useState('');
+  const [rolloutFrom, setRolloutFrom] = useState('');
+  const [rolloutTo,   setRolloutTo]   = useState('');
+  // client-side watchlist + date-range filters on top of server-filtered frs
   const watchedFrIds = new Set(getWatchIds('feature_requests'));
   const displayedFrs = (watchlistOnly ? frs.filter(fr => watchedFrIds.has(String(fr.id))) : frs)
-    .filter(fr => inDateRange(fr.created_at, dateFrom, dateTo));
+    .filter(fr => inDateRange(fr.created_at, dateFrom, dateTo))
+    .filter(fr => inDateRange(fr.expected_rollout_date, rolloutFrom, rolloutTo));
   const [filters, setFilters]   = useState({ status: '', priority: '', related_to: '', search: '' });
   const [relatedOpts, setRelatedOpts] = useState([]);
 
@@ -445,6 +448,7 @@ export default function FeatureRequestsPage() {
         <SelectDropdown options={['P0', 'P1', 'P2', 'P3']} value={filters.priority} onChange={v => applyFilter({ priority: v })} placeholder="All Priorities" className="w-40" />
         <SelectDropdown options={relatedOpts} value={filters.related_to} onChange={v => applyFilter({ related_to: v })} placeholder="All Products" className="w-48" />
         <DateRangeFilter from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Created date" />
+        <DateRangeFilter from={rolloutFrom} to={rolloutTo} onChange={(f, t) => { setRolloutFrom(f); setRolloutTo(t); }} placeholder="Rollout date" />
         <input value={filters.search} onChange={e => applyFilter({ search: e.target.value })} placeholder="Search title…" className="flex-1 min-w-[160px] !py-1.5 text-sm" />
         {isEnabled('watchlist') && (
           <button

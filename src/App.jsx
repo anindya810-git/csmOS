@@ -162,7 +162,7 @@ function AppRoutes() {
         <Route path="escalations" element={<EscalationsDashboard />} />
         <Route path="escalations/weekly" element={<Navigate to="/reports/weekly" replace />} />
         <Route path="issues" element={<IssuesDashboard />} />
-        <Route path="settings" element={<AdminOrCxRoute><SettingsPage /></AdminOrCxRoute>} />
+        <Route path="settings" element={<SettingsPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

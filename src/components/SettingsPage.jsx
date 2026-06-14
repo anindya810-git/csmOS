@@ -10,6 +10,7 @@ import { useFeatures } from '../hooks/useFeatures';
 import { timeAgo, fullTime } from './LastEdited';
 import SelectDropdown from './SelectDropdown';
 import { applyTheme, generateScale, scaleToHex } from '../utils/colorTheme';
+import { COMMON_TIMEZONES, getUserTZ, setUserTZ } from '../utils/timezone';
 
 // Users seen within this window count as currently active.
 const ACTIVE_WINDOW_MIN = 5;
@@ -150,6 +151,15 @@ function OrgNode({ u, childrenMap, currentUserId, onEdit, onDelete, deleting }) 
 }
 
 const NAV_ITEMS = [
+  {
+    key: 'profile',
+    label: 'My Preferences',
+    icon: (
+      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    ),
+  },
   {
     key: 'users',
     label: 'Manage Users',
@@ -298,7 +308,10 @@ export default function SettingsPage() {
   const { isEnabled } = useFeatures();
   const navigate = useNavigate();
 
-  const [settingsPage, setSettingsPage] = useState('users');
+  const isAdmin = user?.role === 'admin';
+  const [settingsPage, setSettingsPage] = useState(
+    isAdmin ? 'users' : user?.role === 'cx_strategy' ? 'fields' : 'profile'
+  );
 
   // Users state
   const [users,     setUsers]     = useState([]);
@@ -372,15 +385,19 @@ export default function SettingsPage() {
   const [logoBusy,     setLogoBusy]     = useState(false);
   const [logoError,    setLogoError]    = useState('');
 
+  // Profile / timezone preference
+  const [tzPref,    setTzPref]    = useState(() => getUserTZ(user?.id));
+  const [tzSaved,   setTzSaved]   = useState(false);
+
   useEffect(() => {
     if (!user) return;
-    if (user.role !== 'admin' && user.role !== 'cx_strategy') { navigate('/'); return; }
     if (user.role === 'admin') {
       loadUsers();
     }
-    loadDD();
+    if (user.role === 'admin' || user.role === 'cx_strategy') {
+      loadDD();
+    }
     if (user.role === 'cx_strategy') {
-      setSettingsPage('fields');
       setFieldsTab('dropdowns');
     }
   }, [user]);
@@ -740,9 +757,11 @@ export default function SettingsPage() {
 
   // Map each settings tab to its org feature flag; tabs without a flag always show.
   const TAB_FEATURE = { permissions: 'permissions', ai: 'ai', api: 'api_access', fields: 'field_management', appearance: 'appearance' };
-  const visibleNavItems = (user?.role === 'cx_strategy'
-    ? NAV_ITEMS.filter(i => i.key === 'fields')
-    : NAV_ITEMS
+  const ADMIN_ONLY_TABS = new Set(['users', 'feature-requests', 'permissions', 'ai', 'api', 'appearance']);
+  const visibleNavItems = (
+    isAdmin ? NAV_ITEMS
+    : user?.role === 'cx_strategy' ? NAV_ITEMS.filter(i => i.key === 'fields' || i.key === 'profile')
+    : NAV_ITEMS.filter(i => !ADMIN_ONLY_TABS.has(i.key))
   ).filter(i => !TAB_FEATURE[i.key] || isEnabled(TAB_FEATURE[i.key]));
 
   const { roots, childrenMap } = buildTree(users);
@@ -777,7 +796,7 @@ export default function SettingsPage() {
       <div className="hidden sm:flex w-56 shrink-0 bg-white border-r border-gray-100 flex-col">
         <div className="px-5 py-5 border-b border-gray-100">
           <h1 className="text-base font-bold text-gray-900">Settings</h1>
-          <p className="text-xs text-gray-400 mt-0.5">Admin controls</p>
+          <p className="text-xs text-gray-400 mt-0.5">{isAdmin ? 'Admin controls' : 'My preferences'}</p>
         </div>
         <nav className="py-3 flex-1">
           {visibleNavItems.map(item => (
@@ -798,6 +817,65 @@ export default function SettingsPage() {
 
       {/* ── Main Content ──────────────────────────────────────────────── */}
       <div className="flex-1 min-w-0 p-4 sm:p-6 space-y-6">
+
+        {/* ── My Preferences (profile / timezone) ──────────────────── */}
+        {settingsPage === 'profile' && (
+          <div className="max-w-lg space-y-6">
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">My Preferences</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Personal display settings for your account</p>
+            </div>
+
+            <div className="card p-5 space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Display Timezone</h3>
+                <p className="text-xs text-gray-500 mb-3">Dates and times are shown in your chosen timezone across Tasks and all other views.</p>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Timezone</label>
+                <select
+                  value={tzPref}
+                  onChange={e => {
+                    const tz = e.target.value;
+                    setTzPref(tz);
+                    setUserTZ(user?.id, tz);
+                    setTzSaved(true);
+                    setTimeout(() => setTzSaved(false), 2500);
+                  }}
+                  className="w-full text-sm"
+                >
+                  {COMMON_TIMEZONES.map(tz => (
+                    <option key={tz.value} value={tz.value}>{tz.label}</option>
+                  ))}
+                </select>
+                {tzSaved && (
+                  <p className="text-xs text-green-600 font-medium mt-2">✓ Timezone saved</p>
+                )}
+                <p className="text-xs text-gray-400 mt-2">
+                  Your current browser timezone is <strong>{Intl.DateTimeFormat().resolvedOptions().timeZone}</strong>.
+                  Preference is saved locally and applies immediately.
+                </p>
+              </div>
+            </div>
+
+            <div className="card p-5">
+              <h3 className="text-sm font-semibold text-gray-900 mb-0.5">Account Info</h3>
+              <p className="text-xs text-gray-500 mb-3">Your profile details (edit via admin users page)</p>
+              <dl className="space-y-2 text-sm">
+                <div className="flex gap-3">
+                  <dt className="w-20 shrink-0 text-xs text-gray-500 font-medium pt-0.5">Name</dt>
+                  <dd className="text-gray-900">{user?.name || '—'}</dd>
+                </div>
+                <div className="flex gap-3">
+                  <dt className="w-20 shrink-0 text-xs text-gray-500 font-medium pt-0.5">Email</dt>
+                  <dd className="text-gray-700">{user?.email || '—'}</dd>
+                </div>
+                <div className="flex gap-3">
+                  <dt className="w-20 shrink-0 text-xs text-gray-500 font-medium pt-0.5">Role</dt>
+                  <dd className="text-gray-700 capitalize">{user?.role || '—'}</dd>
+                </div>
+              </dl>
+            </div>
+          </div>
+        )}
 
         {/* ── Manage Users page ─────────────────────────────────────── */}
         {settingsPage === 'users' && (

@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { getUserTZ, fmtDTwithTZ } from '../utils/timezone';
 import Pagination from './Pagination';
 import ColumnToggle from './ColumnToggle';
 import SelectDropdown from './SelectDropdown';
@@ -39,14 +40,8 @@ function deriveStatus(task) {
   return 'Open';
 }
 
-function fmtDT(s) {
-  if (!s) return '—';
-  try {
-    return new Date(s).toLocaleString('en-IN', {
-      day: '2-digit', month: 'short', year: 'numeric',
-      hour: '2-digit', minute: '2-digit', hour12: true,
-    });
-  } catch { return s; }
+function fmtDT(s, tz) {
+  return fmtDTwithTZ(s, tz);
 }
 
 function fmtDate(s) {
@@ -72,6 +67,7 @@ export default function TasksPage() {
   const { user } = useAuth();
   const navigate  = useNavigate();
   const isAdmin   = user?.role === 'admin';
+  const tz = useMemo(() => getUserTZ(user?.id), [user?.id]);
   const { can } = usePermissions();
   const { isEnabled } = useFeatures();
   const { isWatched, toggle: watchToggle, getIds: getWatchIds } = useWatchlist();
@@ -166,10 +162,9 @@ export default function TasksPage() {
       if (assigneeFilter && t.assigned_to !== assigneeFilter) return false;
       if (search) {
         const q = search.toLowerCase();
-        if (!(t.task_subject?.toLowerCase().includes(q) ||
-              t.task_description?.toLowerCase().includes(q) ||
-              t.account_name?.toLowerCase().includes(q) ||
-              t.assigned_to?.toLowerCase().includes(q))) return false;
+        const blob = [t.task_subject, t.task_description, t.account_name, t.assigned_to, t.nature_of_task, t.assigned_by]
+          .filter(Boolean).join(' ').toLowerCase();
+        if (!blob.includes(q)) return false;
       }
       if (accountFilter.length > 0 && !accountFilter.includes(t.account_name)) return false;
       if (!inDateRange(t.due_date, dateFrom, dateTo)) return false;
@@ -223,7 +218,10 @@ export default function TasksPage() {
     if (!form.due_date) { setFormError('Due date is required'); return; }
     setSaving(true); setFormError(null);
     try {
-      const payload = { ...form };
+      const payload = {
+        ...form,
+        due_date: form.due_date ? new Date(form.due_date).toISOString() : form.due_date,
+      };
       if (!payload.account_id) delete payload.account_id;
       if (!payload.assigned_to_id) delete payload.assigned_to_id;
 
@@ -495,7 +493,7 @@ export default function TasksPage() {
                           cell = (
                             <>
                               <p className={`text-xs font-medium ${ds === 'Overdue' ? 'text-red-700' : 'text-gray-700'}`}>
-                                {fmtDT(task.due_date)}
+                                {fmtDT(task.due_date, tz)}
                               </p>
                               {ds === 'Completed' && task.completed_at && (
                                 <p className="text-xs text-gray-400 mt-0.5">Done {fmtDate(task.completed_at)}</p>
@@ -559,19 +557,19 @@ export default function TasksPage() {
                               )}
                             </>
                           )}
+                          {(isAdmin || String(task.assigned_to_id) === String(user?.id)) && (
+                            <button onClick={() => openEdit(task)}
+                              className="p-1.5 rounded-md text-gray-400 hover:text-brand-600 hover:bg-gray-100 transition"
+                              title="Edit">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                            </button>
+                          )}
                           {isAdmin && (
-                            <>
-                              <button onClick={() => openEdit(task)}
-                                className="p-1.5 rounded-md text-gray-400 hover:text-brand-600 hover:bg-gray-100 transition"
-                                title="Edit">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                              </button>
-                              <button onClick={() => deleteTask(task.id)}
-                                className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
-                                title="Delete">
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                              </button>
-                            </>
+                            <button onClick={() => deleteTask(task.id)}
+                              className="p-1.5 rounded-md text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
+                              title="Delete">
+                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                            </button>
                           )}
                           {isEnabled('watchlist') && <button onClick={ev => { ev.stopPropagation(); watchToggle('tasks', task.id); }}
                             className={`p-1.5 rounded-md transition ${isWatched('tasks', task.id) ? 'text-brand-600' : 'text-gray-300 hover:text-gray-500'}`}
