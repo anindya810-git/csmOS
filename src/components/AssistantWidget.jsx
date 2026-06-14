@@ -113,7 +113,12 @@ export default function AssistantWidget() {
 
   const assistant = ai?.assistant;
   const botName = assistant?.name || 'Custally Assistant';
-  const available = !!user && isEnabled('ai') && isEnabled('assistant') && !!ai?.enabled && assistant?.enabled !== false;
+  // Show the launcher once the assistant is switched on (org feature flag +
+  // admin toggle). Whether an AI provider key is actually set is a separate
+  // concern handled inside the panel, so enabling it always surfaces the bot.
+  const available = !!user && isEnabled('ai') && isEnabled('assistant') && assistant?.enabled !== false;
+  const configured = !!ai?.enabled; // active provider has a key
+  const isAdmin = user?.role === 'admin';
 
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
@@ -128,6 +133,12 @@ export default function AssistantWidget() {
   const send = async (override) => {
     const text = (override != null ? override : input).trim();
     if (!text || loading) return;
+    if (!configured) {
+      setError(isAdmin
+        ? 'No AI provider is configured yet. Add a provider key in Settings → AI to enable the assistant.'
+        : 'The assistant isn\'t fully set up yet. Please ask your admin to configure an AI provider.');
+      return;
+    }
     const next = [...messages, { role: 'user', content: text }];
     setMessages(next);
     setInput('');
@@ -202,15 +213,25 @@ export default function AssistantWidget() {
                   <BotIcon className="w-6 h-6" />
                 </div>
                 <p className="text-sm font-semibold text-gray-800">{assistant?.greeting || `Hi ${user?.name?.split(' ')[0] || 'there'}! I'm ${botName}.`}</p>
-                <p className="text-xs text-gray-500 mt-1 px-4">Ask me about your accounts, issues, escalations, tasks or feature requests.</p>
-                <div className="mt-4 space-y-1.5">
-                  {SUGGESTIONS.map(s => (
-                    <button key={s} onClick={() => send(s)}
-                      className="block w-full text-left text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2 hover:border-brand-300 hover:text-brand-700 transition">
-                      {s}
-                    </button>
-                  ))}
-                </div>
+                {configured ? (
+                  <>
+                    <p className="text-xs text-gray-500 mt-1 px-4">Ask me about your accounts, issues, escalations, tasks or feature requests.</p>
+                    <div className="mt-4 space-y-1.5">
+                      {SUGGESTIONS.map(s => (
+                        <button key={s} onClick={() => send(s)}
+                          className="block w-full text-left text-xs text-gray-600 bg-white border border-gray-200 rounded-lg px-3 py-2 hover:border-brand-300 hover:text-brand-700 transition">
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-3 mx-2 text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2.5 text-left">
+                    {isAdmin
+                      ? <>No AI provider is configured yet. Add a provider key in <span className="font-semibold">Settings → AI</span> to start chatting.</>
+                      : 'The assistant isn\'t fully set up yet. Ask your admin to configure an AI provider.'}
+                  </div>
+                )}
               </div>
             )}
 
@@ -250,13 +271,14 @@ export default function AssistantWidget() {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
                 rows={1}
-                placeholder={`Ask ${botName.split(' ')[0]}…`}
-                className="flex-1 resize-none !py-2 text-sm max-h-28"
+                disabled={!configured}
+                placeholder={configured ? `Ask ${botName.split(' ')[0]}…` : 'AI provider not configured'}
+                className="flex-1 resize-none !py-2 text-sm max-h-28 disabled:bg-gray-50 disabled:text-gray-400"
                 style={{ minHeight: '40px' }}
               />
               <button
                 onClick={() => send()}
-                disabled={!input.trim() || loading}
+                disabled={!input.trim() || loading || !configured}
                 className="shrink-0 w-10 h-10 rounded-xl bg-brand-600 hover:bg-brand-700 text-white flex items-center justify-center transition disabled:opacity-40"
                 aria-label="Send"
               >

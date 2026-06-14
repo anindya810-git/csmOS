@@ -74,7 +74,18 @@ export default function Layout() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
+      <div className="sticky top-0 z-40">
+      {/* Support access (impersonation) indicator — only on support sessions */}
+      {user?.support_access && (
+        <div className="bg-amber-500 text-amber-950 flex items-center justify-center gap-2 px-4 py-1.5 text-xs sm:text-sm font-semibold">
+          <svg className="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+          </svg>
+          <span className="truncate">Support Access — viewing {user?.org_name || 'this organisation'} as admin. Changes are live.</span>
+          <button onClick={handleLogout} className="ml-1 shrink-0 px-2 py-0.5 rounded-md bg-amber-950/15 hover:bg-amber-950/25 transition">Exit</button>
+        </div>
+      )}
+      <header className="bg-white border-b border-gray-200">
         <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 flex items-center justify-between h-14">
           <div className="flex items-center gap-6">
             <a href="/accounts" className="flex items-center gap-2 text-decoration-none no-underline">
@@ -163,6 +174,7 @@ export default function Layout() {
           </div>
         </div>
       </header>
+      </div>
 
       <main className="flex-1 max-w-screen-2xl mx-auto w-full px-4 sm:px-6 py-5 sm:py-6 pb-24 sm:pb-6">
         <Suspense fallback={

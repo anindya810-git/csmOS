@@ -472,9 +472,9 @@ export default function OrgDetail() {
             className="flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-medium transition disabled:opacity-60"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
             </svg>
-            {impersonating ? 'Generating…' : 'Login as Admin'}
+            {impersonating ? 'Generating…' : 'Support Access'}
           </button>
           <button
             onClick={() => setShowLoginReport(true)}
@@ -506,11 +506,11 @@ export default function OrgDetail() {
         </div>
 
         {impersonateLink && (
-          <div className="bg-violet-950 border border-violet-800 rounded-xl p-4 space-y-2">
-            <p className="text-xs text-violet-300 font-semibold">Impersonation link (valid 2 hours) — open in a separate browser/incognito window:</p>
+          <div className="bg-amber-950 border border-amber-800 rounded-xl p-4 space-y-2">
+            <p className="text-xs text-amber-300 font-semibold">Support access link (valid 2 hours) — open in a separate browser/incognito window. You'll see exactly what this org's admin sees, with a banner indicating support access.</p>
             <div className="flex gap-2">
               <input readOnly value={impersonateLink} className="flex-1 bg-gray-900 border border-gray-700 text-gray-300 rounded-lg px-3 py-1.5 text-xs focus:outline-none" />
-              <button onClick={() => { navigator.clipboard.writeText(impersonateLink); }} className="px-3 py-1.5 bg-violet-700 hover:bg-violet-600 text-white rounded-lg text-xs font-medium transition">Copy</button>
+              <button onClick={() => { navigator.clipboard.writeText(impersonateLink); }} className="px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white rounded-lg text-xs font-medium transition">Copy</button>
             </div>
           </div>
         )}

@@ -82,7 +82,11 @@ export default async function handler(req, res) {
   user.org_logo_url = meta.logo_url;
   user.org_name     = meta.org_name;
   user.org_theme    = meta.theme_color || null;
-  // Surface the support context so the UI can show an "impersonating" banner.
-  if (impersonated) user.impersonated_by = decoded.impersonated_by;
+  // Flag support-access (impersonated) sessions so the UI can show a banner.
+  // impersonated_by is carried for later use but not surfaced in the UI yet.
+  if (impersonated) {
+    user.support_access = true;
+    user.impersonated_by = decoded.impersonated_by;
+  }
   res.json(user);
 }
