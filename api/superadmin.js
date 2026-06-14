@@ -27,6 +27,7 @@ export default async function handler(req, res) {
   if (resource === 'orgs') return handleOrgs(req, res, admin);
   if (resource === 'clone') return handleCloneOrg(req, res, admin);
   if (resource === 'stats') return handleStats(req, res);
+  if (resource === 'admins') return handleAdmins(req, res, admin);
 
   return res.status(404).json({ error: 'Not found' });
 }
@@ -92,6 +93,8 @@ async function handleLogin(req, res) {
 
   const valid = bcrypt.compareSync(password, admin.password_hash);
   if (!valid) return res.status(401).json({ error: 'Invalid credentials' });
+
+  if (admin.is_active === false) return res.status(403).json({ error: 'This superadmin account has been deactivated' });
 
   await supabase.from('superadmin_users').update({ last_login_at: new Date().toISOString() }).eq('id', admin.id);
 
@@ -395,4 +398,131 @@ async function handleStats(req, res) {
     totalIssues: (issues || []).length,
     planBreakdown,
   });
+}
+
+// Is there at least one OTHER active superadmin besides `excludeId`? Used to
+// block actions that would lock everyone out of the platform.
+async function otherActiveAdminExists(excludeId) {
+  let { data, error } = await supabase
+    .from('superadmin_users').select('id, is_active').neq('id', excludeId);
+  if (error) {
+    // is_active column not migrated yet → treat any other row as active.
+    ({ data } = await supabase.from('superadmin_users').select('id').neq('id', excludeId));
+    return (data || []).length > 0;
+  }
+  return (data || []).some(a => a.is_active !== false);
+}
+
+// Superadmin (platform owner) account management — mirrors org-level user
+// management, but global: superadmins don't belong to an org and own no
+// org-scoped data.
+async function handleAdmins(req, res, admin) {
+  const { id, action } = req.query;
+
+  if (req.method === 'GET') {
+    let { data, error } = await supabase
+      .from('superadmin_users')
+      .select('id, name, email, is_active, last_login_at, created_at')
+      .order('name');
+    if (error) {
+      // Pre-migration fallback (no is_active column yet).
+      ({ data, error } = await supabase
+        .from('superadmin_users')
+        .select('id, name, email, last_login_at, created_at')
+        .order('name'));
+    }
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json(data || []);
+  }
+
+  if (req.method === 'POST' && action === 'replace') {
+    return handleReplaceAdmin(req, res, admin);
+  }
+
+  if (req.method === 'POST') {
+    const { name, email, password } = req.body || {};
+    if (!name || !email || !password)
+      return res.status(400).json({ error: 'name, email and password are required' });
+    const password_hash = bcrypt.hashSync(password, 10);
+    const { data, error } = await supabase
+      .from('superadmin_users')
+      .insert({ name, email: email.toLowerCase().trim(), password_hash })
+      .select('id, name, email, is_active, last_login_at, created_at')
+      .single();
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ error: 'A superadmin with that email already exists' });
+      return res.status(500).json({ error: error.message });
+    }
+    return res.status(201).json(data);
+  }
+
+  if (req.method === 'PUT') {
+    if (!id) return res.status(400).json({ error: 'id required' });
+    const { name, email, password, is_active } = req.body || {};
+
+    if (is_active === false) {
+      if (String(id) === String(admin.id))
+        return res.status(400).json({ error: 'You cannot deactivate your own account' });
+      if (!(await otherActiveAdminExists(id)))
+        return res.status(400).json({ error: 'Cannot deactivate the last active superadmin' });
+    }
+
+    const updates = {};
+    if (name !== undefined) updates.name = name;
+    if (email !== undefined) updates.email = email.toLowerCase().trim();
+    if (is_active !== undefined) updates.is_active = !!is_active;
+    if (password) updates.password_hash = bcrypt.hashSync(password, 10);
+    if (Object.keys(updates).length === 0) return res.status(400).json({ error: 'Nothing to update' });
+
+    const { data, error } = await supabase
+      .from('superadmin_users')
+      .update(updates)
+      .eq('id', id)
+      .select('id, name, email, is_active, last_login_at, created_at')
+      .single();
+    if (error) {
+      if (error.code === '23505') return res.status(409).json({ error: 'A superadmin with that email already exists' });
+      return res.status(500).json({ error: error.message });
+    }
+    return res.json(data);
+  }
+
+  if (req.method === 'DELETE') {
+    if (!id) return res.status(400).json({ error: 'id required' });
+    if (String(id) === String(admin.id))
+      return res.status(400).json({ error: 'Cannot delete your own account' });
+    if (!(await otherActiveAdminExists(id)))
+      return res.status(400).json({ error: 'Cannot delete the last active superadmin' });
+    const { error } = await supabase.from('superadmin_users').delete().eq('id', id);
+    if (error) return res.status(500).json({ error: error.message });
+    return res.json({ success: true });
+  }
+
+  return res.status(405).json({ error: 'Method not allowed' });
+}
+
+// "Replace" a superadmin. Superadmins are global and own no org-scoped data,
+// so there is nothing to reassign — replacing hands over to the chosen
+// (active) successor and deactivates the outgoing admin.
+async function handleReplaceAdmin(req, res, admin) {
+  const { old_admin_id, new_admin_id, deactivate_old = true } = req.body || {};
+  if (!old_admin_id || !new_admin_id)
+    return res.status(400).json({ error: 'old_admin_id and new_admin_id required' });
+  if (String(old_admin_id) === String(new_admin_id))
+    return res.status(400).json({ error: 'Pick two different superadmins' });
+
+  const { data: pair } = await supabase
+    .from('superadmin_users').select('id, name, email, is_active').in('id', [old_admin_id, new_admin_id]);
+  const oldA = (pair || []).find(a => String(a.id) === String(old_admin_id));
+  const newA = (pair || []).find(a => String(a.id) === String(new_admin_id));
+  if (!oldA || !newA) return res.status(404).json({ error: 'Superadmin not found' });
+
+  if (deactivate_old) {
+    if (String(old_admin_id) === String(admin.id))
+      return res.status(400).json({ error: 'You cannot deactivate your own account' });
+    if (newA.is_active === false)
+      return res.status(400).json({ error: 'The replacement superadmin must be active' });
+    await supabase.from('superadmin_users').update({ is_active: false }).eq('id', old_admin_id);
+  }
+  return res.json({ success: true, from: oldA.name, to: newA.name, deactivated: !!deactivate_old });
 }
