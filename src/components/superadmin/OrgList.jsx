@@ -27,8 +27,8 @@ export default function OrgList() {
   const filtered = orgs.filter(o => !search || o.name.toLowerCase().includes(search.toLowerCase()) || o.slug.includes(search.toLowerCase()));
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="p-4 sm:p-8 space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-white">Organisations</h1>
           <p className="text-gray-500 text-sm mt-0.5">{orgs.length} org{orgs.length !== 1 ? 's' : ''} total</p>
@@ -56,7 +56,8 @@ export default function OrgList() {
         </div>
       ) : (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[640px]">
             <thead>
               <tr className="border-b border-gray-800">
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Organisation</th>
@@ -108,6 +109,7 @@ export default function OrgList() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

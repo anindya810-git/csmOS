@@ -182,7 +182,7 @@ export default function OrgDetail() {
   if (!org) return <div className="p-8 text-red-400">{error || 'Not found'}</div>;
 
   return (
-    <div className="p-8 space-y-6 max-w-4xl">
+    <div className="p-4 sm:p-8 space-y-6 max-w-4xl">
       {/* Back + header */}
       <div className="flex items-center gap-3">
         <button onClick={() => navigate('/superadmin/orgs')} className="p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-800 transition">
@@ -397,7 +397,7 @@ export default function OrgDetail() {
             <button onClick={() => setEditing(true)} className="text-xs px-3 py-1.5 border border-gray-700 text-gray-300 rounded-lg hover:bg-gray-800 transition">Edit</button>
           )}
         </div>
-        <div className="p-5 grid grid-cols-2 gap-4">
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs text-gray-500 mb-1.5">Name</label>
             {editing ? <input className={inputCls} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
@@ -479,8 +479,8 @@ export default function OrgDetail() {
         <div className="px-5 py-4 border-b border-gray-800">
           <h2 className="text-sm font-semibold text-white">Users ({org.users?.length ?? 0})</h2>
         </div>
-        <div className="overflow-auto">
-          <table className="w-full text-sm">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
             <thead>
               <tr className="border-b border-gray-800">
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase">Name</th>

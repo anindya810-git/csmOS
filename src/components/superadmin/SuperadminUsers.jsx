@@ -196,8 +196,8 @@ export default function SuperadminUsers() {
   const iconBtn = "p-1.5 rounded-lg text-gray-500 hover:text-white hover:bg-gray-700 transition disabled:opacity-40 disabled:cursor-not-allowed";
 
   return (
-    <div className="p-8 space-y-6">
-      <div className="flex items-center justify-between gap-4">
+    <div className="p-4 sm:p-8 space-y-6">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-bold text-white">Administrators</h1>
           <p className="text-gray-500 text-sm mt-0.5">{admins.length} superadmin{admins.length !== 1 ? 's' : ''} · full platform access</p>
@@ -219,7 +219,8 @@ export default function SuperadminUsers() {
         </div>
       ) : (
         <div className="bg-gray-900 border border-gray-800 rounded-2xl overflow-hidden">
-          <table className="w-full text-sm">
+          <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[560px]">
             <thead>
               <tr className="border-b border-gray-800">
                 <th className="text-left px-5 py-3.5 text-xs font-semibold text-gray-500 uppercase tracking-wider">Name</th>
@@ -293,6 +294,7 @@ export default function SuperadminUsers() {
               )}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
