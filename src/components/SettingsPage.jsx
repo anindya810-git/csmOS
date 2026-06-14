@@ -756,7 +756,7 @@ export default function SettingsPage() {
   };
 
   // Map each settings tab to its org feature flag; tabs without a flag always show.
-  const TAB_FEATURE = { permissions: 'permissions', ai: 'ai', api: 'api_access', fields: 'field_management', appearance: 'appearance' };
+  const TAB_FEATURE = { permissions: 'permissions', ai: 'ai', api: 'api_access', fields: 'field_management', appearance: 'appearance', 'feature-requests': 'feature_requests' };
   const ADMIN_ONLY_TABS = new Set(['users', 'feature-requests', 'permissions', 'ai', 'api', 'appearance']);
   const visibleNavItems = (
     isAdmin ? NAV_ITEMS
