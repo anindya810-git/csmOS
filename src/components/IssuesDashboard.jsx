@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import AddToFeatureRequest from './AddToFeatureRequest';
 import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import DateRangeFilter, { inDateRange } from './DateRangeFilter';
 import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
@@ -257,7 +258,7 @@ export default function IssuesDashboard() {
   const [editForm,     setEditForm]     = useState({});
   const [editSaving,   setEditSaving]   = useState(false);
 
-  const [filters,      setFilters]      = useState({ status: [], priority: [], issue_type: [], owner_team: [], csm: [], month: [], account_name: [] });
+  const [filters,      setFilters]      = useState({ status: [], priority: [], issue_type: [], owner_team: [], csm: [], month: [], account_name: [], dateFrom: '', dateTo: '' });
   const [search,       setSearch]       = useState('');
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [conditions,   setConditions]   = useState([]);
@@ -413,12 +414,12 @@ export default function IssuesDashboard() {
 
   const clearAll = () => {
     setSearch('');
-    setFilters({ status: [], priority: [], issue_type: [], owner_team: [], csm: [], month: [], account_name: [] });
+    setFilters({ status: [], priority: [], issue_type: [], owner_team: [], csm: [], month: [], account_name: [], dateFrom: '', dateTo: '' });
     setConditions([]);
     setWatchlistOnly(false);
     setPage(1);
   };
-  const hasFilters = !!(search || filters.status.length || filters.priority.length || filters.issue_type.length || filters.owner_team.length || filters.csm.length || filters.month.length || filters.account_name.length || conditions.length > 0 || watchlistOnly);
+  const hasFilters = !!(search || filters.status.length || filters.priority.length || filters.issue_type.length || filters.owner_team.length || filters.csm.length || filters.month.length || filters.account_name.length || filters.dateFrom || filters.dateTo || conditions.length > 0 || watchlistOnly);
   const activeConditions = conditions.filter(c => c.field && c.operator);
   const watchedIssueIds = new Set(getWatchIds('issues'));
 
@@ -441,6 +442,7 @@ export default function IssuesDashboard() {
       const m = MONTHS[new Date(issue.reported_date + 'T00:00:00').getMonth()];
       if (!filters.month.includes(m)) return false;
     }
+    if (!inDateRange(issue.reported_date, filters.dateFrom, filters.dateTo)) return false;
     if (activeConditions.length === 0) return true;
     return evalConditions(activeConditions, c => matchesCondition(issue, c, fieldDefs));
   });
@@ -584,6 +586,12 @@ export default function IssuesDashboard() {
             <MultiSelectDropdown placeholder="All CSMs" options={allCsms} value={filters.csm} onChange={v => setFilter('csm', v)} />
           )}
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
+          <DateRangeFilter
+            from={filters.dateFrom}
+            to={filters.dateTo}
+            onChange={(f, t) => { setFilters(prev => ({ ...prev, dateFrom: f, dateTo: t })); setPage(1); }}
+            placeholder="Reported date"
+          />
           {isEnabled('watchlist') && (
             <button
               onClick={() => setWatchlistOnly(w => !w)}

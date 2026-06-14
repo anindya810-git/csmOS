@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import AddToFeatureRequest from './AddToFeatureRequest';
 import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import DateRangeFilter, { inDateRange } from './DateRangeFilter';
 import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import ColumnToggle from './ColumnToggle';
@@ -147,7 +148,7 @@ export default function EscalationsDashboard() {
   const colCount = visibleEscCols.length + 2 + (user?.role === 'admin' ? 1 : 0);
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
-  const [filters,     setFilters]     = useState({ status: [], csm: [], ownership: [], issue_type: [], month: [] });
+  const [filters,     setFilters]     = useState({ status: [], csm: [], ownership: [], issue_type: [], month: [], dateFrom: '', dateTo: '' });
   const [search,      setSearch]      = useState('');
   const [advancedOpen,setAdvancedOpen]= useState(false);
   const [conditions,  setConditions]  = useState([]);
@@ -328,12 +329,12 @@ export default function EscalationsDashboard() {
 
   const clearAll = () => {
     setSearch('');
-    setFilters({ status: [], csm: [], ownership: [], issue_type: [], month: [] });
+    setFilters({ status: [], csm: [], ownership: [], issue_type: [], month: [], dateFrom: '', dateTo: '' });
     setConditions([]);
     setWatchlistOnly(false);
     setPage(1);
   };
-  const hasFilters = !!(search || filters.status.length || filters.csm.length || filters.ownership.length || filters.issue_type.length || filters.month.length || conditions.length > 0 || watchlistOnly);
+  const hasFilters = !!(search || filters.status.length || filters.csm.length || filters.ownership.length || filters.issue_type.length || filters.month.length || filters.dateFrom || filters.dateTo || conditions.length > 0 || watchlistOnly);
   const activeConditions = conditions.filter(c => c.field && c.operator);
   const watchedEscIds = new Set(getWatchIds('escalations'));
 
@@ -349,6 +350,7 @@ export default function EscalationsDashboard() {
     if (filters.ownership.length > 0  && !filters.ownership.includes(e.ownership)) return false;
     if (filters.issue_type.length > 0 && !filters.issue_type.includes(e.issue_type)) return false;
     if (filters.month.length > 0      && !filters.month.includes(e.month))        return false;
+    if (!inDateRange(e.date_of_escalation, filters.dateFrom, filters.dateTo))     return false;
     if (activeConditions.length === 0) return true;
     return evalConditions(activeConditions, c => matchesEscalationCondition(e, c, fieldDefs));
   });
@@ -630,6 +632,12 @@ export default function EscalationsDashboard() {
           <MultiSelectDropdown placeholder="All Ownerships" options={allOwnerships} value={filters.ownership} onChange={v => setFilter('ownership', v)} />
           <MultiSelectDropdown placeholder="All Issue Types" options={allIssueTypes} value={filters.issue_type} onChange={v => setFilter('issue_type', v)} />
           <MultiSelectDropdown placeholder="All Months" options={allMonths} value={filters.month} onChange={v => setFilter('month', v)} />
+          <DateRangeFilter
+            from={filters.dateFrom}
+            to={filters.dateTo}
+            onChange={(f, t) => { setFilters(prev => ({ ...prev, dateFrom: f, dateTo: t })); setPage(1); }}
+            placeholder="Escalation date"
+          />
           {isEnabled('watchlist') && (
             <button
               onClick={() => setWatchlistOnly(w => !w)}

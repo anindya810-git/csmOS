@@ -9,6 +9,7 @@ import { useWatchlist } from '../hooks/useWatchlist';
 import ExportButton from './ExportButton';
 import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
+import DateRangeFilter, { inDateRange } from './DateRangeFilter';
 import DrillModal from './DrillModal';
 import AccountListModal from './AccountListModal';
 import AiPanel from './AiPanel';
@@ -102,9 +103,12 @@ export default function FeatureRequestsPage() {
 
   const [frs, setFrs]           = useState([]);
   const [loading, setLoading]   = useState(true);
-  // client-side watchlist filter applied on top of server-filtered frs
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo,   setDateTo]   = useState('');
+  // client-side watchlist + created-date-range filters on top of server-filtered frs
   const watchedFrIds = new Set(getWatchIds('feature_requests'));
-  const displayedFrs = watchlistOnly ? frs.filter(fr => watchedFrIds.has(String(fr.id))) : frs;
+  const displayedFrs = (watchlistOnly ? frs.filter(fr => watchedFrIds.has(String(fr.id))) : frs)
+    .filter(fr => inDateRange(fr.created_at, dateFrom, dateTo));
   const [filters, setFilters]   = useState({ status: '', priority: '', related_to: '', search: '' });
   const [relatedOpts, setRelatedOpts] = useState([]);
 
@@ -440,6 +444,7 @@ export default function FeatureRequestsPage() {
         <SelectDropdown options={['pending', 'approved', 'rejected']} value={filters.status} onChange={v => applyFilter({ status: v })} placeholder="All Statuses" className="w-40" />
         <SelectDropdown options={['P0', 'P1', 'P2', 'P3']} value={filters.priority} onChange={v => applyFilter({ priority: v })} placeholder="All Priorities" className="w-40" />
         <SelectDropdown options={relatedOpts} value={filters.related_to} onChange={v => applyFilter({ related_to: v })} placeholder="All Products" className="w-48" />
+        <DateRangeFilter from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Created date" />
         <input value={filters.search} onChange={e => applyFilter({ search: e.target.value })} placeholder="Search title…" className="flex-1 min-w-[160px] !py-1.5 text-sm" />
         {isEnabled('watchlist') && (
           <button

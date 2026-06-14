@@ -7,6 +7,7 @@ import Pagination from './Pagination';
 import ColumnToggle from './ColumnToggle';
 import SelectDropdown from './SelectDropdown';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import DateRangeFilter, { inDateRange } from './DateRangeFilter';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { TASK_FIELDS } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
@@ -97,6 +98,8 @@ export default function TasksPage() {
   const [statusFilter,  setStatusFilter]  = useState('Open');   // all | Open | Overdue | Completed
   const [natureFilter,  setNatureFilter]  = useState('');
   const [assigneeFilter,setAssigneeFilter]= useState('');
+  const [dateFrom,      setDateFrom]      = useState('');
+  const [dateTo,        setDateTo]        = useState('');
   const [search,        setSearch]        = useState('');
   const [accountFilter, setAccountFilter] = useState([]);
   const [page,          setPage]          = useState(1);
@@ -141,7 +144,7 @@ export default function TasksPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  useEffect(() => { setPage(1); }, [statusFilter, natureFilter, assigneeFilter, search, accountFilter]);
+  useEffect(() => { setPage(1); }, [statusFilter, natureFilter, assigneeFilter, search, accountFilter, dateFrom, dateTo]);
 
   const natureOptions = useMemo(() =>
     [...new Set((ddConfig.nature_of_task || []).map(o => o.value))], [ddConfig]);
@@ -169,9 +172,10 @@ export default function TasksPage() {
               t.assigned_to?.toLowerCase().includes(q))) return false;
       }
       if (accountFilter.length > 0 && !accountFilter.includes(t.account_name)) return false;
+      if (!inDateRange(t.due_date, dateFrom, dateTo)) return false;
       return true;
     });
-  }, [tasks, statusFilter, natureFilter, assigneeFilter, search, watchlistOnly, watchedTaskIds]);
+  }, [tasks, statusFilter, natureFilter, assigneeFilter, search, accountFilter, dateFrom, dateTo, watchlistOnly, watchedTaskIds]);
 
   const counts = useMemo(() => ({
     all:       tasks.length,
@@ -394,8 +398,9 @@ export default function TasksPage() {
           <SelectDropdown compact className="w-44" placeholder="All assignees" options={assigneeOptions} value={assigneeFilter} onChange={setAssigneeFilter} />
         )}
         <MultiSelectDropdown compact className="w-44" placeholder="All Accounts" options={accountOptions} value={accountFilter} onChange={setAccountFilter} />
-        {search || natureFilter || assigneeFilter || accountFilter.length > 0 ? (
-          <button onClick={() => { setSearch(''); setNatureFilter(''); setAssigneeFilter(''); setAccountFilter([]); }}
+        <DateRangeFilter from={dateFrom} to={dateTo} onChange={(f, t) => { setDateFrom(f); setDateTo(t); }} placeholder="Due date" />
+        {search || natureFilter || assigneeFilter || accountFilter.length > 0 || dateFrom || dateTo ? (
+          <button onClick={() => { setSearch(''); setNatureFilter(''); setAssigneeFilter(''); setAccountFilter([]); setDateFrom(''); setDateTo(''); }}
             className="text-xs text-gray-400 hover:text-gray-600 transition">Clear</button>
         ) : null}
         <div className="ml-auto">
