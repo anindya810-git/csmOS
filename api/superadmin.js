@@ -219,7 +219,7 @@ async function handleOrgs(req, res, admin) {
 
   if (req.method === 'PUT') {
     if (!id) return res.status(400).json({ error: 'id required' });
-    const { name, plan, billing_status, user_limit, notes, features, custom_domain } = req.body || {};
+    const { name, plan, billing_status, user_limit, notes, features, custom_domain, theme_color } = req.body || {};
     const updates = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name;
     if (plan !== undefined) updates.plan = plan;
@@ -227,8 +227,11 @@ async function handleOrgs(req, res, admin) {
     if (user_limit !== undefined) updates.user_limit = Number(user_limit);
     if (notes !== undefined) updates.notes = notes || null;
     if (features !== undefined && features && typeof features === 'object') updates.features = features;
-    // White-label custom domain. Stored normalized; empty clears it.
     if (custom_domain !== undefined) updates.custom_domain = normalizeHost(custom_domain) || null;
+    if (theme_color !== undefined) {
+      const validHex = typeof theme_color === 'string' && /^#[0-9a-fA-F]{6}$/.test(theme_color.trim());
+      updates.theme_color = validHex ? theme_color.trim() : null;
+    }
 
     const { data, error } = await supabase.from('organizations').update(updates).eq('id', id).select().single();
     if (error) {

@@ -29,6 +29,10 @@ export default function OrgDetail() {
   const [domainSaving, setDomainSaving] = useState(false);
   const [domainError, setDomainError] = useState('');
   const [domainSaved, setDomainSaved] = useState(false);
+  const [themeColor, setThemeColor] = useState('');
+  const [themeHex, setThemeHex] = useState('');
+  const [themeSaving, setThemeSaving] = useState(false);
+  const [themeSaved, setThemeSaved] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [showLoginReport, setShowLoginReport] = useState(false);
 
@@ -42,6 +46,8 @@ export default function OrgDetail() {
       setForm({ name: data.name, plan: data.plan, billing_status: data.billing_status, user_limit: data.user_limit, notes: data.notes || '' });
       setFeatForm(data.features || {});
       setDomain(data.custom_domain || '');
+      setThemeColor(data.theme_color || '');
+      setThemeHex(data.theme_color || '');
     } catch { setError('Failed to load organisation'); }
     finally { setLoading(false); }
   }
@@ -98,6 +104,21 @@ export default function OrgDetail() {
       setTimeout(() => setDomainSaved(false), 2500);
     } catch (err) { setDomainError(err?.response?.data?.error || 'Failed to save domain'); }
     finally { setDomainSaving(false); }
+  }
+
+  async function saveTheme() {
+    const isValid = /^#[0-9a-fA-F]{6}$/.test(themeHex.trim());
+    const val = isValid ? themeHex.trim() : null;
+    setThemeSaving(true); setThemeSaved(false);
+    try {
+      const { data } = await api.put(`/api/superadmin?resource=orgs&id=${id}`, { theme_color: val });
+      setOrg(o => ({ ...o, ...data }));
+      setThemeColor(data.theme_color || '');
+      setThemeHex(data.theme_color || '');
+      setThemeSaved(true);
+      setTimeout(() => setThemeSaved(false), 2500);
+    } catch (err) { setError(err?.response?.data?.error || 'Failed to save theme'); }
+    finally { setThemeSaving(false); }
   }
 
   async function save() {
@@ -243,6 +264,79 @@ export default function OrgDetail() {
           </div>
         )}
       </div>
+
+      {/* Color theme */}
+      {(() => {
+        const PRESETS = [
+          { label: 'Custally Green', hex: '#0ea4a4' },
+          { label: 'Ocean Blue',     hex: '#0284c7' },
+          { label: 'Indigo',         hex: '#4f46e5' },
+          { label: 'Violet',         hex: '#7c3aed' },
+          { label: 'Rose',           hex: '#e11d48' },
+          { label: 'Amber',          hex: '#d97706' },
+          { label: 'Teal',           hex: '#0d9488' },
+          { label: 'Slate',          hex: '#475569' },
+        ];
+        const isValid = h => /^#[0-9a-fA-F]{6}$/.test((h || '').trim());
+        const unchanged = themeHex.trim() === (org.theme_color || '');
+        return (
+          <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Color Theme</h2>
+              <p className="text-xs text-gray-500 mt-0.5">Brand color used across the org's app. Leave blank to use the default.</p>
+            </div>
+            {/* Presets */}
+            <div className="flex gap-3 flex-wrap">
+              {PRESETS.map(p => (
+                <button
+                  key={p.hex}
+                  title={p.label}
+                  onClick={() => { setThemeHex(p.hex); setThemeColor(p.hex); }}
+                  className="flex flex-col items-center gap-1 focus:outline-none group"
+                >
+                  <span
+                    className={`w-8 h-8 rounded-full border-2 transition-transform group-hover:scale-110 ${themeHex === p.hex ? 'border-white scale-110' : 'border-gray-700'}`}
+                    style={{ backgroundColor: p.hex }}
+                  />
+                  <span className="text-[9px] text-gray-500">{p.label}</span>
+                </button>
+              ))}
+            </div>
+            {/* Hex input + picker */}
+            <div className="flex items-center gap-3">
+              <input
+                type="color"
+                value={isValid(themeHex) ? themeHex : '#0ea4a4'}
+                onChange={e => { setThemeHex(e.target.value); setThemeColor(e.target.value); }}
+                className="w-10 h-10 p-0.5 rounded-lg border border-gray-700 bg-gray-800 cursor-pointer shrink-0"
+              />
+              <input
+                value={themeHex}
+                onChange={e => { setThemeHex(e.target.value); }}
+                placeholder="#0ea4a4"
+                maxLength={7}
+                className={`${inputCls} w-36 font-mono`}
+              />
+              {themeHex && (
+                <button onClick={() => { setThemeHex(''); setThemeColor(''); }} className="text-xs text-gray-500 hover:text-gray-300 transition">
+                  Clear
+                </button>
+              )}
+              <button
+                onClick={saveTheme}
+                disabled={themeSaving || (unchanged && !themeSaved)}
+                className="ml-auto px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold transition disabled:opacity-40"
+              >
+                {themeSaving ? 'Saving…' : 'Save Theme'}
+              </button>
+              {themeSaved && <span className="text-xs text-emerald-400 font-medium">Saved ✓</span>}
+            </div>
+            {themeHex && !isValid(themeHex) && (
+              <p className="text-xs text-red-400">Enter a valid 6-digit hex color (e.g. #4f46e5)</p>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Edit form */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl">
