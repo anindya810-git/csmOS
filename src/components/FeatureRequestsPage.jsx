@@ -729,19 +729,48 @@ export default function FeatureRequestsPage() {
             </div>
 
             <div className="overflow-y-auto flex-1 p-5 space-y-4">
-              {/* FR summary */}
-              <div className="space-y-2">
-                <p className="font-semibold text-gray-900 text-base">{reviewFr.title}</p>
-                {reviewFr.description && <p className="text-sm text-gray-600 leading-relaxed">{reviewFr.description}</p>}
-                <div className="flex flex-wrap items-center gap-2 text-xs pt-1">
-                  <span className={`font-bold px-2 py-0.5 rounded-full ${PRIORITY_COLORS[reviewFr.priority] || ''}`}>{reviewFr.priority}</span>
-                  {reviewFr.related_to && <span className="bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{reviewFr.related_to}</span>}
-                  <span className={`px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[reviewFr.status] || ''}`}>{reviewFr.status}</span>
+              {/* FR summary — mirrors every field of the create form, always visible */}
+              <div className="space-y-3">
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Title</p>
+                  <p className="font-semibold text-gray-900 text-base leading-snug">{reviewFr.title}</p>
                 </div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
-                  <span>By: <span className="text-gray-700">{reviewFr.created_by || '—'}</span></span>
-                  {reviewFr.expected_rollout_date && (
-                    <span>Rollout: <span className="text-gray-700">{fmtDate(reviewFr.expected_rollout_date)}</span></span>
+
+                <div>
+                  <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Description</p>
+                  {reviewFr.description
+                    ? <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">{reviewFr.description}</p>
+                    : <p className="text-sm text-gray-300 italic">No description provided</p>}
+                </div>
+
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3 pt-0.5">
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Related To</p>
+                    {reviewFr.related_to
+                      ? <span className="inline-block text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full">{reviewFr.related_to}</span>
+                      : <span className="text-sm text-gray-300">—</span>}
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Priority</p>
+                    <span className={`inline-block text-xs font-bold px-2 py-0.5 rounded-full ${PRIORITY_COLORS[reviewFr.priority] || 'bg-gray-100 text-gray-600'}`}>{reviewFr.priority || '—'}</span>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Status</p>
+                    <span className={`inline-block text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[reviewFr.status] || 'bg-gray-100 text-gray-600'}`}>{reviewFr.status || '—'}</span>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Expected Rollout</p>
+                    <p className="text-sm text-gray-700">{reviewFr.expected_rollout_date ? fmtDate(reviewFr.expected_rollout_date) : '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Requested By</p>
+                    <p className="text-sm text-gray-700">{reviewFr.created_by || '—'}</p>
+                  </div>
+                  {reviewFr.approver_name && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide mb-1">Approver</p>
+                      <p className="text-sm text-gray-700">{reviewFr.approver_name}</p>
+                    </div>
                   )}
                 </div>
               </div>
