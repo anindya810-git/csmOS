@@ -22,7 +22,6 @@ CREATE TABLE IF NOT EXISTS public.accounts (
   region      TEXT,
   csm_lead    TEXT,
   csm         TEXT,
-  closure_eta TEXT,
   cp          TEXT,
   tam_assigned TEXT,
   billing_frequency TEXT,

@@ -185,7 +185,7 @@ export default function AccountsPage() {
   const [accounts,         setAccounts]         = useState([]);
   const [filters,          setFilters]          = useState({});
   const [loading,          setLoading]          = useState(true);
-  const [query,            setQuery]            = useState({ csm: [], industry: [], region: [], rag_status: [], mrr_tier: [] });
+  const [query,            setQuery]            = useState({ csm: [], industry: [], region: [], rag_status: [], mrr_tier: [], churn_status: [] });
   const [search,           setSearch]           = useState('');
   const [showAdd,          setShowAdd]          = useState(false);
   const [sortField,        setSortField]        = useState('account_name');
@@ -261,6 +261,11 @@ export default function AccountsPage() {
     return sortDir === 'asc' ? String(va||'').localeCompare(String(vb||'')) : String(vb||'').localeCompare(String(va||''));
   });
 
+  const churnOptions = useMemo(
+    () => [...new Set(accounts.map(a => a.churn_status).filter(Boolean))].sort(),
+    [accounts]
+  );
+
   const activeConditions = conditions.filter(c => c.field && c.operator);
 
   const watchedAccountIds = new Set(getWatchIds('accounts'));
@@ -272,6 +277,7 @@ export default function AccountsPage() {
     if (query.industry.length > 0   && !query.industry.includes(a.industry))     return false;
     if (query.region.length > 0     && !query.region.includes(a.region))         return false;
     if (query.mrr_tier.length > 0   && !query.mrr_tier.includes(a.mrr_tier))     return false;
+    if (query.churn_status.length > 0 && !query.churn_status.includes(a.churn_status)) return false;
     if (search) {
       const q = search.toLowerCase();
       const blob = [a.account_name, a.tenant_id, a.csm, a.industry, a.region,
@@ -296,7 +302,7 @@ export default function AccountsPage() {
 
   const clearAll = () => {
     setSearch('');
-    setQuery({ csm: [], industry: [], region: [], rag_status: [], mrr_tier: [] });
+    setQuery({ csm: [], industry: [], region: [], rag_status: [], mrr_tier: [], churn_status: [] });
     setConditions([]);
     setWatchlistOnly(false);
     setPage(1);
@@ -402,6 +408,7 @@ export default function AccountsPage() {
           <MultiSelectDropdown options={filters.industries || []} value={query.industry} onChange={v => setQuery(q => ({...q, industry: v}))} placeholder="All Industries" />
           <MultiSelectDropdown options={['North','South','East','West']} value={query.region} onChange={v => setQuery(q => ({...q, region: v}))} placeholder="All Regions" />
           <MultiSelectDropdown options={filters.tiers || []} value={query.mrr_tier} onChange={v => setQuery(q => ({...q, mrr_tier: v}))} placeholder="All Tiers" />
+          <MultiSelectDropdown options={churnOptions} value={query.churn_status} onChange={v => setQuery(q => ({...q, churn_status: v}))} placeholder="All Churn Status" />
           {isEnabled('watchlist') && (
             <button
               onClick={() => setWatchlistOnly(w => !w)}

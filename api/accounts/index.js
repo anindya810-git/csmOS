@@ -133,7 +133,7 @@ export default async function handler(req, res) {
     const ALLOWED = [
       'csm','csm_lead','cp','tam_assigned','sa_status',
       'industry','region','mrr_tier','mrr',
-      'billing_frequency','renewal_date','renewal_status','closure_eta',
+      'billing_frequency','renewal_date','renewal_status',
       'churn_status','churn_reason','contraction_risk','churn_risk','grr','nps','renewal_comments',
       'rag_status','adoption_score','stickiness_score','adoption_rate','rag_reason','actions_taken',
       'implementation_status','implementation_type','ps_engagement','ps_solutioning',

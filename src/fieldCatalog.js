@@ -27,7 +27,6 @@ export const ACCOUNT_FIELDS = [
   { key: 'golive_date',           label: 'Go-live Date',          type: 'date' },
   { key: 'renewal_date',          label: 'Renewal Date',          type: 'date', bulkGroup: 'Team & Commercial' },
   { key: 'renewal_status',        label: 'Renewal Status',        type: 'select', ddKey: 'renewal_status', opts: ['Renewed','At Risk','Lost','Pending'], bulkGroup: 'Team & Commercial' },
-  { key: 'closure_eta',           label: 'Closure ETA',           type: 'date', bulkGroup: 'Team & Commercial' },
   { key: 'churn_status',          label: 'Churn Status',          type: 'select', ddKey: 'churn_status', opts: ['Churn Activated','Churn Predicted','Churn Executed','Contraction Predicted'], bulkGroup: 'Churn & Risk' },
   { key: 'churn_reason',          label: 'Churn Reason',          type: 'text', bulkGroup: 'Churn & Risk' },
   { key: 'contraction_risk',      label: 'Contraction Risk',      type: 'select', ddKey: 'contraction_risk', opts: ['High','Medium','Low','None'], bulkGroup: 'Churn & Risk' },

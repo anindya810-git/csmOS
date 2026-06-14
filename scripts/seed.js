@@ -63,7 +63,6 @@ async function seed() {
     region: a.region ?? null,
     csm_lead: a.csm_lead ?? null,
     csm: a.csm ?? null,
-    closure_eta: a.closure_eta ?? null,
     cp: a.cp ?? null,
     tam_assigned: a.tam_assigned ?? null,
     billing_frequency: a.billing_frequency ?? null,

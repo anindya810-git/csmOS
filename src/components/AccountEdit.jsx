@@ -122,7 +122,7 @@ export default function AccountEdit() {
         const fields = [
           'account_name','tenant_id','industry','mrr_tier','mrr','region','golive_date',
           'csm_lead','csm','cp','tam_assigned','billing_frequency','renewal_date',
-          'renewal_status','closure_eta','sa_status',
+          'renewal_status','sa_status',
           'churn_status','churn_reason','grr','nps','renewal_comments',
           'contraction_risk','churn_risk',
           'rag_status','adoption_score','stickiness_score','adoption_rate','rag_reason','actions_taken',
@@ -277,9 +277,6 @@ export default function AccountEdit() {
         </Field>
         <Field label="Renewal Status">
           <SelectDropdown options={opts('renewal_status', ['Renewed','At Risk','Lost','Pending'])} value={form.renewal_status || ''} onChange={v => set('renewal_status', v)} />
-        </Field>
-        <Field label="Closure ETA">
-          <DatePicker value={form.closure_eta ? form.closure_eta.substring(0,10) : ''} onChange={v => set('closure_eta', v)} placeholder="Pick a date" />
         </Field>
       </SectionCard>
 

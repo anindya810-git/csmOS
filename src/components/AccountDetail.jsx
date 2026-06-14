@@ -662,7 +662,6 @@ export default function AccountDetail() {
                 ['Implementation',     a.implementation_status],
                 ['PS Engagement',      a.ps_engagement],
                 ['Go-live Date',       fmtDate(a.golive_date)],
-                ['Closure ETA',        fmtDate(a.closure_eta)],
                 ['GRR (%)',            a.grr != null ? `${a.grr}%` : null],
                 ['Stickiness Score',   a.stickiness_score != null ? `${a.stickiness_score}` : null],
                 ['Adoption Rate',      a.adoption_rate != null ? `${a.adoption_rate}%` : null],

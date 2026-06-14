@@ -2,7 +2,7 @@
 // Shared by the UI and the open REST API.
 export const ACCOUNT_EDITABLE_FIELDS = [
   'account_name','tenant_id','industry','mrr_tier','mrr','region','csm_lead','csm',
-  'closure_eta','cp','tam_assigned','billing_frequency','renewal_date','renewal_status',
+  'cp','tam_assigned','billing_frequency','renewal_date','renewal_status',
   'churn_status','churn_reason','renewal_comments','implementation_status','implementation_type',
   'ps_engagement','ps_solutioning','account_understanding_session','new_csm_intro_done',
   'csm_escalation_matrix_shared','ring_fence_meeting_initiated','meeting_planned_date',
