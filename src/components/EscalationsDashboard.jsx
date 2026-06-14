@@ -138,6 +138,10 @@ export default function EscalationsDashboard() {
     user?.email, 'escalations', Object.fromEntries(ESC_COLS.map(c => [c.key, !c.off]))
   );
   const visibleEscCols = ESC_COLS.filter(c => c.key !== 'account_name' && showCol(c.key));
+  const exportEscCols  = [
+    { key: 'account_name', label: fieldLabel('escalations', 'account_name', 'Account') },
+    ...visibleEscCols.map(c => ({ key: c.key, label: fieldLabel('escalations', c.key, c.label) })),
+  ];
   const colCount = visibleEscCols.length + 2 + (user?.role === 'admin' ? 1 : 0);
   const [escalations, setEscalations] = useState([]);
   const [loading,     setLoading]     = useState(true);
@@ -398,33 +402,18 @@ export default function EscalationsDashboard() {
               Bulk Update
             </button>
           )}
-          {can('export', 'escalations') && (
+          {isEnabled('export') && can('export', 'escalations') && (
             <ExportButton
               filename="Escalations"
-              columns={[
-                { key: 'account_name',      label: 'Account' },
-                { key: 'csm',               label: 'CSM' },
-                { key: 'trigger_reason',    label: 'Trigger / Reason' },
-                { key: 'status',            label: 'Status' },
-                { key: 'date_of_escalation',label: 'Date' },
-                { key: 'month',             label: 'Month' },
-                { key: 'ownership',         label: 'Ownership' },
-                { key: 'issue_type',        label: 'Issue Type' },
-                { key: 'action_plan',       label: 'Action Plan' },
-                { key: 'next_steps',        label: 'Next Steps' },
-              ]}
-              getRows={() => displayed.map(e => ({
-                account_name:       e.accounts?.account_name || e.account_name || '',
-                csm:                e.csm           || '',
-                trigger_reason:     e.trigger_reason|| '',
-                status:             e.status        || '',
-                date_of_escalation: e.date_of_escalation || '',
-                month:              e.month         || '',
-                ownership:          e.ownership     || '',
-                issue_type:         e.issue_type    || '',
-                action_plan:        e.action_plan   || '',
-                next_steps:         e.next_steps    || '',
-              }))}
+              columns={exportEscCols}
+              getRows={() => displayed.map(e =>
+                Object.fromEntries(exportEscCols.map(c => [
+                  c.key,
+                  c.key === 'account_name'
+                    ? (e.accounts?.account_name || e.account_name || '')
+                    : (e[c.key] ?? ''),
+                ]))
+              )}
             />
           )}
           {can('create', 'escalations') && (

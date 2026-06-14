@@ -175,6 +175,10 @@ export default function AccountsPage() {
     user?.email, 'accounts', Object.fromEntries(ACCOUNTS_COLS.map(c => [c.key, !c.off]))
   );
   const visibleCols = ACCOUNTS_COLS.filter(c => c.key !== 'account_name' && showCol(c.key));
+  const exportCols  = [
+    { key: 'account_name', label: fieldLabel('accounts', 'account_name', 'Account Name') },
+    ...visibleCols.map(c => ({ key: c.key, label: fieldLabel('accounts', c.key, c.label) })),
+  ];
   const colCount = visibleCols.length + 2 + (user?.role === 'admin' ? 1 : 0); // +account_name +actions
   const [accounts,         setAccounts]         = useState([]);
   const [filters,          setFilters]          = useState({});
@@ -354,37 +358,13 @@ export default function AccountsPage() {
               Bulk Update
             </button>
           )}
-          {can('export', 'accounts') && (
+          {isEnabled('export') && can('export', 'accounts') && (
             <ExportButton
               filename="Accounts"
-              columns={[
-                { key: 'account_name', label: 'Account Name' },
-                { key: 'tenant_id',    label: 'Tenant ID' },
-                { key: 'csm',         label: 'CSM' },
-                { key: 'rag_status',  label: 'RAG Status' },
-                { key: 'mrr',         label: 'MRR' },
-                { key: 'mrr_tier',    label: 'MRR Tier' },
-                { key: 'industry',    label: 'Industry' },
-                { key: 'region',      label: 'Region' },
-                { key: 'renewal_date',   label: 'Renewal Date' },
-                { key: 'renewal_status', label: 'Renewal Status' },
-                { key: 'churn_status',   label: 'Churn Status' },
-                { key: 'adoption_score', label: 'Adoption Score' },
-              ]}
-              getRows={() => displayed.map(a => ({
-                account_name:  a.account_name  || '',
-                tenant_id:     a.tenant_id     || '',
-                csm:           a.csm           || '',
-                rag_status:    a.rag_status     || '',
-                mrr:           a.mrr           || '',
-                mrr_tier:      a.mrr_tier      || '',
-                industry:      a.industry      || '',
-                region:        a.region        || '',
-                renewal_date:   a.renewal_date   || '',
-                renewal_status: a.renewal_status || '',
-                churn_status:   a.churn_status   || '',
-                adoption_score: a.adoption_score ?? '',
-              }))}
+              columns={exportCols}
+              getRows={() => displayed.map(a =>
+                Object.fromEntries(exportCols.map(c => [c.key, a[c.key] ?? '']))
+              )}
             />
           )}
           {can('create', 'accounts') && (<button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">

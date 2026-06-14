@@ -80,6 +80,10 @@ export default function TasksPage() {
     user?.email, 'tasks', Object.fromEntries(visibleTaskCols.map(c => [c.key, !c.off]))
   );
   const dataCols = visibleTaskCols.filter(c => c.key !== 'task_subject' && showCol(c.key));
+  const exportTaskCols = [
+    { key: 'task_subject', label: fieldLabel('tasks', 'task_subject', 'Task') },
+    ...dataCols.map(c => ({ key: c.key, label: fieldLabel('tasks', c.key, c.label) })),
+  ];
   const colCount = dataCols.length + 1 + (isAdmin ? 2 : 1); // +subject, +checkbox for admin, +actions
 
   const [tasks,     setTasks]     = useState([]);
@@ -327,29 +331,20 @@ export default function TasksPage() {
           <p className="text-sm text-gray-500 mt-0.5">{counts.Open} open · {counts.Overdue} overdue · {counts.Completed} completed</p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {can('export', 'tasks') && (
+          {isEnabled('export') && can('export', 'tasks') && (
             <ExportButton
               filename="Tasks"
-              columns={[
-                { key: 'task_subject',  label: 'Task' },
-                { key: 'nature_of_task',label: 'Type' },
-                { key: 'account_name',  label: 'Account' },
-                { key: 'assigned_to',   label: 'Assigned To' },
-                { key: 'assigned_by',   label: 'Assigned By' },
-                { key: 'due_date',      label: 'Due Date' },
-                { key: 'status',        label: 'Status' },
-                { key: 'description',   label: 'Description' },
-              ]}
-              getRows={() => filtered.map(t => ({
-                task_subject:  t.task_subject  || '',
-                nature_of_task:t.nature_of_task|| '',
-                account_name:  t.accounts?.account_name || t.account_name || '',
-                assigned_to:   t.assigned_to   || '',
-                assigned_by:   t.assigned_by   || '',
-                due_date:      t.due_date      || '',
-                status:        t.derived_status || t.status || '',
-                description:   t.description   || '',
-              }))}
+              columns={exportTaskCols}
+              getRows={() => filtered.map(t =>
+                Object.fromEntries(exportTaskCols.map(c => [
+                  c.key,
+                  c.key === 'account_name'
+                    ? (t.accounts?.account_name || t.account_name || '')
+                    : c.key === 'task_subject'
+                    ? (t.task_subject || '')
+                    : (t[c.key] ?? ''),
+                ]))
+              )}
             />
           )}
           {can('create', 'tasks') && (

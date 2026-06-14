@@ -238,6 +238,10 @@ export default function IssuesDashboard() {
     user?.email, 'issues', Object.fromEntries(ISSUES_COLS.map(c => [c.key, !c.off]))
   );
   const visibleIssueCols = ISSUES_COLS.filter(c => c.key !== 'account_name' && showCol(c.key));
+  const exportIssueCols  = [
+    { key: 'account_name', label: fieldLabel('issues', 'account_name', 'Account') },
+    ...visibleIssueCols.map(c => ({ key: c.key, label: fieldLabel('issues', c.key, c.label) })),
+  ];
   const colCount = visibleIssueCols.length + 2 + (user?.role === 'admin' ? 1 : 0);
   const [issues,       setIssues]       = useState([]);
   const [loading,      setLoading]      = useState(true);
@@ -480,35 +484,18 @@ export default function IssuesDashboard() {
               Bulk Update
             </button>
           )}
-          {can('export', 'issues') && (
+          {isEnabled('export') && can('export', 'issues') && (
             <ExportButton
               filename="Issues"
-              columns={[
-                { key: 'description',   label: 'Description' },
-                { key: 'account_name',  label: 'Account' },
-                { key: 'priority',      label: 'Priority' },
-                { key: 'status',        label: 'Status' },
-                { key: 'issue_type',    label: 'Issue Type' },
-                { key: 'issue_sub_type',label: 'Sub Type' },
-                { key: 'csm',           label: 'CSM' },
-                { key: 'owner_team',    label: 'Owner Team' },
-                { key: 'reported_date', label: 'Reported Date' },
-                { key: 'closure_date',  label: 'Closure Date' },
-                { key: 'next_steps',    label: 'Next Steps' },
-              ]}
-              getRows={() => displayed.map(i => ({
-                description:   i.description   || '',
-                account_name:  i.accounts?.account_name || i.account_name || '',
-                priority:      i.priority      || '',
-                status:        i.status        || '',
-                issue_type:    i.issue_type    || '',
-                issue_sub_type:i.issue_sub_type|| '',
-                csm:           i.csm           || '',
-                owner_team:    i.owner_team    || '',
-                reported_date: i.reported_date || '',
-                closure_date:  i.closure_date  || '',
-                next_steps:    i.next_steps    || '',
-              }))}
+              columns={exportIssueCols}
+              getRows={() => displayed.map(i =>
+                Object.fromEntries(exportIssueCols.map(c => [
+                  c.key,
+                  c.key === 'account_name'
+                    ? (i.accounts?.account_name || i.account_name || '')
+                    : (i[c.key] ?? ''),
+                ]))
+              )}
             />
           )}
           {can('create', 'issues') && (
