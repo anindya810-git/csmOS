@@ -4,6 +4,7 @@ import api from '../../utils/superadminAxios';
 import { FEATURE_DEFS } from '../../hooks/useFeatures';
 import CloneOrgModal from './CloneOrgModal';
 import OrgLoginReport from './OrgLoginReport';
+import { COMMON_TIMEZONES } from '../../utils/timezone';
 
 const PLAN_OPTIONS   = ['trial', 'starter', 'pro', 'enterprise'];
 const STATUS_OPTIONS = ['active', 'suspended', 'cancelled'];
@@ -34,6 +35,9 @@ export default function OrgDetail() {
   const [themeHex, setThemeHex] = useState('');
   const [themeSaving, setThemeSaving] = useState(false);
   const [themeSaved, setThemeSaved] = useState(false);
+  const [orgTimezone, setOrgTimezone] = useState('');
+  const [orgTzSaving, setOrgTzSaving] = useState(false);
+  const [orgTzSaved, setOrgTzSaved] = useState(false);
   const [showClone, setShowClone] = useState(false);
   const [showLoginReport, setShowLoginReport] = useState(false);
 
@@ -49,6 +53,7 @@ export default function OrgDetail() {
       setDomain(data.custom_domain || '');
       setThemeColor(data.theme_color || '');
       setThemeHex(data.theme_color || '');
+      setOrgTimezone(data.org_timezone || '');
     } catch { setError('Failed to load organisation'); }
     finally { setLoading(false); }
   }
@@ -120,6 +125,17 @@ export default function OrgDetail() {
       setTimeout(() => setThemeSaved(false), 2500);
     } catch (err) { setError(err?.response?.data?.error || 'Failed to save theme'); }
     finally { setThemeSaving(false); }
+  }
+
+  async function saveOrgTimezone() {
+    setOrgTzSaving(true); setOrgTzSaved(false);
+    try {
+      const { data } = await api.put(`/api/superadmin?resource=orgs&id=${id}`, { org_timezone: orgTimezone });
+      setOrg(o => ({ ...o, org_timezone: data.org_timezone }));
+      setOrgTzSaved(true);
+      setTimeout(() => setOrgTzSaved(false), 2500);
+    } catch (err) { setError(err?.response?.data?.error || 'Failed to save timezone'); }
+    finally { setOrgTzSaving(false); }
   }
 
   async function save() {
@@ -344,6 +360,34 @@ export default function OrgDetail() {
           </div>
         );
       })()}
+
+      {/* Org Timezone card */}
+      <div className="bg-gray-900 border border-gray-800 rounded-2xl p-5 space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-white">Default Timezone</h2>
+          <p className="text-xs text-gray-500 mt-0.5">Org-wide default. Users can override this from their own My Preferences.</p>
+        </div>
+        <select
+          value={orgTimezone}
+          onChange={e => setOrgTimezone(e.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 text-gray-200 text-sm rounded-xl px-3 py-2 focus:outline-none focus:border-brand-500"
+        >
+          <option value="">— None (browser default) —</option>
+          {COMMON_TIMEZONES.map(tz => (
+            <option key={tz.value} value={tz.value}>{tz.label}</option>
+          ))}
+        </select>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={saveOrgTimezone}
+            disabled={orgTzSaving}
+            className="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-sm font-semibold transition disabled:opacity-40"
+          >
+            {orgTzSaving ? 'Saving…' : 'Save Timezone'}
+          </button>
+          {orgTzSaved && <span className="text-xs text-emerald-400 font-medium">Saved ✓</span>}
+        </div>
+      </div>
 
       {/* Edit form */}
       <div className="bg-gray-900 border border-gray-800 rounded-2xl">

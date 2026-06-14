@@ -156,12 +156,12 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
             </select>
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account Name <span className="text-gray-300 font-normal normal-case">(read-only)</span></p>
-            <input type="text" value={f.account_name || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account Name</p>
+            <input type="text" value={f.account_name || ''} readOnly className="!py-1.5 text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
           </div>
           <div>
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM <span className="text-gray-300 font-normal normal-case">(from account)</span></p>
-            <input type="text" value={f.csm || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
+            <input type="text" value={f.csm || ''} readOnly className="!py-1.5 text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
           </div>
         </>
       )}

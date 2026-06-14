@@ -131,9 +131,10 @@ async function handleOrgs(req, res, admin) {
   const { id } = req.query;
 
   if (req.method === 'GET' && id) {
-    const [{ data: org }, { data: users }] = await Promise.all([
+    const [{ data: org }, { data: users }, { data: tzData }] = await Promise.all([
       supabase.from('organizations').select('*').eq('id', id).maybeSingle(),
       supabase.from('users').select('id, name, email, role, csm_name, last_active_at').eq('org_id', id).order('name'),
+      supabase.from('dropdown_config').select('value').eq('org_id', id).eq('field_name', 'org_timezone').maybeSingle(),
     ]);
     if (!org) return res.status(404).json({ error: 'Not found' });
 
@@ -150,6 +151,7 @@ async function handleOrgs(req, res, admin) {
     return res.json({
       ...org,
       features: org.features || {},
+      org_timezone: tzData?.value || null,
       users: users || [],
       _stats: {
         users: (users || []).length,
@@ -219,7 +221,7 @@ async function handleOrgs(req, res, admin) {
 
   if (req.method === 'PUT') {
     if (!id) return res.status(400).json({ error: 'id required' });
-    const { name, plan, billing_status, user_limit, notes, features, custom_domain, theme_color } = req.body || {};
+    const { name, plan, billing_status, user_limit, notes, features, custom_domain, theme_color, org_timezone } = req.body || {};
     const updates = { updated_at: new Date().toISOString() };
     if (name !== undefined) updates.name = name;
     if (plan !== undefined) updates.plan = plan;
@@ -240,7 +242,17 @@ async function handleOrgs(req, res, admin) {
         return res.status(409).json({ error: 'That domain is already assigned to another organisation.' });
       return res.status(500).json({ error: error.message });
     }
-    return res.json(data);
+
+    // Store org timezone in dropdown_config (no schema change needed).
+    let savedTz = undefined;
+    if (org_timezone !== undefined) {
+      const tz = typeof org_timezone === 'string' ? org_timezone.trim() : '';
+      await supabase.from('dropdown_config').delete().eq('org_id', id).eq('field_name', 'org_timezone');
+      if (tz) await supabase.from('dropdown_config').insert({ org_id: Number(id), field_name: 'org_timezone', value: tz });
+      savedTz = tz || null;
+    }
+
+    return res.json({ ...data, ...(savedTz !== undefined ? { org_timezone: savedTz } : {}) });
   }
 
   if (req.method === 'DELETE') {

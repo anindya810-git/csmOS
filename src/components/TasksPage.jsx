@@ -671,9 +671,9 @@ export default function TasksPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Task Description</label>
-                  <textarea rows={4} value={form.task_description}
+                  <textarea rows={10} value={form.task_description}
                     onChange={e => setForm(f => ({ ...f, task_description: e.target.value }))}
-                    placeholder="Details, context, links…" className="resize-none" />
+                    placeholder="Details, context, links…" className="resize-y min-h-[180px]" />
                 </div>
               </form>
             </div>
