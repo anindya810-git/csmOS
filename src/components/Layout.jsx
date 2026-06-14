@@ -38,18 +38,17 @@ export default function Layout() {
 
   // Dynamic favicon + browser title when org has a logo/name
   useEffect(() => {
-    document.title = user?.org_name ? `${user.org_name} · Custally` : 'Custally';
+    document.title = user?.org_name || 'Custally';
     if (user?.org_logo_url) {
-      let link = document.querySelector("link[rel~='icon']");
-      if (!link) {
-        link = document.createElement('link');
-        link.rel = 'icon';
-        document.head.appendChild(link);
-      }
+      // Remove any existing icon links, then add a fresh one with the org logo
+      document.querySelectorAll("link[rel~='icon']").forEach(el => el.remove());
+      const link = document.createElement('link');
+      link.rel = 'icon';
+      link.type = 'image/png';
       link.href = user.org_logo_url;
+      document.head.appendChild(link);
     }
     return () => {
-      // Reset to default when logged out / component unmounts
       document.title = 'Custally';
     };
   }, [user?.org_logo_url, user?.org_name]);
@@ -80,7 +79,9 @@ export default function Layout() {
           <div className="flex items-center gap-6">
             <a href="/accounts" className="flex items-center gap-2 text-decoration-none no-underline">
               {user?.org_logo_url ? (
-                <img src={user.org_logo_url} alt={user.org_name || 'Logo'} className="h-8 w-auto max-w-[170px] object-contain" />
+                <img src={user.org_logo_url} alt={user.org_name || 'Logo'} className="h-8 w-auto max-w-[180px] object-contain" />
+              ) : user?.org_name ? (
+                <span className="font-bold text-gray-900 text-lg tracking-tight">{user.org_name}</span>
               ) : (
                 <>
                   <svg viewBox="0 0 64 64" className="w-7 h-7">

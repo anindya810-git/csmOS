@@ -15,6 +15,7 @@ import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { evalConditions } from '../utils/conditions';
+import ExportButton from './ExportButton';
 
 // Every account field is available as a column; only these start visible.
 const DEFAULT_ON = ['account_name', 'industry', 'mrr', 'csm', 'rag_status', 'renewal_date', 'churn_status', 'region'];
@@ -347,6 +348,39 @@ export default function AccountsPage() {
               </svg>
               Bulk Update
             </button>
+          )}
+          {can('export', 'accounts') && (
+            <ExportButton
+              filename="Accounts"
+              columns={[
+                { key: 'account_name', label: 'Account Name' },
+                { key: 'tenant_id',    label: 'Tenant ID' },
+                { key: 'csm',         label: 'CSM' },
+                { key: 'rag_status',  label: 'RAG Status' },
+                { key: 'mrr',         label: 'MRR' },
+                { key: 'mrr_tier',    label: 'MRR Tier' },
+                { key: 'industry',    label: 'Industry' },
+                { key: 'region',      label: 'Region' },
+                { key: 'renewal_date',   label: 'Renewal Date' },
+                { key: 'renewal_status', label: 'Renewal Status' },
+                { key: 'churn_status',   label: 'Churn Status' },
+                { key: 'adoption_score', label: 'Adoption Score' },
+              ]}
+              getRows={() => displayed.map(a => ({
+                account_name:  a.account_name  || '',
+                tenant_id:     a.tenant_id     || '',
+                csm:           a.csm           || '',
+                rag_status:    a.rag_status     || '',
+                mrr:           a.mrr           || '',
+                mrr_tier:      a.mrr_tier      || '',
+                industry:      a.industry      || '',
+                region:        a.region        || '',
+                renewal_date:   a.renewal_date   || '',
+                renewal_status: a.renewal_status || '',
+                churn_status:   a.churn_status   || '',
+                adoption_score: a.adoption_score ?? '',
+              }))}
+            />
           )}
           {can('create', 'accounts') && (<button onClick={() => setShowAdd(true)} className="inline-flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition">
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>

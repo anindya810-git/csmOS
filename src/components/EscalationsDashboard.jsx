@@ -18,6 +18,7 @@ import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { evalConditions } from '../utils/conditions';
+import ExportButton from './ExportButton';
 
 // Every escalation field can be shown as a column; these start visible.
 const ESC_DEFAULT_ON = ['account_name', 'rag_status', 'date_of_escalation', 'description', 'status', 'csm', 'ownership', 'eta', 'escalated_by'];
@@ -393,6 +394,35 @@ export default function EscalationsDashboard() {
               </svg>
               Bulk Update
             </button>
+          )}
+          {can('export', 'escalations') && (
+            <ExportButton
+              filename="Escalations"
+              columns={[
+                { key: 'account_name',      label: 'Account' },
+                { key: 'csm',               label: 'CSM' },
+                { key: 'trigger_reason',    label: 'Trigger / Reason' },
+                { key: 'status',            label: 'Status' },
+                { key: 'date_of_escalation',label: 'Date' },
+                { key: 'month',             label: 'Month' },
+                { key: 'ownership',         label: 'Ownership' },
+                { key: 'issue_type',        label: 'Issue Type' },
+                { key: 'action_plan',       label: 'Action Plan' },
+                { key: 'next_steps',        label: 'Next Steps' },
+              ]}
+              getRows={() => displayed.map(e => ({
+                account_name:       e.accounts?.account_name || e.account_name || '',
+                csm:                e.csm           || '',
+                trigger_reason:     e.trigger_reason|| '',
+                status:             e.status        || '',
+                date_of_escalation: e.date_of_escalation || '',
+                month:              e.month         || '',
+                ownership:          e.ownership     || '',
+                issue_type:         e.issue_type    || '',
+                action_plan:        e.action_plan   || '',
+                next_steps:         e.next_steps    || '',
+              }))}
+            />
           )}
           {can('create', 'escalations') && (
             <button

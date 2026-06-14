@@ -13,6 +13,7 @@ import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
 import { useWatchlist } from '../hooks/useWatchlist';
+import ExportButton from './ExportButton';
 
 // Every task field can be shown as a column; these start visible.
 const TASKS_DEFAULT_ON = ['task_subject', 'nature_of_task', 'account_name', 'assigned_to', 'due_date', 'derived_status'];
@@ -321,17 +322,44 @@ export default function TasksPage() {
           <h1 className="text-xl font-bold text-gray-900">Tasks</h1>
           <p className="text-sm text-gray-500 mt-0.5">{counts.Open} open · {counts.Overdue} overdue · {counts.Completed} completed</p>
         </div>
-        {can('create', 'tasks') && (
-          <button
-            onClick={openAdd}
-            className="shrink-0 inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Add Task
-          </button>
-        )}
+        <div className="flex items-center gap-2 shrink-0">
+          {can('export', 'tasks') && (
+            <ExportButton
+              filename="Tasks"
+              columns={[
+                { key: 'task_subject',  label: 'Task' },
+                { key: 'nature_of_task',label: 'Type' },
+                { key: 'account_name',  label: 'Account' },
+                { key: 'assigned_to',   label: 'Assigned To' },
+                { key: 'assigned_by',   label: 'Assigned By' },
+                { key: 'due_date',      label: 'Due Date' },
+                { key: 'status',        label: 'Status' },
+                { key: 'description',   label: 'Description' },
+              ]}
+              getRows={() => filtered.map(t => ({
+                task_subject:  t.task_subject  || '',
+                nature_of_task:t.nature_of_task|| '',
+                account_name:  t.accounts?.account_name || t.account_name || '',
+                assigned_to:   t.assigned_to   || '',
+                assigned_by:   t.assigned_by   || '',
+                due_date:      t.due_date      || '',
+                status:        t.derived_status || t.status || '',
+                description:   t.description   || '',
+              }))}
+            />
+          )}
+          {can('create', 'tasks') && (
+            <button
+              onClick={openAdd}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+              Add Task
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Status tabs */}

@@ -18,6 +18,7 @@ import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { evalConditions } from '../utils/conditions';
+import ExportButton from './ExportButton';
 
 // Every issue field can be shown as a column; these start visible.
 const ISSUES_DEFAULT_ON = ['account_name', 'priority', 'description', 'issue_type', 'owner_team', 'status', 'reported_date', 'csm'];
@@ -474,6 +475,37 @@ export default function IssuesDashboard() {
               </svg>
               Bulk Update
             </button>
+          )}
+          {can('export', 'issues') && (
+            <ExportButton
+              filename="Issues"
+              columns={[
+                { key: 'description',   label: 'Description' },
+                { key: 'account_name',  label: 'Account' },
+                { key: 'priority',      label: 'Priority' },
+                { key: 'status',        label: 'Status' },
+                { key: 'issue_type',    label: 'Issue Type' },
+                { key: 'issue_sub_type',label: 'Sub Type' },
+                { key: 'csm',           label: 'CSM' },
+                { key: 'owner_team',    label: 'Owner Team' },
+                { key: 'reported_date', label: 'Reported Date' },
+                { key: 'closure_date',  label: 'Closure Date' },
+                { key: 'next_steps',    label: 'Next Steps' },
+              ]}
+              getRows={() => displayed.map(i => ({
+                description:   i.description   || '',
+                account_name:  i.accounts?.account_name || i.account_name || '',
+                priority:      i.priority      || '',
+                status:        i.status        || '',
+                issue_type:    i.issue_type    || '',
+                issue_sub_type:i.issue_sub_type|| '',
+                csm:           i.csm           || '',
+                owner_team:    i.owner_team    || '',
+                reported_date: i.reported_date || '',
+                closure_date:  i.closure_date  || '',
+                next_steps:    i.next_steps    || '',
+              }))}
+            />
           )}
           {can('create', 'issues') && (
             <button

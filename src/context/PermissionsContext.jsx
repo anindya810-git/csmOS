@@ -16,15 +16,16 @@ export const PERM_ACTIONS = [
   { key: 'create', label: 'Create' },
   { key: 'edit',   label: 'Edit' },
   { key: 'delete', label: 'Delete' },
+  { key: 'export', label: 'Export' },
 ];
 
 const ROLE_BASE = {
-  admin:       { view: true, create: true, edit: true, delete: true },
-  csm:         { view: true, create: true, edit: true, delete: true },
-  sales:       { view: true, create: true, edit: true, delete: true },
-  product:     { view: true, create: true, edit: true, delete: true },
-  cx_strategy: { view: true, create: false, edit: false, delete: false },
-  ps:          { view: true, create: true, edit: true, delete: true },
+  admin:       { view: true, create: true, edit: true, delete: true, export: true },
+  csm:         { view: true, create: true, edit: true, delete: true, export: true },
+  sales:       { view: true, create: true, edit: true, delete: true, export: true },
+  product:     { view: true, create: true, edit: true, delete: true, export: true },
+  cx_strategy: { view: true, create: false, edit: false, delete: false, export: true },
+  ps:          { view: true, create: true, edit: true, delete: true, export: true },
 };
 
 export function getDefaultPermsForRole(role) {

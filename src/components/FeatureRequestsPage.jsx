@@ -5,6 +5,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { useWatchlist } from '../hooks/useWatchlist';
+import ExportButton from './ExportButton';
 import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
 import DrillModal from './DrillModal';
@@ -393,12 +394,39 @@ export default function FeatureRequestsPage() {
           <h1 className="text-xl font-bold text-gray-900">Feature Requests</h1>
           <p className="text-sm text-gray-500 mt-0.5">Create a request, then attach escalations &amp; issues from their pages</p>
         </div>
-        {can('create', 'feature_requests') && (
-          <button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            New Request
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {can('export', 'feature_requests') && (
+            <ExportButton
+              filename="Feature Requests"
+              columns={[
+                { key: 'request_id',    label: 'ID' },
+                { key: 'feature_name',  label: 'Feature Name' },
+                { key: 'priority',      label: 'Priority' },
+                { key: 'status',        label: 'Status' },
+                { key: 'related_to',    label: 'Product Area' },
+                { key: 'date_requested',label: 'Date Requested' },
+                { key: 'description',   label: 'Description' },
+                { key: 'requester',     label: 'Requester' },
+              ]}
+              getRows={() => frs.map(fr => ({
+                request_id:    fr.request_id   || `FR-${String(fr.id).padStart(5,'0')}`,
+                feature_name:  fr.feature_name || fr.title || '',
+                priority:      fr.priority     || '',
+                status:        fr.status       || '',
+                related_to:    fr.related_to   || '',
+                date_requested:fr.date_requested|| '',
+                description:   fr.description  || '',
+                requester:     fr.requester    || '',
+              }))}
+            />
+          )}
+          {can('create', 'feature_requests') && (
+            <button onClick={openCreate} className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              New Request
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Filters */}
