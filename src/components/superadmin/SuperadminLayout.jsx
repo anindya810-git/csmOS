@@ -1,10 +1,15 @@
-import React, { Suspense } from 'react';
+import React, { Suspense, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { useSuperadminAuth } from '../../context/SuperadminAuthContext';
+import { applyTheme } from '../../utils/colorTheme';
 
 export default function SuperadminLayout() {
   const { admin, logout } = useSuperadminAuth();
   const navigate = useNavigate();
+
+  // Superadmin panel always uses the default Custally theme regardless of
+  // whichever org theme the logged-in account may belong to.
+  useEffect(() => { applyTheme(null); }, []);
 
   function handleLogout() { logout(); navigate('/superadmin/login'); }
 
