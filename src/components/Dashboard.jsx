@@ -79,7 +79,7 @@ export default function Dashboard() {
   }, [tasks]);
 
   const atRiskMrr = useMemo(() =>
-    accounts.filter(a => a.rag_status === 'Red' || a.rag_status === 'Amber')
+    accounts.filter(a => a.rag_status === 'Red')
             .reduce((s, a) => s + (a.mrr || 0), 0),
   [accounts]);
 
@@ -182,7 +182,7 @@ export default function Dashboard() {
       {/* KPI row */}
       <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-4">
         <KpiCard label="Total MRR" value={fmt(total.total_mrr)} sub={`${total.count} accounts`} onClick={() => navigate('/accounts')} />
-        <KpiCard label="At-Risk MRR" value={fmt(atRiskMrr)} sub="Red + Amber accounts" color="text-red-600" onClick={() => navigate('/rag')} />
+        <KpiCard label="At-Risk MRR" value={fmt(atRiskMrr)} sub="Red accounts" color="text-red-600" onClick={() => navigate('/reports/rag?rag=Red')} />
         <KpiCard label="Active Escalations" value={activeEscalations.length} sub={openEsc ? `${openEsc} open` : 'none open'} color={activeEscalations.length ? 'text-orange-600' : 'text-gray-400'} onClick={() => navigate('/escalations')} />
         <KpiCard label="Active Issues" value={activeIssues.length} sub={`of ${issues.length} total`} color={activeIssues.length ? 'text-amber-600' : 'text-gray-400'} onClick={() => navigate('/issues')} />
         <KpiCard label="Open Tasks" value={openTasks + overdueTasks} sub={overdueTasks ? `${overdueTasks} overdue` : 'none overdue'} color={overdueTasks ? 'text-red-600' : (openTasks + overdueTasks) ? 'text-blue-700' : 'text-gray-400'} onClick={() => navigate('/tasks')} />

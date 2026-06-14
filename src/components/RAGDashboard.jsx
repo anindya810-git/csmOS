@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import AiPanel from './AiPanel';
@@ -12,10 +12,12 @@ const RAG_CONFIG = {
 };
 
 export default function RAGDashboard() {
+  const [searchParams] = useSearchParams();
+  const ragParam = searchParams.get('rag');
   const [accounts,         setAccounts]         = useState([]);
   const [loading,          setLoading]          = useState(true);
   const [error,            setError]            = useState(null);
-  const [activeRag,        setActiveRag]        = useState('');
+  const [activeRag,        setActiveRag]        = useState(RAG_ORDER.includes(ragParam) ? ragParam : '');
   const [filterCsm,        setFilterCsm]        = useState([]);
   const [filterRegion,     setFilterRegion]     = useState([]);
   const [filterIndustry,   setFilterIndustry]   = useState([]);
