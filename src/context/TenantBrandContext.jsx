@@ -40,7 +40,11 @@ export function TenantBrandProvider({ children }) {
   const [loading, setLoading] = useState(cached === undefined);
 
   useEffect(() => {
-    if (cached?.brand) applyTabBranding(cached.brand);
+    if (cached?.brand) {
+      applyTabBranding(cached.brand);
+      // Apply theme immediately from cache so there's no flash on refresh.
+      if (cached.brand.theme_color) applyTheme(cached.brand.theme_color);
+    }
 
     let cancelled = false;
     axios.get('/api/auth/login', { params: { host: HOST } })
@@ -51,8 +55,8 @@ export function TenantBrandProvider({ children }) {
           : null;
         setBrand(next);
         applyTabBranding(next);
-        // Pre-login: apply the org's theme so the Sign In button already matches.
-        if (next?.theme_color) applyTheme(next.theme_color);
+        // Apply (or clear) the org's theme so the login page matches before signing in.
+        applyTheme(next?.theme_color || null);
         try { sessionStorage.setItem(CACHE_KEY, JSON.stringify({ brand: next })); } catch {}
       })
       .catch(() => {})

@@ -18,7 +18,7 @@ export default async function handler(req, res) {
     if (!host) return res.json({ found: false });
     const { data } = await supabase
       .from('organizations')
-      .select('id, name, logo_url, custom_domain, theme_color')
+      .select('*')
       .eq('custom_domain', host)
       .maybeSingle();
     if (!data) return res.json({ found: false });
