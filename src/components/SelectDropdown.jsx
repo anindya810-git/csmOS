@@ -19,10 +19,10 @@ export default function SelectDropdown({
   const triggerRef = useRef(null);
   const panelRef = useRef(null);
 
-  const opts = useMemo(() => options.map(norm), [options]);
+  const opts = useMemo(() => (options ?? []).map(norm), [options]);
   const searchable = searchableProp !== undefined ? searchableProp : opts.length > 10;
   const filtered = search
-    ? opts.filter(o => o.label.toLowerCase().includes(search.toLowerCase()))
+    ? opts.filter(o => String(o.label ?? '').toLowerCase().includes(search.toLowerCase()))
     : opts;
 
   useLayoutEffect(() => {
