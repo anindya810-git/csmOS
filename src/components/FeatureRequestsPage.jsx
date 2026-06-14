@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { usePermissions } from '../context/PermissionsContext';
+import { useFeatures } from '../hooks/useFeatures';
 import { useWatchlist } from '../hooks/useWatchlist';
 import ExportButton from './ExportButton';
 import SelectDropdown from './SelectDropdown';
@@ -92,6 +93,7 @@ const EMPTY_FORM = { title: '', description: '', related_to: '', priority: 'P2',
 export default function FeatureRequestsPage() {
   const { user } = useAuth();
   const { can } = usePermissions();
+  const { isEnabled } = useFeatures();
   const { isWatched, toggle: watchToggle, getIds: getWatchIds } = useWatchlist();
   const [watchlistOnly, setWatchlistOnly] = useState(false);
   const navigate = useNavigate();
@@ -399,28 +401,28 @@ export default function FeatureRequestsPage() {
           <p className="text-sm text-gray-500 mt-0.5">Create a request, then attach escalations &amp; issues from their pages</p>
         </div>
         <div className="flex items-center gap-2">
-          {can('export', 'feature_requests') && (
+          {isEnabled('export') && can('export', 'feature_requests') && (
             <ExportButton
               filename="Feature Requests"
               columns={[
                 { key: 'request_id',    label: 'ID' },
-                { key: 'feature_name',  label: 'Feature Name' },
+                { key: 'title',         label: 'Feature Name' },
                 { key: 'priority',      label: 'Priority' },
                 { key: 'status',        label: 'Status' },
                 { key: 'related_to',    label: 'Product Area' },
-                { key: 'date_requested',label: 'Date Requested' },
                 { key: 'description',   label: 'Description' },
-                { key: 'requester',     label: 'Requester' },
+                { key: 'created_by',    label: 'Requester' },
+                { key: 'expected_rollout_date', label: 'Expected Rollout' },
               ]}
-              getRows={() => frs.map(fr => ({
-                request_id:    fr.request_id   || `FR-${String(fr.id).padStart(5,'0')}`,
-                feature_name:  fr.feature_name || fr.title || '',
-                priority:      fr.priority     || '',
-                status:        fr.status       || '',
-                related_to:    fr.related_to   || '',
-                date_requested:fr.date_requested|| '',
-                description:   fr.description  || '',
-                requester:     fr.requester    || '',
+              getRows={() => displayedFrs.map(fr => ({
+                request_id:            fr.request_id || `FR-${String(fr.id).padStart(5, '0')}`,
+                title:                 fr.title || '',
+                priority:              fr.priority || '',
+                status:                fr.status || '',
+                related_to:            fr.related_to || '',
+                description:           fr.description || '',
+                created_by:            fr.created_by || '',
+                expected_rollout_date: fr.expected_rollout_date || '',
               }))}
             />
           )}
