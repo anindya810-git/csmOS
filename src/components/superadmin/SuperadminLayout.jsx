@@ -9,7 +9,30 @@ export default function SuperadminLayout() {
 
   // Superadmin panel always uses the default Custally theme regardless of
   // whichever org theme the logged-in account may belong to.
-  useEffect(() => { applyTheme(null); }, []);
+  // Also sets a distinct dark favicon so the tab is easy to tell apart.
+  useEffect(() => {
+    applyTheme(null);
+
+    const prev = { title: document.title, favicons: [] };
+    document.querySelectorAll("link[rel~='icon']").forEach(el => {
+      prev.favicons.push(el.cloneNode());
+      el.remove();
+    });
+
+    document.title = 'Custally · Superadmin';
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#0f172a"/><path d="M47 20 A18 18 0 1 0 47 44" fill="none" stroke="#0EA47E" stroke-width="10" stroke-linecap="round"/><polygon points="49,24.5 51.55,29.45 56.5,32 51.55,34.55 49,39.5 46.45,34.55 41.5,32 46.45,29.45" fill="#2DD4A7"/></svg>`;
+    const link = document.createElement('link');
+    link.rel = 'icon';
+    link.type = 'image/svg+xml';
+    link.href = `data:image/svg+xml;base64,${btoa(svg)}`;
+    document.head.appendChild(link);
+
+    return () => {
+      document.title = prev.title;
+      document.querySelectorAll("link[rel~='icon']").forEach(el => el.remove());
+      prev.favicons.forEach(el => document.head.appendChild(el));
+    };
+  }, []);
 
   function handleLogout() { logout(); navigate('/superadmin/login'); }
 
