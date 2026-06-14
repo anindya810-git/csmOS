@@ -283,7 +283,9 @@ export default function AccountDetail() {
           <div>
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 leading-tight">{a.account_name}</h1>
             <div className="flex flex-wrap items-center gap-2 mt-1.5">
-              {a.tenant_id && <span className="text-xs bg-gray-100 text-gray-600 font-mono px-2 py-0.5 rounded">{a.tenant_id}</span>}
+              {String(a.tenant_id || '').split(',').map(t => t.trim()).filter(Boolean).map((t, i) => (
+                <span key={`${t}-${i}`} className="text-xs bg-gray-100 text-gray-600 font-mono px-2 py-0.5 rounded">{t}</span>
+              ))}
               {a.industry && <span className="text-xs text-gray-500">{a.industry}</span>}
               {a.region && <span className="text-xs text-gray-400">· {a.region}</span>}
               {a.rag_status && <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${RAG_COLOR[a.rag_status] || 'bg-gray-100 text-gray-600'}`}>{a.rag_status}</span>}

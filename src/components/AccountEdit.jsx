@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
+import TagInput from './TagInput';
 import { useMyTeam } from '../hooks/useMyTeam';
 
 /* ── Toggle switch ─────────────────────────────────────────── */
@@ -229,8 +230,8 @@ export default function AccountEdit() {
         <Field label="Account Name" full>
           <input className={inp} value={form.account_name || ''} onChange={e => set('account_name', e.target.value)} placeholder="Company name" />
         </Field>
-        <Field label="Tenant ID">
-          <input className={inp} value={form.tenant_id || ''} onChange={e => set('tenant_id', e.target.value)} placeholder="e.g. 5528" />
+        <Field label="Tenant ID" hint="Press Enter or comma to add multiple tenant IDs">
+          <TagInput value={form.tenant_id || ''} onChange={v => set('tenant_id', v)} placeholder="e.g. 5528" />
         </Field>
         <Field label="Region">
           <SelectDropdown options={['North','South','East','West']} value={form.region || ''} onChange={v => set('region', v)} placeholder="— Select Region —" />

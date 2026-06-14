@@ -7,6 +7,7 @@ import Pagination from './Pagination';
 import MultiSelectDropdown from './MultiSelectDropdown';
 import SelectDropdown from './SelectDropdown';
 import DatePicker from './DatePicker';
+import TagInput from './TagInput';
 import ColumnToggle from './ColumnToggle';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { ACCOUNT_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
@@ -784,7 +785,8 @@ function AddAccountModal({ onClose, onSave }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Tenant ID</label>
-              <input value={form.tenant_id} onChange={e => setForm(f=>({...f, tenant_id: e.target.value}))} />
+              <TagInput value={form.tenant_id} onChange={v => setForm(f=>({...f, tenant_id: v}))} placeholder="e.g. 5528" />
+              <p className="text-[11px] text-gray-400 mt-1">Press Enter or comma to add multiple tenant IDs</p>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Industry</label>
