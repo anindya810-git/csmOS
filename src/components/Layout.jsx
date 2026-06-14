@@ -2,6 +2,7 @@ import React, { Suspense, useRef, useState, useEffect } from 'react';
 import { Outlet, NavLink, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useFeatures } from '../hooks/useFeatures';
+import AssistantWidget from './AssistantWidget';
 
 const icon = (d) => (
   <svg className="w-5 h-5 sm:w-4 sm:h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -182,6 +183,9 @@ export default function Layout() {
           </NavLink>
         ))}
       </nav>
+
+      {/* Conversational AI assistant — floating, all authenticated pages */}
+      <AssistantWidget />
     </div>
   );
 }

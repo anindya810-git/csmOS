@@ -1,10 +1,15 @@
 import supabase from './_utils/supabase.js';
 import { verifyToken } from './_utils/auth.js';
 import { setCors } from './_utils/cors.js';
-import { callAI, AI_SECTIONS, DEFAULT_MODELS, PROVIDERS } from './_utils/ai.js';
+import { callAI, callAIWithTools, AI_SECTIONS, DEFAULT_MODELS, PROVIDERS } from './_utils/ai.js';
 import { getOrgFeatures, featureEnabled } from './_utils/features.js';
+import { FIELD_CATALOG } from '../src/fieldCatalog.js';
 
 const PROMPT_KEYS = Object.keys(AI_SECTIONS); // account_summary, account_escalations, account_issues, ...
+
+// The assistant agent loop makes several sequential LLM + DB round-trips, so
+// give this function more headroom than the default 10s.
+export const config = { maxDuration: 60 };
 
 // ai_config is a flat key/value table: provider, key_<p>, model_<p>, prompt_<section>.
 async function loadAiConfig(orgId = 1) {
@@ -25,7 +30,15 @@ function publicAiConfig(map) {
   const prompts = {};
   for (const k of PROMPT_KEYS) prompts[k] = map[`prompt_${k}`] || '';
   const provider = map.provider || '';
-  return { provider, enabled: !!providers[provider], providers, models, prompts };
+  return {
+    provider, enabled: !!providers[provider], providers, models, prompts,
+    assistant: {
+      // The conversational assistant is on by default once a provider is set.
+      enabled: map.assistant_enabled !== 'false',
+      name: map.assistant_name || 'Custally Assistant',
+      greeting: map.assistant_greeting || '',
+    },
+  };
 }
 
 function fmtDate(s) {
@@ -108,16 +121,17 @@ async function buildContext(section, body, user, csmName) {
   if (section === 'feature_request') {
     const frId = body.feature_request_id;
     if (!frId) throw new Error('feature_request_id required');
-    const { data: fr } = await supabase.from('feature_requests').select('*, feature_request_links(*)').eq('id', frId).maybeSingle();
+    // org-scope every read so a guessed id can't surface another tenant's data.
+    const { data: fr } = await supabase.from('feature_requests').select('*, feature_request_links(*)').eq('id', frId).eq('org_id', orgId).maybeSingle();
     if (!fr) throw new Error('Feature request not found');
     const links = fr.feature_request_links || [];
     const escIds = links.filter(l => l.link_type === 'escalation').map(l => l.linked_id);
     const issIds = links.filter(l => l.link_type === 'issue').map(l => l.linked_id);
     const acctIds = [...new Set(links.map(l => l.account_id).filter(Boolean))];
     const [{ data: escs }, { data: isss }, { data: accts }] = await Promise.all([
-      escIds.length ? supabase.from('escalations').select('*').in('id', escIds) : Promise.resolve({ data: [] }),
-      issIds.length ? supabase.from('issues').select('*').in('id', issIds) : Promise.resolve({ data: [] }),
-      acctIds.length ? supabase.from('accounts').select('account_name, mrr, rag_status, region, industry').in('id', acctIds) : Promise.resolve({ data: [] }),
+      escIds.length ? supabase.from('escalations').select('*').in('id', escIds).eq('org_id', orgId) : Promise.resolve({ data: [] }),
+      issIds.length ? supabase.from('issues').select('*').in('id', issIds).eq('org_id', orgId) : Promise.resolve({ data: [] }),
+      acctIds.length ? supabase.from('accounts').select('account_name, mrr, rag_status, region, industry').in('id', acctIds).eq('org_id', orgId) : Promise.resolve({ data: [] }),
     ]);
     const acctTxt = (accts || []).length ? (accts || []).map(a => `- ${a.account_name} | MRR ${a.mrr ?? '–'} | RAG ${a.rag_status || '–'} | ${a.region || '–'}`).join('\n') : '(none)';
     return {
@@ -211,11 +225,16 @@ async function handleGenerate(req, res, user) {
 
 // Whitelisted fields per entity — prevents arbitrary column selection (security).
 const ALLOWED_FIELDS = {
-  accounts: new Set(['id','account_name','tenant_id','csm','csm_lead','rag_status','region','industry','mrr','mrr_tier','renewal_date','golive_date','adoption_score','stickiness_score']),
-  issues: new Set(['id','account_name','priority','issue_type','issue_sub_type','owner_team','status','reported_date','closure_date','csm','csm_lead','description']),
-  escalations: new Set(['id','account_name','date_of_escalation','month','status','csm','ownership','trigger_reason','issue_type','escalated_by','description','source_of_escalation']),
-  tasks: new Set(['id','task_subject','nature_of_task','account_name','assigned_to','assigned_by','due_date','status']),
+  accounts: new Set(['id','account_name','tenant_id','csm','csm_lead','rag_status','rag_reason','region','industry','mrr','mrr_tier','renewal_date','renewal_status','churn_status','churn_risk','golive_date','adoption_score','stickiness_score','nps','implementation_status']),
+  issues: new Set(['id','account_name','tenant_id','priority','issue_type','issue_sub_type','owner_team','status','reported_date','closure_date','csm','csm_lead','description','next_steps']),
+  escalations: new Set(['id','account_name','tenant_id','date_of_escalation','month','status','csm','ownership','trigger_reason','issue_type','issue_sub_type','escalated_by','ps_leader','eta','description','action_taken','source_of_escalation']),
+  tasks: new Set(['id','task_subject','task_description','nature_of_task','account_name','assigned_to','assigned_by','due_date','status']),
+  feature_requests: new Set(['id','title','description','related_to','priority','status','expected_rollout_date','created_by','approved_by']),
 };
+
+// Numeric / date typed fields per entity, so the assistant query layer casts
+// comparison values correctly for gt/gte/lt/lte operators.
+const NUMERIC_FIELDS = new Set(['mrr','adoption_score','stickiness_score','nps','support_ticket','dev_ticket']);
 
 async function handleRunReport(req, res, user) {
   const cfg = req.body?.run_config || {};
@@ -440,11 +459,270 @@ async function handleCustomReports(req, res, user) {
   return res.status(405).json({ error: 'Method not allowed' });
 }
 
+// ──────────────────────────────────────────────────────────────────────────
+// Conversational Assistant — an agentic chat that can query org data, respecting
+// the asking user's role and per-object view permissions.
+// ──────────────────────────────────────────────────────────────────────────
+
+const ASSISTANT_ENTITIES = ['accounts', 'issues', 'escalations', 'tasks', 'feature_requests'];
+
+// The single data-access tool the assistant uses. One flexible query covers
+// look-ups, filtered lists and simple grouped reports.
+const QUERY_TOOL = {
+  name: 'query_data',
+  description: 'Query the organization\'s CRM data to answer questions or build simple reports. Always use this to fetch real numbers and records — never guess. Returns JSON: a list of rows, or aggregated groups when group_by is set.',
+  parameters: {
+    type: 'object',
+    properties: {
+      entity: { type: 'string', enum: ASSISTANT_ENTITIES, description: 'Which dataset to query.' },
+      filters: {
+        type: 'array',
+        description: 'Conditions ANDed together to narrow rows.',
+        items: {
+          type: 'object',
+          properties: {
+            field: { type: 'string', description: 'A field key from this entity\'s schema.' },
+            op: { type: 'string', enum: ['eq', 'neq', 'in', 'gt', 'gte', 'lt', 'lte', 'contains', 'is_empty', 'not_empty'], description: 'Comparison operator. Use "contains" for partial text, "in" with an array of values.' },
+            value: { description: 'Value to compare. String or number; array of strings for "in". Dates as YYYY-MM-DD. Omit for is_empty/not_empty.' },
+          },
+          required: ['field', 'op'],
+        },
+      },
+      group_by: { type: 'string', description: 'Field key to group by for a count/sum report (e.g. group accounts by rag_status).' },
+      metric: { type: 'string', enum: ['count', 'sum', 'avg'], description: 'Aggregation to compute per group (default count).' },
+      metric_field: { type: 'string', description: 'Numeric field for sum/avg (e.g. mrr).' },
+      sort_by: { type: 'string', description: 'Field to sort rows by.' },
+      sort_dir: { type: 'string', enum: ['asc', 'desc'] },
+      limit: { type: 'number', description: 'Max rows to return (default 50, max 200).' },
+    },
+    required: ['entity'],
+  },
+};
+
+function canViewEntity(role, entity, rolePerms) {
+  if (role === 'admin') return true;
+  const stored = rolePerms?.[role];
+  // Default-on: only an explicit false blocks access.
+  return stored?.[entity]?.view !== false;
+}
+
+// Run one assistant data query with full access control. Returns a JS object
+// (serialized by the caller into the tool result).
+async function runAssistantQuery(input, ctx) {
+  const { user, orgId, csmName, rolePerms } = ctx;
+  const entity = input.entity;
+  if (!ALLOWED_FIELDS[entity]) return { error: `Unknown entity "${entity}". Valid: ${ASSISTANT_ENTITIES.join(', ')}` };
+  if (!canViewEntity(user.role, entity, rolePerms)) return { error: `You do not have permission to view ${entity}.` };
+
+  const allowed = ALLOWED_FIELDS[entity];
+  const cols = [...allowed].join(',');
+  let q = supabase.from(entity).select(cols).eq('org_id', orgId);
+
+  // Role scoping: a CSM only sees their own book of business.
+  if (user.role === 'csm' && csmName) {
+    if (entity === 'tasks') q = q.eq('assigned_to', csmName);
+    else if (allowed.has('csm')) q = q.eq('csm', csmName);
+  }
+
+  // Apply filters (only on whitelisted fields).
+  for (const f of (input.filters || [])) {
+    if (!f || !allowed.has(f.field)) continue;
+    const cast = (v) => NUMERIC_FIELDS.has(f.field) ? Number(v) : v;
+    switch (f.op) {
+      case 'eq':        q = q.eq(f.field, cast(f.value)); break;
+      case 'neq':       q = q.neq(f.field, cast(f.value)); break;
+      case 'in':        q = q.in(f.field, (Array.isArray(f.value) ? f.value : [f.value]).map(cast)); break;
+      case 'gt':        q = q.gt(f.field, cast(f.value)); break;
+      case 'gte':       q = q.gte(f.field, cast(f.value)); break;
+      case 'lt':        q = q.lt(f.field, cast(f.value)); break;
+      case 'lte':       q = q.lte(f.field, cast(f.value)); break;
+      case 'contains':  q = q.ilike(f.field, `%${f.value}%`); break;
+      case 'is_empty':  q = q.is(f.field, null); break;
+      case 'not_empty': q = q.not(f.field, 'is', null); break;
+      default: break;
+    }
+  }
+
+  const grouping = input.group_by && allowed.has(input.group_by);
+  const metric = ['count', 'sum', 'avg'].includes(input.metric) ? input.metric : 'count';
+  const metricField = input.metric_field && allowed.has(input.metric_field) ? input.metric_field : null;
+
+  if (input.sort_by && allowed.has(input.sort_by) && !grouping) {
+    q = q.order(input.sort_by, { ascending: input.sort_dir !== 'desc' });
+  }
+  // Grouped reports scan more rows; plain lists are capped tighter.
+  q = q.limit(grouping ? 2000 : Math.min(Math.max(Number(input.limit) || 50, 1), 200));
+
+  const { data, error } = await q;
+  if (error) return { error: error.message };
+  const rows = data || [];
+
+  if (grouping) {
+    const groups = {};
+    for (const r of rows) {
+      const key = r[input.group_by] == null || r[input.group_by] === '' ? '(blank)' : String(r[input.group_by]);
+      if (!groups[key]) groups[key] = { group: key, count: 0, _sum: 0, _n: 0 };
+      groups[key].count++;
+      if (metricField) { const n = Number(r[metricField]); if (!isNaN(n)) { groups[key]._sum += n; groups[key]._n++; } }
+    }
+    const out = Object.values(groups).map(g => ({
+      group: g.group,
+      value: metric === 'sum' ? g._sum
+        : metric === 'avg' ? (g._n ? Math.round((g._sum / g._n) * 100) / 100 : 0)
+        : g.count,
+    })).sort((a, b) => b.value - a.value).slice(0, 50);
+    return { entity, report: { group_by: input.group_by, metric, metric_field: metricField }, groups: out, scanned: rows.length };
+  }
+
+  // Plain list — clip long text fields to keep the tool payload compact.
+  const clipped = rows.map(r => {
+    const o = {};
+    for (const k of Object.keys(r)) {
+      const v = r[k];
+      o[k] = (typeof v === 'string' && v.length > 240) ? v.slice(0, 240) + '…' : v;
+    }
+    return o;
+  });
+  return { entity, count: clipped.length, rows: clipped };
+}
+
+// Build a compact field glossary for the system prompt so the model knows
+// which fields exist, their meaning (admin-authored descriptions) and labels.
+function buildSchemaGlossary(labels, descs) {
+  const lines = [];
+  for (const entity of ASSISTANT_ENTITIES) {
+    const allowed = ALLOWED_FIELDS[entity];
+    const cat = FIELD_CATALOG[entity];
+    const fieldDefs = cat ? cat.fields : [];
+    const byKey = {};
+    fieldDefs.forEach(f => { byKey[f.key] = f; });
+    const parts = [];
+    for (const key of allowed) {
+      if (key === 'id') continue;
+      const def = byKey[key];
+      const label = labels[`${entity}.${key}`] || def?.label || key;
+      const desc = descs[`${entity}.${key}`];
+      parts.push(`${key} (${label}${def?.type ? ', ' + def.type : ''}${desc ? ' — ' + desc : ''})`);
+    }
+    lines.push(`${entity}: ${parts.join('; ')}`);
+  }
+  return lines.join('\n');
+}
+
+async function handleChat(req, res, user) {
+  const orgId = user.org_id || 1;
+  const cfg = await loadAiConfig(orgId);
+  const provider = cfg.provider;
+  if (!provider || !PROVIDERS.includes(provider)) return res.status(400).json({ error: 'No AI provider configured. An admin can set one in Settings → AI.' });
+  const key = cfg[`key_${provider}`];
+  if (!key) return res.status(400).json({ error: `No API key set for ${provider}.` });
+  if (cfg.assistant_enabled === 'false') return res.status(403).json({ error: 'The assistant is turned off for your organisation.' });
+  const model = cfg[`model_${provider}`] || DEFAULT_MODELS[provider];
+
+  const incoming = Array.isArray(req.body?.messages) ? req.body.messages : [];
+  const history = incoming
+    .filter(m => m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .slice(-12)
+    .map(m => ({ role: m.role, text: m.content }));
+  if (!history.length || history[history.length - 1].role !== 'user')
+    return res.status(400).json({ error: 'A user message is required.' });
+
+  // Resolve the CSM display name for role scoping.
+  let csmName = null;
+  if (user.role === 'csm') {
+    const { data: u } = await supabase.from('users').select('csm_name, name').eq('id', user.id).maybeSingle();
+    csmName = u?.csm_name || u?.name || null;
+  }
+
+  // Load role permissions + field labels/descriptions in one round-trip.
+  const { data: cfgRows } = await supabase
+    .from('dropdown_config')
+    .select('field_name, value, parent_value')
+    .eq('org_id', orgId)
+    .in('field_name', ['role_permissions', 'field_label', 'field_description']);
+  const rolePerms = {}; const labels = {}; const descs = {};
+  (cfgRows || []).forEach(r => {
+    if (r.field_name === 'role_permissions') { try { rolePerms[r.value] = JSON.parse(r.parent_value); } catch {} }
+    else if (r.field_name === 'field_label') labels[r.value] = r.parent_value;
+    else if (r.field_name === 'field_description') descs[r.value] = r.parent_value;
+  });
+
+  const assistantName = cfg.assistant_name || 'Custally Assistant';
+  const orgName = (await supabase.from('organizations').select('name').eq('id', orgId).maybeSingle()).data?.name || 'this organization';
+  const today = new Date().toISOString().slice(0, 10);
+  const scope = user.role === 'admin'
+    ? 'You can see all data across the organization.'
+    : user.role === 'csm'
+      ? `You can only see data for the CSM "${csmName}" (their own accounts, issues, escalations and tasks). Never imply data exists beyond their book.`
+      : 'You can see organization-wide data permitted to this user\'s role.';
+
+  const system = [
+    `You are ${assistantName}, a helpful Customer Success analyst assistant embedded inside Custally (a CSM platform) for ${orgName}.`,
+    `The person chatting with you is ${user.name || 'a user'} (role: ${user.role}${csmName ? `, CSM name: ${csmName}` : ''}). ${scope}`,
+    `Today's date is ${today}.`,
+    '',
+    'You can answer questions and produce simple reports about the org\'s CRM data using the query_data tool. Rules:',
+    '- For ANY question about counts, lists, specific records, or metrics, call query_data to get real data. Never invent numbers or names.',
+    '- For "how many / breakdown / by X" questions, use group_by (+ metric/metric_field) to build a grouped report.',
+    '- You may call query_data multiple times to gather what you need before answering.',
+    '- Present results clearly and concisely. Use Markdown tables for tabular data and Markdown bullets/bold for summaries. Keep answers focused.',
+    '- Respect the user\'s access scope above; the tool already enforces it, so just answer with what it returns.',
+    '- If the data is empty, say so plainly. If a question is outside the CRM data, answer from general CS knowledge but say it is general guidance.',
+    '',
+    'DATA SCHEMA (entity: field (Label, type — description); only these fields are queryable):',
+    buildSchemaGlossary(labels, descs),
+  ].join('\n');
+
+  const ctx = { user, orgId, csmName, rolePerms };
+  const deadline = Date.now() + 50000;
+  const MAX_STEPS = 4;
+  let turns = history.slice();
+  let finalText = '';
+
+  try {
+    for (let step = 0; step < MAX_STEPS; step++) {
+      const budget = deadline - Date.now();
+      if (budget < 4000) break;
+      const lastStep = step === MAX_STEPS - 1;
+      const resp = await callAIWithTools({
+        provider, key, model, system, turns,
+        tools: lastStep ? [] : [QUERY_TOOL],
+        maxTokens: 1400,
+        timeoutMs: Math.min(22000, budget - 1000),
+      });
+      if (!resp.toolUses?.length) { finalText = resp.text || ''; break; }
+      turns.push({ role: 'assistant', text: resp.text || '', toolUses: resp.toolUses });
+      const results = [];
+      for (const tu of resp.toolUses) {
+        let out;
+        try { out = (tu.name === 'query_data') ? await runAssistantQuery(tu.input || {}, ctx) : { error: `Unknown tool ${tu.name}` }; }
+        catch (e) { out = { error: e.message || 'Tool failed' }; }
+        let content = JSON.stringify(out);
+        if (content.length > 8000) content = content.slice(0, 8000) + '…(truncated)';
+        results.push({ id: tu.id, name: tu.name, content });
+      }
+      turns.push({ role: 'tool', results });
+      finalText = resp.text || finalText;
+    }
+  } catch (e) {
+    const msg = /aborted/i.test(e.message || '') ? 'The assistant timed out. Try a more specific question or a faster model.' : (e.message || 'Assistant request failed');
+    return res.status(502).json({ error: msg });
+  }
+
+  if (!finalText) finalText = 'I wasn\'t able to put together an answer for that. Could you rephrase or narrow it down?';
+  return res.json({ text: finalText });
+}
+
 async function handleAiSave(req, res, user) {
   const orgId = user.org_id || 1;
-  const { provider, keys, clear, models, prompts } = req.body || {};
+  const { provider, keys, clear, models, prompts, assistant } = req.body || {};
   const rows = [];
   if (provider !== undefined) rows.push({ org_id: orgId, key: 'provider', value: provider || '' });
+  if (assistant && typeof assistant === 'object') {
+    if (assistant.name !== undefined)     rows.push({ org_id: orgId, key: 'assistant_name', value: String(assistant.name || '').slice(0, 60) });
+    if (assistant.greeting !== undefined) rows.push({ org_id: orgId, key: 'assistant_greeting', value: String(assistant.greeting || '').slice(0, 300) });
+    if (assistant.enabled !== undefined)  rows.push({ org_id: orgId, key: 'assistant_enabled', value: assistant.enabled ? 'true' : 'false' });
+  }
   if (keys && typeof keys === 'object') {
     for (const p of PROVIDERS) if (keys[p]) rows.push({ org_id: orgId, key: `key_${p}`, value: String(keys[p]) });
   }
@@ -494,6 +772,17 @@ export default async function handler(req, res) {
     if (!featureEnabled(features, 'ai'))
       return res.status(403).json({ error: 'AI is disabled for your organisation.' });
     return handleGenerate(req, res, user);
+  }
+
+  // Conversational assistant — available to any authenticated user; the query
+  // layer scopes data to their role/permissions.
+  if (req.method === 'POST' && req.body?.action === 'ai_chat') {
+    const features = await getOrgFeatures(orgId);
+    if (!featureEnabled(features, 'ai'))
+      return res.status(403).json({ error: 'AI is disabled for your organisation.' });
+    if (!featureEnabled(features, 'assistant'))
+      return res.status(403).json({ error: 'The Assistant is disabled for your organisation.' });
+    return handleChat(req, res, user);
   }
 
   if (req.method === 'GET') {

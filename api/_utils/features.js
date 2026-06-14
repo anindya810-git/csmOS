@@ -15,6 +15,8 @@ export const FEATURE_KEYS = [
   'column_selection',
   'watchlist',
   'export',
+  'appearance',
+  'assistant',
 ];
 
 // Fetch an org's feature map. Missing column (pre-migration), missing row,

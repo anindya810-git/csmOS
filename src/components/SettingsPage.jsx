@@ -342,7 +342,7 @@ export default function SettingsPage() {
 
   // AI settings
   const { ai: aiConfig, reload: reloadAi } = useAiConfig();
-  const [aiForm,   setAiForm]   = useState({ provider: '', keys: {}, models: {}, prompts: {} });
+  const [aiForm,   setAiForm]   = useState({ provider: '', keys: {}, models: {}, prompts: {}, assistant: { name: '', greeting: '', enabled: true } });
   const [aiSaving, setAiSaving] = useState(false);
   const [aiMsg,    setAiMsg]    = useState('');
 
@@ -398,6 +398,11 @@ export default function SettingsPage() {
       keys: {},
       models: { ...(aiConfig.models || {}) },
       prompts: { ...(aiConfig.prompts || {}) },
+      assistant: {
+        name: aiConfig.assistant?.name || 'Custally Assistant',
+        greeting: aiConfig.assistant?.greeting || '',
+        enabled: aiConfig.assistant?.enabled !== false,
+      },
     });
   }, [aiConfig]);
 
@@ -469,6 +474,7 @@ export default function SettingsPage() {
         keys: aiForm.keys,            // only non-empty values are applied server-side
         models: aiForm.models,
         prompts: aiForm.prompts,
+        assistant: aiForm.assistant,
       });
       await reloadAi();
       setAiForm(f => ({ ...f, keys: {} }));   // never keep key text around
@@ -1023,6 +1029,46 @@ export default function SettingsPage() {
             <div>
               <h2 className="text-xl font-bold text-gray-900">AI (Bring Your Own Key)</h2>
               <p className="text-sm text-gray-500 mt-0.5">Choose a provider, paste your API key, and tune how each AI section analyzes data. AI buttons stay greyed out until the active provider has a key.</p>
+            </div>
+
+            {/* Conversational Assistant settings */}
+            <div className="card space-y-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+                    <svg className="w-4 h-4 text-brand-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                    Conversational Assistant
+                  </h3>
+                  <p className="text-xs text-gray-500 mt-0.5">A floating chat bot (bottom-right) that answers questions and pulls reports from your data, scoped to each user's access.</p>
+                </div>
+                <label className="flex items-center gap-2 cursor-pointer select-none shrink-0">
+                  <input type="checkbox" checked={aiForm.assistant?.enabled !== false}
+                    onChange={e => setAiForm(f => ({ ...f, assistant: { ...f.assistant, enabled: e.target.checked } }))}
+                    className="!w-4 !h-4" />
+                  <span className="text-xs font-medium text-gray-600">Enabled</span>
+                </label>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Bot Name</label>
+                  <input
+                    value={aiForm.assistant?.name || ''}
+                    onChange={e => setAiForm(f => ({ ...f, assistant: { ...f.assistant, name: e.target.value } }))}
+                    placeholder="Custally Assistant"
+                    maxLength={60}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Welcome Message <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <input
+                    value={aiForm.assistant?.greeting || ''}
+                    onChange={e => setAiForm(f => ({ ...f, assistant: { ...f.assistant, greeting: e.target.value } }))}
+                    placeholder="Hi! Ask me anything about your accounts…"
+                    maxLength={300}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-gray-400">The assistant uses the active provider and model configured below.</p>
             </div>
 
             {/* Provider + keys */}
