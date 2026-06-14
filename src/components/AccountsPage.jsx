@@ -13,6 +13,7 @@ import { ACCOUNT_FIELDS, toFieldDef, toBulkFieldDefs } from '../fieldCatalog';
 import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
+import { useMyTeam } from '../hooks/useMyTeam';
 import { useWatchlist } from '../hooks/useWatchlist';
 import { evalConditions } from '../utils/conditions';
 import ExportButton from './ExportButton';
@@ -742,7 +743,11 @@ export default function AccountsPage() {
 }
 
 function AddAccountModal({ onClose, onSave }) {
-  const [form, setForm] = useState({ account_name: '', tenant_id: '', industry: '', mrr_tier: 'Tier 1 (>500k)', mrr: '', region: '', csm_lead: 'Anindya', csm: '', rag_status: 'Green' });
+  const { teamNames, isLead, selfName } = useMyTeam();
+  const [form, setForm] = useState(() => ({
+    account_name: '', tenant_id: '', industry: '', mrr_tier: 'Tier 1 (>500k)',
+    mrr: '', region: '', csm_lead: '', csm: selfName, rag_status: 'Green',
+  }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
@@ -795,7 +800,11 @@ function AddAccountModal({ onClose, onSave }) {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">CSM</label>
-              <input value={form.csm} onChange={e => setForm(f=>({...f, csm: e.target.value}))} />
+              {isLead ? (
+                <SelectDropdown options={teamNames} value={form.csm} onChange={v => setForm(f => ({ ...f, csm: v ?? '' }))} placeholder="— Select CSM —" />
+              ) : (
+                <input value={form.csm} readOnly className="bg-gray-50 text-gray-500 cursor-not-allowed" />
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">RAG Status</label>

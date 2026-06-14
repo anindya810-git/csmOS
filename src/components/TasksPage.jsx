@@ -13,6 +13,7 @@ import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
 import { useWatchlist } from '../hooks/useWatchlist';
+import { useMyTeam } from '../hooks/useMyTeam';
 import ExportButton from './ExportButton';
 
 // Every task field can be shown as a column; these start visible.
@@ -73,6 +74,7 @@ export default function TasksPage() {
   const { can } = usePermissions();
   const { isEnabled } = useFeatures();
   const { isWatched, toggle: watchToggle, getIds: getWatchIds } = useWatchlist();
+  const { teamNames, teamMembers, isLead, selfName } = useMyTeam();
   const [watchlistOnly, setWatchlistOnly] = useState(false);
   const { label: fieldLabel } = useFieldLabels();
   const visibleTaskCols = TASKS_COLS.filter(c => !c.adminOnly || isAdmin);
@@ -649,8 +651,18 @@ export default function TasksPage() {
                           <option key={c.id} value={c.id}>{c.csm_name || c.name}</option>
                         ))}
                       </select>
+                    ) : isLead ? (
+                      <SelectDropdown
+                        options={teamNames}
+                        value={form.assigned_to}
+                        onChange={v => {
+                          const member = (teamMembers || []).find(m => (m.csm_name || m.name) === v);
+                          setForm(f => ({ ...f, assigned_to: v ?? selfName, assigned_to_id: member?.id ?? '' }));
+                        }}
+                        placeholder="— Select —"
+                      />
                     ) : (
-                      <input value={form.assigned_to || user?.csm_name || user?.name || ''} readOnly className="bg-gray-50 text-gray-500" />
+                      <input value={form.assigned_to || selfName} readOnly className="bg-gray-50 text-gray-500" />
                     )}
                   </div>
                 </div>

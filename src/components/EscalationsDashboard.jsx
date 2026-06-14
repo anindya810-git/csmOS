@@ -17,6 +17,7 @@ import { useFieldLabels } from '../context/FieldLabelsContext';
 import { usePermissions } from '../context/PermissionsContext';
 import { useFeatures } from '../hooks/useFeatures';
 import { useWatchlist } from '../hooks/useWatchlist';
+import { useMyTeam } from '../hooks/useMyTeam';
 import { evalConditions } from '../utils/conditions';
 import ExportButton from './ExportButton';
 
@@ -133,6 +134,7 @@ export default function EscalationsDashboard() {
   const { isEnabled } = useFeatures();
   const { label: fieldLabel } = useFieldLabels();
   const { isWatched, toggle: watchToggle, getIds: getWatchIds } = useWatchlist();
+  const { teamNames, isLead, selfName, isAdmin: isTeamAdmin } = useMyTeam();
   const [watchlistOnly, setWatchlistOnly] = useState(false);
   const { show: showCol, toggle: toggleCol, prefs: colPrefs } = useColumnPrefs(
     user?.email, 'escalations', Object.fromEntries(ESC_COLS.map(c => [c.key, !c.off]))
@@ -159,7 +161,8 @@ export default function EscalationsDashboard() {
   const [expanded,    setExpanded]    = useState(null);
   const [reload,      setReload]      = useState(0);
   const [showForm,    setShowForm]    = useState(false);
-  const [form,        setForm]        = useState(EMPTY_FORM);
+  const initForm = () => ({ ...EMPTY_FORM, csm: isTeamAdmin ? '' : selfName });
+  const [form,        setForm]        = useState(initForm);
   const [saving,      setSaving]      = useState(false);
   const [accounts,    setAccounts]    = useState([]);
   const [csms,        setCsms]        = useState([]);
@@ -203,7 +206,7 @@ export default function EscalationsDashboard() {
     try {
       await axios.post('/api/escalations', form);
       setShowForm(false);
-      setForm(EMPTY_FORM);
+      setForm(initForm());
       setReload(r => r + 1);
     } catch (e) {
       alert('Failed to save: ' + (e.response?.data?.error || e.message));
@@ -418,7 +421,7 @@ export default function EscalationsDashboard() {
           )}
           {can('create', 'escalations') && (
             <button
-              onClick={() => { setShowForm(s => !s); setForm(EMPTY_FORM); }}
+              onClick={() => { setShowForm(s => !s); setForm(initForm()); }}
               className="inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition"
             >
               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -431,11 +434,11 @@ export default function EscalationsDashboard() {
       {/* Add Escalation Form */}
       {showForm && createPortal(
         <>
-          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }} />
+          <div className="fixed inset-0 z-40 bg-black/20" onClick={() => { setShowForm(false); setForm(initForm()); }} />
           <div className="fixed inset-y-0 right-0 w-[520px] max-w-[90vw] bg-white shadow-2xl z-50 flex flex-col border-l border-gray-200">
             <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 shrink-0">
               <h3 className="text-sm font-semibold text-gray-900">Add Escalation</h3>
-              <button onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
+              <button onClick={() => { setShowForm(false); setForm(initForm()); }} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 transition">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -502,12 +505,18 @@ export default function EscalationsDashboard() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">CSM</label>
-                  {csms.length ? (
-                    <select value={form.csm} onChange={e => setForm(f => ({ ...f, csm: e.target.value }))} className="!py-1.5 text-sm">
-                      <option value="">—</option>
-                      {csms.map(c => <option key={c}>{c}</option>)}
-                    </select>
-                  ) : inp('csm', 'CSM name')}
+                  {isTeamAdmin ? (
+                    csms.length ? (
+                      <select value={form.csm} onChange={e => setForm(f => ({ ...f, csm: e.target.value }))} className="!py-1.5 text-sm">
+                        <option value="">—</option>
+                        {csms.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                    ) : inp('csm', 'CSM name')
+                  ) : isLead ? (
+                    <SelectDropdown options={teamNames} value={form.csm} onChange={v => setForm(f => ({ ...f, csm: v ?? '' }))} placeholder="— Select CSM —" />
+                  ) : (
+                    <input value={form.csm} readOnly className="!py-1.5 text-sm bg-gray-50 text-gray-500 cursor-not-allowed" />
+                  )}
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">PS Leader</label>
@@ -562,7 +571,7 @@ export default function EscalationsDashboard() {
                 className="flex-1 px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium rounded-lg transition disabled:opacity-50">
                 {saving ? 'Saving…' : 'Save Escalation'}
               </button>
-              <button type="button" onClick={() => { setShowForm(false); setForm(EMPTY_FORM); }}
+              <button type="button" onClick={() => { setShowForm(false); setForm(initForm()); }}
                 className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-100 border border-gray-200 rounded-lg transition">
                 Cancel
               </button>

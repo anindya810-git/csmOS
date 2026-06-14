@@ -57,6 +57,20 @@ export default async function handler(req, res) {
   if (!user) return res.status(401).json({ error: 'User not found' });
   // Deactivated mid-session → end the session (AuthContext drops the token on 403).
   if (user.is_active === false) return res.status(403).json({ error: 'Account deactivated' });
+
+  // Attach direct reportees so the frontend can restrict CSM dropdowns to the
+  // user's own team (self + people whose csm_lead = this user's csm_name).
+  let reportees = [];
+  if (user.csm_name && user.org_id) {
+    const { data: reps } = await supabase
+      .from('users')
+      .select('id, name, csm_name')
+      .eq('org_id', user.org_id)
+      .eq('csm_lead', user.csm_name);
+    reportees = (reps || []).filter(r => r.csm_name || r.name);
+  }
+  user.reportees = reportees;
+
   const meta = await getOrgMeta(user.org_id);
   user.features = meta.features;
   user.org_logo_url = meta.logo_url;
