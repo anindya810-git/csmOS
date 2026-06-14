@@ -17,6 +17,7 @@ export const FEATURE_DEFS = [
   { key: 'export',          label: 'Export',              desc: 'Excel and PDF export on all object pages' },
   { key: 'appearance',      label: 'Appearance',          desc: 'Color theme customisation in Settings' },
   { key: 'assistant',       label: 'AI Assistant',        desc: 'Conversational AI assistant (floating chat)' },
+  { key: 'feature_requests', label: 'Feature Requests',  desc: 'Feature request submission and approval workflow' },
 ];
 
 export function useFeatures() {
