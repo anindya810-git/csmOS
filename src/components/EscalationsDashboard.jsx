@@ -450,29 +450,32 @@ export default function EscalationsDashboard() {
               <div className="space-y-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Account *</label>
-                  <select value={form.account_id || ''} onChange={e => handleAccountSelect(e.target.value)} className="!py-1.5 text-sm">
-                    <option value="">Select account…</option>
-                    {accounts.map(a => (
-                      <option key={a.id} value={a.id}>{a.account_name}</option>
-                    ))}
-                  </select>
+                  <SelectDropdown
+                    options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
+                    value={String(form.account_id || '')}
+                    onChange={v => handleAccountSelect(v)}
+                    placeholder="Select account…"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Date of Escalation</label>
-                  <input type="date" value={form.date_of_escalation}
-                    onChange={e => {
-                      const val = e.target.value;
-                      const month = val ? MONTHS[new Date(val + 'T00:00:00').getMonth()] : '';
-                      setForm(f => ({ ...f, date_of_escalation: val, month }));
+                  <DatePicker
+                    value={form.date_of_escalation || ''}
+                    onChange={v => {
+                      const month = v ? MONTHS[new Date(v + 'T00:00:00').getMonth()] : '';
+                      setForm(f => ({ ...f, date_of_escalation: v || '', month }));
                     }}
-                    className="!py-1.5 text-sm" />
+                    placeholder="Select date"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Month</label>
-                  <select value={form.month} onChange={e => setForm(f => ({ ...f, month: e.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {MONTHS.map(m => <option key={m}>{m}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={MONTHS}
+                    value={form.month}
+                    onChange={v => setForm(f => ({ ...f, month: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Description *</label>
@@ -488,31 +491,36 @@ export default function EscalationsDashboard() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Status</label>
-                  <select value={form.status} onChange={e => setForm(f => ({ ...f, status: e.target.value }))} className="!py-1.5 text-sm">
-                    {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']}
+                    value={form.status}
+                    onChange={v => setForm(f => ({ ...f, status: v ?? 'Open' }))}
+                    placeholder="—"
+                    clearable={false}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Ownership</label>
-                  <select value={form.ownership} onChange={e => setForm(f => ({ ...f, ownership: e.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.ownership || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.ownership || []).map(o => o.value)}
+                    value={form.ownership}
+                    onChange={v => setForm(f => ({ ...f, ownership: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">ETA</label>
-                  <input type="date" value={form.eta}
-                    onChange={e => setForm(f => ({ ...f, eta: e.target.value }))}
-                    className="!py-1.5 text-sm" />
+                  <DatePicker
+                    value={form.eta || ''}
+                    onChange={v => setForm(f => ({ ...f, eta: v || '' }))}
+                    placeholder="Select date"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">CSM</label>
                   {isTeamAdmin ? (
                     csms.length ? (
-                      <select value={form.csm} onChange={e => setForm(f => ({ ...f, csm: e.target.value }))} className="!py-1.5 text-sm">
-                        <option value="">—</option>
-                        {csms.map(c => <option key={c}>{c}</option>)}
-                      </select>
+                      <SelectDropdown options={csms} value={form.csm} onChange={v => setForm(f => ({ ...f, csm: v ?? '' }))} placeholder="—" />
                     ) : inp('csm', 'CSM name')
                   ) : isLead ? (
                     <SelectDropdown options={teamNames} value={form.csm} onChange={v => setForm(f => ({ ...f, csm: v ?? '' }))} placeholder="— Select CSM —" />
@@ -522,45 +530,58 @@ export default function EscalationsDashboard() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">PS Leader</label>
-                  <select value={form.ps_leader} onChange={e => setForm(f => ({ ...f, ps_leader: e.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.ps_leader || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.ps_leader || []).map(o => o.value)}
+                    value={form.ps_leader}
+                    onChange={v => setForm(f => ({ ...f, ps_leader: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Escalated By</label>
-                  <select value={form.escalated_by} onChange={e => setForm(f => ({ ...f, escalated_by: e.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.escalated_by || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.escalated_by || []).map(o => o.value)}
+                    value={form.escalated_by}
+                    onChange={v => setForm(f => ({ ...f, escalated_by: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Trigger Reason</label>
-                  <select value={form.trigger_reason} onChange={e => setForm(f => ({ ...f, trigger_reason: e.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.trigger_reason || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.trigger_reason || []).map(o => o.value)}
+                    value={form.trigger_reason}
+                    onChange={v => setForm(f => ({ ...f, trigger_reason: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Source of Escalation</label>
-                  <select value={form.source_of_escalation} onChange={e => setForm(f => ({ ...f, source_of_escalation: e.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.source_of_escalation || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.source_of_escalation || []).map(o => o.value)}
+                    value={form.source_of_escalation}
+                    onChange={v => setForm(f => ({ ...f, source_of_escalation: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Issue Type</label>
-                  <select value={form.issue_type} onChange={e => setForm(f => ({ ...f, issue_type: e.target.value, issue_sub_type: '' }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.issue_type || []).map(o => o.value)}
+                    value={form.issue_type}
+                    onChange={v => setForm(f => ({ ...f, issue_type: v ?? '', issue_sub_type: '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Issue Sub-Type</label>
-                  <select value={form.issue_sub_type} onChange={e => setForm(f => ({ ...f, issue_sub_type: e.target.value }))} className="!py-1.5 text-sm" disabled={!form.issue_type}>
-                    <option value="">{form.issue_type ? '—' : 'Select Issue Type first'}</option>
-                    {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === form.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === form.issue_type).map(o => o.value)}
+                    value={form.issue_sub_type}
+                    onChange={v => setForm(f => ({ ...f, issue_sub_type: v ?? '' }))}
+                    placeholder={form.issue_type ? '—' : 'Select Issue Type first'}
+                    disabled={!form.issue_type}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-500 mb-1">Email Subject</label>
@@ -1381,36 +1402,46 @@ export default function EscalationsDashboard() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
-                  <select value={editForm.account_id || ''} onChange={ev => handleEditAccountSelect(ev.target.value)} className="!py-1.5 text-sm">
-                    <option value="">Select account…</option>
-                    {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
+                    value={String(editForm.account_id || '')}
+                    onChange={v => handleEditAccountSelect(v)}
+                    placeholder="Select account…"
+                  />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Tenant ID <span className="text-gray-300 font-normal normal-case">(read-only)</span></p>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Tenant ID</p>
                   <input type="text" value={editForm.tenant_id || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed font-mono" />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Date of Escalation</p>
-                  <input type="date" value={editForm.date_of_escalation || ''}
-                    onChange={ev => { const val = ev.target.value; const month = val ? MONTHS[new Date(val + 'T00:00:00').getMonth()] : ''; setEditForm(f => ({ ...f, date_of_escalation: val, month })); }}
-                    className="!py-1.5 text-sm" />
+                  <DatePicker
+                    value={editForm.date_of_escalation || ''}
+                    onChange={v => { const month = v ? MONTHS[new Date(v + 'T00:00:00').getMonth()] : ''; setEditForm(f => ({ ...f, date_of_escalation: v || '', month })); }}
+                    placeholder="Select date"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Month</p>
-                  <select value={editForm.month || ''} onChange={ev => setEditForm(f => ({ ...f, month: ev.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {MONTHS.map(m => <option key={m}>{m}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={MONTHS}
+                    value={editForm.month || ''}
+                    onChange={v => setEditForm(f => ({ ...f, month: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
-                  <select value={editForm.status || 'Open'} onChange={ev => setEditForm(f => ({ ...f, status: ev.target.value }))} className="!py-1.5 text-sm">
-                    {(dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']).map(s => <option key={s}>{s}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={dropdownConfig.escalation_status?.length ? dropdownConfig.escalation_status.map(o => o.value) : ['Open','In Progress','Partly Resolved','Resolved']}
+                    value={editForm.status || 'Open'}
+                    onChange={v => setEditForm(f => ({ ...f, status: v ?? 'Open' }))}
+                    placeholder="—"
+                    clearable={false}
+                  />
                 </div>
                 <div>
-                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM <span className="text-gray-300 font-normal normal-case">(from account)</span></p>
+                  <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">CSM</p>
                   <input type="text" value={editForm.csm || ''} readOnly className="!py-1.5 text-sm bg-gray-100 cursor-not-allowed" />
                 </div>
                 <div className="sm:col-span-2">
@@ -1423,56 +1454,75 @@ export default function EscalationsDashboard() {
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Ownership</p>
-                  <select value={editForm.ownership || ''} onChange={ev => setEditForm(f => ({ ...f, ownership: ev.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.ownership || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.ownership || []).map(o => o.value)}
+                    value={editForm.ownership || ''}
+                    onChange={v => setEditForm(f => ({ ...f, ownership: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">ETA</p>
-                  <input type="date" value={editForm.eta || ''} onChange={ev => setEditForm(f => ({ ...f, eta: ev.target.value }))} className="!py-1.5 text-sm" />
+                  <DatePicker
+                    value={editForm.eta || ''}
+                    onChange={v => setEditForm(f => ({ ...f, eta: v || '' }))}
+                    placeholder="Select date"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">PS Leader</p>
-                  <select value={editForm.ps_leader || ''} onChange={ev => setEditForm(f => ({ ...f, ps_leader: ev.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.ps_leader || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.ps_leader || []).map(o => o.value)}
+                    value={editForm.ps_leader || ''}
+                    onChange={v => setEditForm(f => ({ ...f, ps_leader: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Escalated By</p>
-                  <select value={editForm.escalated_by || ''} onChange={ev => setEditForm(f => ({ ...f, escalated_by: ev.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.escalated_by || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.escalated_by || []).map(o => o.value)}
+                    value={editForm.escalated_by || ''}
+                    onChange={v => setEditForm(f => ({ ...f, escalated_by: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Trigger Reason</p>
-                  <select value={editForm.trigger_reason || ''} onChange={ev => setEditForm(f => ({ ...f, trigger_reason: ev.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.trigger_reason || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.trigger_reason || []).map(o => o.value)}
+                    value={editForm.trigger_reason || ''}
+                    onChange={v => setEditForm(f => ({ ...f, trigger_reason: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Source of Escalation</p>
-                  <select value={editForm.source_of_escalation || ''} onChange={ev => setEditForm(f => ({ ...f, source_of_escalation: ev.target.value }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.source_of_escalation || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.source_of_escalation || []).map(o => o.value)}
+                    value={editForm.source_of_escalation || ''}
+                    onChange={v => setEditForm(f => ({ ...f, source_of_escalation: v ?? '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Type</p>
-                  <select value={editForm.issue_type || ''} onChange={ev => setEditForm(f => ({ ...f, issue_type: ev.target.value, issue_sub_type: '' }))} className="!py-1.5 text-sm">
-                    <option value="">—</option>
-                    {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.issue_type || []).map(o => o.value)}
+                    value={editForm.issue_type || ''}
+                    onChange={v => setEditForm(f => ({ ...f, issue_type: v ?? '', issue_sub_type: '' }))}
+                    placeholder="—"
+                  />
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Sub-Type</p>
-                  <select value={editForm.issue_sub_type || ''} onChange={ev => setEditForm(f => ({ ...f, issue_sub_type: ev.target.value }))} className="!py-1.5 text-sm" disabled={!editForm.issue_type}>
-                    <option value="">{editForm.issue_type ? '—' : 'Select Issue Type first'}</option>
-                    {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === editForm.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-                  </select>
+                  <SelectDropdown
+                    options={(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === editForm.issue_type).map(o => o.value)}
+                    value={editForm.issue_sub_type || ''}
+                    onChange={v => setEditForm(f => ({ ...f, issue_sub_type: v ?? '' }))}
+                    placeholder={editForm.issue_type ? '—' : 'Select Issue Type first'}
+                    disabled={!editForm.issue_type}
+                  />
                 </div>
                 <div className="sm:col-span-2">
                   <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Email Subject</p>

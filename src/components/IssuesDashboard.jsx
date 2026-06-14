@@ -140,20 +140,24 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
       {!isEdit && (
         <div className="sm:col-span-2 lg:col-span-1">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
-          <select value={f.account_id || ''} onChange={e => onAccountSelect(e.target.value, set)} className="!py-1.5 text-sm">
-            <option value="">Select account…</option>
-            {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-          </select>
+          <SelectDropdown
+            options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
+            value={String(f.account_id || '')}
+            onChange={v => onAccountSelect(v, set)}
+            placeholder="Select account…"
+          />
         </div>
       )}
       {isEdit && (
         <>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account</p>
-            <select value={f.account_id || ''} onChange={e => onAccountSelect(e.target.value, set)} className="!py-1.5 text-sm">
-              <option value="">Select account…</option>
-              {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-            </select>
+            <SelectDropdown
+              options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
+              value={String(f.account_id || '')}
+              onChange={v => onAccountSelect(v, set)}
+              placeholder="Select account…"
+            />
           </div>
           <div>
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Account Name</p>
@@ -167,20 +171,25 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
       )}
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Reported Date</p>
-        <input type="date" value={f.reported_date || ''} onChange={e => set(p => ({ ...p, reported_date: e.target.value }))} className="!py-1.5 text-sm" />
+        <DatePicker value={f.reported_date || ''} onChange={v => set(p => ({ ...p, reported_date: v || '' }))} placeholder="Select date" />
       </div>
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Priority</p>
-        <select value={f.priority || 'P1'} onChange={e => set(p => ({ ...p, priority: e.target.value }))} className="!py-1.5 text-sm">
-          <option value="">—</option>
-          {['P0','P1','P2','P3'].map(p => <option key={p}>{p}</option>)}
-        </select>
+        <SelectDropdown
+          options={['P0','P1','P2','P3']}
+          value={f.priority || 'P1'}
+          onChange={v => set(p => ({ ...p, priority: v ?? 'P1' }))}
+          placeholder="—"
+        />
       </div>
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Status</p>
-        <select value={f.status || 'Open'} onChange={e => set(p => ({ ...p, status: e.target.value }))} className="!py-1.5 text-sm">
-          {['Open','In Progress','Deferred','Resolved','Closed'].map(s => <option key={s}>{s}</option>)}
-        </select>
+        <SelectDropdown
+          options={['Open','In Progress','Deferred','Resolved','Closed']}
+          value={f.status || 'Open'}
+          onChange={v => set(p => ({ ...p, status: v ?? 'Open' }))}
+          placeholder="—"
+        />
       </div>
       <div className="sm:col-span-2 lg:col-span-3">
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Description *</p>
@@ -190,17 +199,22 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
       </div>
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Type</p>
-        <select value={f.issue_type || ''} onChange={e => set(p => ({ ...p, issue_type: e.target.value, issue_sub_type: '' }))} className="!py-1.5 text-sm">
-          <option value="">—</option>
-          {(dropdownConfig.issue_type || []).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-        </select>
+        <SelectDropdown
+          options={(dropdownConfig.issue_type || []).map(o => o.value)}
+          value={f.issue_type || ''}
+          onChange={v => set(p => ({ ...p, issue_type: v ?? '', issue_sub_type: '' }))}
+          placeholder="—"
+        />
       </div>
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Issue Sub-Type</p>
-        <select value={f.issue_sub_type || ''} onChange={e => set(p => ({ ...p, issue_sub_type: e.target.value }))} className="!py-1.5 text-sm" disabled={!f.issue_type}>
-          <option value="">{f.issue_type ? '—' : 'Select Issue Type first'}</option>
-          {(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === f.issue_type).map(o => <option key={o.id} value={o.value}>{o.value}</option>)}
-        </select>
+        <SelectDropdown
+          options={(dropdownConfig.issue_sub_type || []).filter(o => o.parent_value === f.issue_type).map(o => o.value)}
+          value={f.issue_sub_type || ''}
+          onChange={v => set(p => ({ ...p, issue_sub_type: v ?? '' }))}
+          placeholder={f.issue_type ? '—' : 'Select Issue Type first'}
+          disabled={!f.issue_type}
+        />
       </div>
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Owner Team</p>
@@ -216,7 +230,7 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
       </div>
       <div>
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Closure Date</p>
-        <input type="date" value={f.closure_date || ''} onChange={e => set(p => ({ ...p, closure_date: e.target.value }))} className="!py-1.5 text-sm" />
+        <DatePicker value={f.closure_date || ''} onChange={v => set(p => ({ ...p, closure_date: v || '' }))} placeholder="Select date" />
       </div>
       <div className="sm:col-span-2 lg:col-span-3">
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>

@@ -8,6 +8,7 @@ import Pagination from './Pagination';
 import ColumnToggle from './ColumnToggle';
 import SelectDropdown from './SelectDropdown';
 import MultiSelectDropdown from './MultiSelectDropdown';
+import DatePicker from './DatePicker';
 import DateRangeFilter, { inDateRange } from './DateRangeFilter';
 import { useColumnPrefs } from '../hooks/useColumnPrefs';
 import { TASK_FIELDS } from '../fieldCatalog';
@@ -62,6 +63,12 @@ const EMPTY_FORM = {
   task_subject: '', task_description: '', nature_of_task: '',
   due_date: '', account_id: '', account_name: '', assigned_to_id: '', assigned_to: '',
 };
+
+const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
+  const h = Math.floor(i / 2);
+  const m = (i % 2) * 30;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+});
 
 export default function TasksPage() {
   const { user } = useAuth();
@@ -312,18 +319,14 @@ export default function TasksPage() {
 
   const allChecked = paginated.length > 0 && paginated.every(t => selected.has(t.id));
 
-  // Account change → auto-fill account_name
-  function onAccountChange(e) {
-    const aid = e.target.value;
+  function onAccountChange(aid) {
     const acct = accounts.find(a => String(a.id) === String(aid));
-    setForm(f => ({ ...f, account_id: aid, account_name: acct?.account_name || '' }));
+    setForm(f => ({ ...f, account_id: aid ?? '', account_name: acct?.account_name || '' }));
   }
 
-  // Assignee change → fill name from csm list
-  function onAssigneeChange(e) {
-    const csmId = e.target.value;
+  function onAssigneeChange(csmId) {
     const csm = csms.find(c => String(c.id) === String(csmId));
-    setForm(f => ({ ...f, assigned_to_id: csmId, assigned_to: csm?.csm_name || csm?.name || '' }));
+    setForm(f => ({ ...f, assigned_to_id: csmId ?? '', assigned_to: csm?.csm_name || csm?.name || '' }));
   }
 
   return (
@@ -628,32 +631,51 @@ export default function TasksPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Nature of Task</label>
-                    <select value={form.nature_of_task} onChange={e => setForm(f => ({ ...f, nature_of_task: e.target.value }))}>
-                      <option value="">— Select —</option>
-                      {natureOptions.map(v => <option key={v}>{v}</option>)}
-                    </select>
+                    <SelectDropdown
+                      options={natureOptions}
+                      value={form.nature_of_task}
+                      onChange={v => setForm(f => ({ ...f, nature_of_task: v ?? '' }))}
+                      placeholder="— Select —"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Due Date & Time *</label>
-                    <input type="datetime-local" value={form.due_date}
-                      onChange={e => setForm(f => ({ ...f, due_date: e.target.value }))} required />
+                    <div className="flex gap-1.5">
+                      <DatePicker
+                        value={form.due_date ? form.due_date.slice(0, 10) : ''}
+                        onChange={v => setForm(f => ({ ...f, due_date: v ? `${v}T${f.due_date?.slice(11, 16) || '09:00'}` : '' }))}
+                        placeholder="Date"
+                        className="flex-1"
+                      />
+                      <SelectDropdown
+                        compact
+                        clearable={false}
+                        className="w-28"
+                        options={TIME_OPTIONS}
+                        value={form.due_date?.slice(11, 16) || '09:00'}
+                        onChange={v => setForm(f => ({ ...f, due_date: f.due_date ? `${f.due_date.slice(0, 10)}T${v}` : '' }))}
+                        placeholder="Time"
+                      />
+                    </div>
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Account</label>
-                    <select value={form.account_id} onChange={onAccountChange}>
-                      <option value="">— No account —</option>
-                      {accounts.map(a => <option key={a.id} value={a.id}>{a.account_name}</option>)}
-                    </select>
+                    <SelectDropdown
+                      options={accounts.map(a => ({ value: String(a.id), label: a.account_name }))}
+                      value={String(form.account_id || '')}
+                      onChange={onAccountChange}
+                      placeholder="— No account —"
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 mb-1">Assigned To</label>
                     {isAdmin ? (
-                      <select value={form.assigned_to_id} onChange={onAssigneeChange}>
-                        <option value="">— Unassigned —</option>
-                        {csms.map(c => (
-                          <option key={c.id} value={c.id}>{c.csm_name || c.name}</option>
-                        ))}
-                      </select>
+                      <SelectDropdown
+                        options={csms.map(c => ({ value: String(c.id), label: c.csm_name || c.name }))}
+                        value={String(form.assigned_to_id || '')}
+                        onChange={onAssigneeChange}
+                        placeholder="— Unassigned —"
+                      />
                     ) : isLead ? (
                       <SelectDropdown
                         options={teamNames}
