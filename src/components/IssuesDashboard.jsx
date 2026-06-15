@@ -848,7 +848,7 @@ function DesktopIssuesDashboard() {
                                   : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>}
                               </button>
                               )}
-                              {!isEditing && can('create', 'feature_requests') && (
+                              {!isEditing && isEnabled('feature_requests') && can('create', 'feature_requests') && (
                                 <AddToFeatureRequest type="issue" id={issue.id} accountName={issue.account_name} />
                               )}
                               {user?.role === 'admin' && !isEditing && (
@@ -966,7 +966,7 @@ function DesktopIssuesDashboard() {
                           : <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>}
                       </button>
                       )}
-                      {!isEditing && can('create', 'feature_requests') && (
+                      {!isEditing && isEnabled('feature_requests') && can('create', 'feature_requests') && (
                         <AddToFeatureRequest type="issue" id={issue.id} accountName={issue.account_name}
                           className="flex-1 px-3 border-t border-gray-100 flex items-center justify-center text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition" />
                       )}

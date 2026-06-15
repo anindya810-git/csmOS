@@ -918,7 +918,7 @@ function DesktopEscalationsDashboard() {
                               )}
                             </button>
                             )}
-                            {!isEditing && can('create', 'feature_requests') && (
+                            {!isEditing && isEnabled('feature_requests') && can('create', 'feature_requests') && (
                               <AddToFeatureRequest type="escalation" id={e.id} accountName={e.account_name} />
                             )}
                             {user?.role === 'admin' && !isEditing && (
@@ -1182,7 +1182,7 @@ function DesktopEscalationsDashboard() {
                       )}
                     </button>
                     )}
-                    {!isEditing && can('create', 'feature_requests') && (
+                    {!isEditing && isEnabled('feature_requests') && can('create', 'feature_requests') && (
                       <AddToFeatureRequest type="escalation" id={e.id} accountName={e.account_name}
                         className="flex-1 px-3 border-t border-gray-100 flex items-center justify-center text-gray-400 hover:text-amber-600 hover:bg-amber-50 transition" />
                     )}
