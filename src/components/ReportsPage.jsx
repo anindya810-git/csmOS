@@ -24,7 +24,7 @@ export default function ReportsPage() {
         <NavLink to="issues-pivot"     className={tabClass}>Issue Breakdown</NavLink>
         <NavLink to="account-mapping"  className={tabClass}>Account Mapping</NavLink>
         <NavLink to="task-pivot"       className={tabClass}>Task Analysis</NavLink>
-        <NavLink to="feature-requests" className={tabClass}>Feature Requests</NavLink>
+        {isEnabled('feature_requests') && <NavLink to="feature-requests" className={tabClass}>Feature Requests</NavLink>}
         {isEnabled('custom_reports') && <NavLink to="custom" className={tabClass}>Custom Reports</NavLink>}
       </div>
       {/* Keep the tab bar mounted while a lazily-loaded report chunk arrives */}
