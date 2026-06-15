@@ -30,10 +30,12 @@ export default function DatePicker({ value, onChange, placeholder = 'Select date
   useLayoutEffect(() => {
     if (!open || !triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
-    // Flip up if not enough space below
+    const panelW = 280;
     const panelH = 330;
     const top = window.innerHeight - r.bottom > panelH ? r.bottom + 4 : r.top - panelH - 4;
-    setPos({ top, left: r.left });
+    let left = r.left;
+    if (left + panelW > window.innerWidth - 8) left = Math.max(8, window.innerWidth - 8 - panelW);
+    setPos({ top, left });
     const p = parse(value);
     if (p) { setViewY(p.y); setViewM(p.m); }
   }, [open]);
