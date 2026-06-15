@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import useMobile from '../hooks/useMobile';
+import MobileDashboard from './mobile/MobileDashboard';
 import axios from 'axios';
 import { useNavigate, Link } from 'react-router-dom';
 import {
@@ -37,7 +39,7 @@ function KpiCard({ label, value, sub, color, onClick }) {
   );
 }
 
-export default function Dashboard() {
+function DesktopDashboard() {
   const navigate = useNavigate();
   const [stats,       setStats]       = useState(null);
   const [accounts,    setAccounts]    = useState([]);
@@ -363,4 +365,9 @@ function AtRiskList({ navigate }) {
       ))}
     </div>
   );
+}
+
+export default function Dashboard() {
+  const isMobile = useMobile();
+  return isMobile ? <MobileDashboard /> : <DesktopDashboard />;
 }

@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import useMobile from '../hooks/useMobile';
+import MobileAccountsPage from './mobile/MobileAccountsPage';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
@@ -165,7 +167,7 @@ function matchesCondition(account, cond, escalationMap, fieldDefs) {
   return true;
 }
 
-export default function AccountsPage() {
+function DesktopAccountsPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { can } = usePermissions();
@@ -833,4 +835,9 @@ function AddAccountModal({ onClose, onSave }) {
     </>,
     document.body
   );
+}
+
+export default function AccountsPage() {
+  const isMobile = useMobile();
+  return isMobile ? <MobileAccountsPage /> : <DesktopAccountsPage />;
 }

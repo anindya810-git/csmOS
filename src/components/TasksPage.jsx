@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
+import useMobile from '../hooks/useMobile';
+import MobileTasksPage from './mobile/MobileTasksPage';
 import { createPortal } from 'react-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
@@ -70,7 +72,7 @@ const TIME_OPTIONS = Array.from({ length: 48 }, (_, i) => {
   return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
 });
 
-export default function TasksPage() {
+function DesktopTasksPage() {
   const { user } = useAuth();
   const navigate  = useNavigate();
   const isAdmin   = user?.role === 'admin';
@@ -746,4 +748,9 @@ export default function TasksPage() {
       )}
     </div>
   );
+}
+
+export default function TasksPage() {
+  const isMobile = useMobile();
+  return isMobile ? <MobileTasksPage /> : <DesktopTasksPage />;
 }

@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import useMobile from '../hooks/useMobile';
+import MobileIssuesDashboard from './mobile/MobileIssuesDashboard';
 import { createPortal } from 'react-dom';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -246,7 +248,7 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
   );
 }
 
-export default function IssuesDashboard() {
+function DesktopIssuesDashboard() {
   const { user } = useAuth();
   const { can } = usePermissions();
   const { isEnabled } = useFeatures();
@@ -1070,4 +1072,9 @@ export default function IssuesDashboard() {
       )}
     </div>
   );
+}
+
+export default function IssuesDashboard() {
+  const isMobile = useMobile();
+  return isMobile ? <MobileIssuesDashboard /> : <DesktopIssuesDashboard />;
 }

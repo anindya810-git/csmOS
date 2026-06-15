@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import useMobile from '../hooks/useMobile';
+import MobileEscalationsDashboard from './mobile/MobileEscalationsDashboard';
 import { createPortal } from 'react-dom';
 import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -128,7 +130,7 @@ function EscCell({ e, k }) {
   return <span className="block max-w-[220px] truncate text-gray-600" title={String(v)}>{String(v)}</span>;
 }
 
-export default function EscalationsDashboard() {
+function DesktopEscalationsDashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { can } = usePermissions();
@@ -1576,4 +1578,9 @@ export default function EscalationsDashboard() {
       )}
     </div>
   );
+}
+
+export default function EscalationsDashboard() {
+  const isMobile = useMobile();
+  return isMobile ? <MobileEscalationsDashboard /> : <DesktopEscalationsDashboard />;
 }
