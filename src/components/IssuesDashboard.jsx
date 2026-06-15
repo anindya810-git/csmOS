@@ -197,7 +197,7 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
       </div>
       <div className="sm:col-span-2 lg:col-span-3">
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Description *</p>
-        <textarea rows={3} value={f.description || ''}
+        <textarea rows={5} value={f.description || ''}
           onChange={e => set(p => ({ ...p, description: e.target.value }))}
           placeholder="Describe the issue…" className="text-sm" />
       </div>
@@ -238,7 +238,7 @@ function IssueFormFields({ f, set, isEdit, accounts, dropdownConfig, onAccountSe
       </div>
       <div className="sm:col-span-2 lg:col-span-3">
         <p className="text-xs font-medium text-gray-500 uppercase tracking-wide mb-1">Next Steps</p>
-        <textarea rows={2} value={f.next_steps || ''}
+        <textarea rows={4} value={f.next_steps || ''}
           onChange={e => set(p => ({ ...p, next_steps: e.target.value }))}
           placeholder="What happens next…" className="text-sm" />
       </div>
